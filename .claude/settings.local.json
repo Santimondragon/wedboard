@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm typecheck *)",
+      "Bash(mkdir -p /Users/santimondragon/development/personal/wedding-management-app/.claude)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npx convex *)"
+    ]
+  }
+}
