@@ -31,10 +31,11 @@ interface Invitation {
 
 interface InvitationListProps {
   eventId: Id<"events">
+  eventSlug: string
   invitations: Invitation[]
 }
 
-export function InvitationList({ eventId, invitations }: InvitationListProps) {
+export function InvitationList({ eventId, eventSlug, invitations }: InvitationListProps) {
   const [editTarget, setEditTarget] = useState<Invitation | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Id<"invitations"> | null>(null)
   const deleteInvitation = useMutation(api.invitations.deleteInvitation)
@@ -57,6 +58,7 @@ export function InvitationList({ eventId, invitations }: InvitationListProps) {
         {invitations.map((invitation) => (
           <InvitationCard
             key={invitation._id}
+            eventSlug={eventSlug}
             invitation={invitation}
             onEdit={() => setEditTarget(invitation)}
             onDelete={() => setDeleteTarget(invitation._id)}

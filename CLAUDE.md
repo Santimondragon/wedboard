@@ -82,7 +82,7 @@ Top-level board. One event = one wedding/occasion.
 | Field | Type |
 |---|---|
 | name | string |
-| slug | string |
+| slug | string | Handle-style **event key**, globally unique, editable in settings. Used in public URLs. |
 | ownerUserId | Id<"users"> |
 | date | number? | Unix ms timestamp |
 | venueName | string? | |
@@ -111,7 +111,7 @@ Indexes: `by_eventId`, `by_userId`, `by_eventId_and_userId`
 
 ### `invitations`
 A shareable link representing a person, couple, family, or group.
-Public URL: `/invitations/{slug}`
+Public URL: `/{event-key}/invitations/{slug}`
 
 | Field | Type |
 |---|---|
@@ -129,12 +129,13 @@ Indexes: `by_eventId`, `by_slug`, `by_eventId_and_slug`
 ---
 
 ### `guests`
-Individual attendees. Always belong to an invitation.
+Individual attendees. Belong to an event; optionally linked to an invitation.
+A guest with no `invitationId` is "un-invited" and can be selected when creating an invitation.
 
 | Field | Type |
 |---|---|
 | eventId | Id<"events"> |
-| invitationId | Id<"invitations"> |
+| invitationId | Id<"invitations">? | Optional — un-invited guests have none |
 | firstName | string |
 | lastName | string |
 | email | string? |
@@ -244,7 +245,9 @@ Index: `by_eventId`
 
 ### `convex/lib/slug.ts`
 - `generateSlug(text)` — lowercases and hyphenates
-- `generateUniqueSlug(ctx, tableName, slug)` — appends -2, -3 etc. until unique
+- `generateUniqueSlug(ctx, tableName, slug, existingId?)` — global uniqueness (used for event slugs); appends -2, -3 etc.
+- `generateUniqueInvitationSlug(ctx, eventId, slug, existingId?)` — uniqueness **scoped per event** via `by_eventId_and_slug`
+- `RESERVED_EVENT_SLUGS` — set of top-level route names an event key may not use
 
 ### `convex/users.ts`
 | Function | Type | Notes |
@@ -256,11 +259,12 @@ Index: `by_eventId`
 ### `convex/events.ts`
 | Function | Type |
 |---|---|
-| `listMyEvents` | query — events where user is owner or member |
+| `listMyEvents` | query — events where user is owner or member (non-null) |
 | `getEventById` | query |
+| `getEventBySlug` | query — resolves an event by its slug (auth + access); used by dashboard routes |
 | `getEventSummary` | query — event + counts |
-| `createEvent` | mutation — also creates eventMember with owner role |
-| `updateEvent` | mutation |
+| `createEvent` | mutation — creates eventMember with owner role; returns `{ eventId, slug }` |
+| `updateEvent` | mutation — accepts optional `slug` (validates format, reserved words, global uniqueness) |
 | `archiveEvent` | mutation |
 
 ### `convex/invitations.ts`
@@ -268,10 +272,10 @@ Index: `by_eventId`
 |---|---|---|
 | `listByEvent` | query | Auth required |
 | `getById` | query | Auth required |
-| `getPublicInvitationBySlug` | query | **Public** — no auth |
-| `createInvitation` | mutation | Auto-generates slug from title |
+| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; returns `{event, invitation, guests:[{firstName,lastName}]}` |
+| `createInvitation` | mutation | Per-event-unique slug; optional `guestIds` links selected un-invited guests |
 | `updateInvitation` | mutation | |
-| `deleteInvitation` | mutation | Cascades to guests |
+| `deleteInvitation` | mutation | **Unassigns** its guests (sets invitationId undefined), does not delete them |
 | `setSpecialEventAccess` | mutation | Adds/removes invitationSpecialEventAccess row |
 | `regenerateSlug` | mutation | |
 
@@ -280,12 +284,13 @@ Index: `by_eventId`
 |---|---|---|
 | `listByEvent` | query | Auth required |
 | `listByInvitation` | query | Auth required |
+| `listUnassignedByEvent` | query | Auth required — event guests with no `invitationId` |
 | `getGuestById` | query | |
-| `createGuest` | mutation | |
+| `createGuest` | mutation | Requires `eventId`; optional `invitationId` (creates un-invited guest if omitted) |
 | `updateGuest` | mutation | |
 | `deleteGuest` | mutation | Cascades to guestSpecialEventRsvps |
 | `bulkCreateGuestsForInvitation` | mutation | |
-| `submitPublicRsvp` | mutation | **Public** — validates ownership via slug only |
+| `submitPublicRsvp` | mutation | **Public** — resolves via `{eventSlug, invitationSlug}` (RSVP UI currently deferred) |
 
 ### `convex/specialEvents.ts`
 `listByEvent` (auth), `listForInvitation` (**public**), `createSpecialEvent`, `updateSpecialEvent`, `deleteSpecialEvent` (cascades access + RSVPs)
@@ -323,21 +328,23 @@ Same shape as `menu.ts`.
 /sign-in, /sign-up              Clerk hosted auth components
 /pricing                        Placeholder
 
-/dashboard                      Lists all events (or redirects if only one)
-/events/[eventId]               Overview — 8 metric cards
-/events/[eventId]/invitations   Invitation CRUD + copy public link
-/events/[eventId]/guests        Guest table with search/filter + detail sheet
-/events/[eventId]/menu          Food & drink option management
-/events/[eventId]/tables        Drag-free seat assignment grid
-/events/[eventId]/settings      Event metadata + archive
+/dashboard                            Lists all events — minimal chrome (logo + user menu), NO event sidebar. No auto-redirect.
+/dashboard/[eventSlug]                Overview — 8 metric cards
+/dashboard/[eventSlug]/invitations    Invitation CRUD + copy public link
+/dashboard/[eventSlug]/guests         Guest table with search/filter + detail sheet + Add Guest
+/dashboard/[eventSlug]/menu           Food & drink option management
+/dashboard/[eventSlug]/tables         Drag-free seat assignment grid
+/dashboard/[eventSlug]/settings       Event metadata + editable event key + archive
 
-/invitations/[invitationSlug]   Public RSVP page — no auth required
+/[eventSlug]/invitations/[invitationSlug]   Public invitation page (guest names) — no auth required
 ```
 
 Route groups:
-- `(auth)` — sign-in/sign-up, no dashboard shell
-- `(dashboard)` — all `/dashboard` and `/events` routes, wrapped in `DashboardShell`
+- `(auth)` — sign-in/sign-up (both `fallbackRedirectUrl="/dashboard"`), no dashboard shell
+- `(dashboard)` — minimal group layout (`UserSync` only). `/dashboard` renders its own minimal top bar; the per-event routes `/dashboard/[eventSlug]/*` are wrapped by `dashboard/[eventSlug]/layout.tsx` in `EventProvider` (resolves slug → event) + `DashboardShell` (sidebar + header)
 - `(marketing)` — landing, pricing
+
+> The `[eventSlug]` segment is resolved to its event by `EventProvider`; pages read it via the `useEvent()` hook (`event._id`, `event.slug`) instead of a route id.
 
 ---
 
@@ -358,24 +365,25 @@ src/components/
     copy-button.tsx             Clipboard copy with checkmark feedback
 
   dashboard/
-    dashboard-shell.tsx         Sidebar + Header + scrollable main
-    dashboard-sidebar.tsx       Nav links, event-switcher, user info
-    dashboard-header.tsx        Page title, event name, status badge, UserButton
-    event-switcher.tsx          Dropdown to switch between events or create new
+    event-provider.tsx          Resolves [eventSlug]→event via getEventBySlug; exposes useEvent(); handles loading/not-found. Wraps only event routes.
+    dashboard-shell.tsx         Sidebar + Header + scrollable main (rendered only inside the event layout)
+    dashboard-sidebar.tsx       Nav links (built from eventSlug), event-switcher, user info
+    dashboard-header.tsx        Page title (from path section), event name (useEvent), status badge, UserButton
+    event-switcher.tsx          Dropdown to switch events (by slug → /dashboard/{slug}) or create new
     metric-card.tsx             Stat card with title/value/icon
     user-sync.tsx               Invisible — calls upsertCurrentUser on mount
-    create-event-dialog.tsx     Form dialog to create a new event
+    create-event-dialog.tsx     Form dialog to create an event; navigates to /dashboard/{slug}
 
   invitations/
     invitation-list.tsx         Renders InvitationCard rows with edit/delete state
     invitation-card.tsx         Single row: title, slug, type, status, actions
-    invitation-form.tsx         Create/edit dialog with auto-slug generation
-    copy-invitation-link-button.tsx  Copies /invitations/{slug} to clipboard
+    invitation-form.tsx         Create/edit dialog; create mode lists un-invited guests to link (Add Guest CTA if none)
+    copy-invitation-link-button.tsx  Copies /{eventSlug}/invitations/{slug} to clipboard
 
   guests/
     guest-table.tsx             TanStack Table with search + RSVP filter
     guest-details-sheet.tsx     Right-side sheet — edit all guest fields
-    guest-form.tsx              Add guest to invitation form
+    guest-form.tsx              Add guest form — props `{eventId, invitationId?}` (event-level or invitation-scoped)
     rsvp-status-badge.tsx       attending=green, declined=rose, pending=amber
 
   menu/
@@ -390,23 +398,25 @@ src/components/
     add-table-dialog.tsx        Create table dialog
 
   public-invitation/
-    public-invitation-page.tsx  Loads invitation by slug, renders full page
-    public-rsvp-form.tsx        Manages per-guest state, submits submitPublicRsvp
-    guest-rsvp-card.tsx         Per-guest attending/declined + food/drink/allergies
-    special-event-rsvp-section.tsx  Per-guest special event toggles
+    public-invitation-page.tsx  Loads {eventSlug, invitationSlug} via getPublicInvitation, renders event + guest names
 ```
+
+> RSVP UI (public-rsvp-form, guest-rsvp-card, special-event-rsvp-section) was removed when
+> the public page was simplified to guest-names-only. The `submitPublicRsvp` mutation remains
+> for when the RSVP/templating feature is rebuilt.
 
 ---
 
 ## Auth Flow
 
-1. User visits any `/dashboard` or `/events` route → Clerk middleware redirects to `/sign-in`
-2. After sign-in, Clerk issues a JWT with `aud: "convex"` (requires Clerk Convex integration activated at `dashboard.clerk.com/apps/setup/convex`)
+1. Middleware (`src/middleware.ts`) protects every non-public route: if there's no `userId` it **redirects to `/`** (not `/sign-in`). The marketing landing links to sign-in.
+2. After sign-in/sign-up, Clerk redirects to `/dashboard` (via `fallbackRedirectUrl`). `/dashboard` shows the events list — it does **not** auto-redirect into a single event. Clerk issues a JWT with `aud: "convex"` (requires Clerk Convex integration activated at `dashboard.clerk.com/apps/setup/convex`)
 3. `ConvexProviderWithClerk` attaches the Clerk JWT to every Convex request
 4. `convex/auth.config.ts` validates the JWT against `CLERK_FRONTEND_API_URL`
-5. `UserSync` component calls `upsertCurrentUser` on mount → creates/updates the `users` table row
-6. All protected Convex functions call `requireUser(ctx)` which reads `ctx.auth.getUserIdentity()` and looks up by `tokenIdentifier`
-7. Public routes (`/invitations/[slug]`) skip auth entirely — Convex functions for those use no auth checks
+5. The `(dashboard)/layout.tsx` gates its subtree on Convex auth state via `<AuthLoading>` / `<Authenticated>` / `<Unauthenticated>` (from `convex/react`). This is required: it ensures no query/mutation (`UserSync`, `listMyEvents`, `getEventBySlug`, …) runs before the Clerk token is attached to the Convex client — otherwise `requireUser` throws `Unauthorized` on a hard refresh. `<Unauthenticated>` client-redirects to `/` (`RedirectToHome`).
+6. `UserSync` (inside `<Authenticated>`) calls `upsertCurrentUser` on mount → creates/updates the `users` table row
+7. All protected Convex functions call `requireUser(ctx)` which reads `ctx.auth.getUserIdentity()` and looks up by `tokenIdentifier`
+8. Public routes (`/[eventSlug]/invitations/[invitationSlug]`, matched in middleware as `/:eventSlug/invitations/:invitationSlug`) skip auth entirely — Convex functions for those use no auth checks
 
 ## Documentation Rule
 
@@ -439,7 +449,7 @@ Since AGENTS.md is a copy of CLAUDE.md, both must be kept in sync. Update one, t
 
 | File | Schema | Key rules |
 |---|---|---|
-| `event.ts` | `eventSchema` | name min 2 chars, date is optional string |
+| `event.ts` | `eventSchema` | name min 2 chars, optional `slug` (`/^[a-z0-9-]+$/`, min 2), date optional string |
 | `invitation.ts` | `invitationSchema` | slug: `/^[a-z0-9-]+$/`, maxGuests 1–10 |
 | `guest.ts` | `guestSchema` | firstName/lastName required, email optional |
 | `menu.ts` | `menuOptionSchema` | name required, isActive boolean |

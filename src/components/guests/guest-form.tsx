@@ -13,11 +13,12 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 
 interface GuestFormProps {
-  invitationId: Id<"invitations">
+  eventId: Id<"events">
+  invitationId?: Id<"invitations">
   onSuccess: () => void
 }
 
-export function GuestForm({ invitationId, onSuccess }: GuestFormProps) {
+export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) {
   const createGuest = useMutation(api.guests.createGuest)
 
   const {
@@ -41,6 +42,7 @@ export function GuestForm({ invitationId, onSuccess }: GuestFormProps) {
   async function onSubmit(data: GuestFormData) {
     try {
       await createGuest({
+        eventId,
         invitationId,
         firstName: data.firstName,
         lastName: data.lastName,

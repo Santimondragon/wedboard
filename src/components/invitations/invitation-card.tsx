@@ -21,12 +21,13 @@ interface Invitation {
 }
 
 interface InvitationCardProps {
+  eventSlug: string
   invitation: Invitation
   onEdit: () => void
   onDelete: () => void
 }
 
-export function InvitationCard({ invitation, onEdit, onDelete }: InvitationCardProps) {
+export function InvitationCard({ eventSlug, invitation, onEdit, onDelete }: InvitationCardProps) {
   return (
     <Card className="bg-white border shadow-sm">
       <CardContent className="py-4 flex items-center justify-between gap-4">
@@ -50,7 +51,7 @@ export function InvitationCard({ invitation, onEdit, onDelete }: InvitationCardP
           </Badge>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <CopyInvitationLinkButton slug={invitation.slug} />
+          <CopyInvitationLinkButton eventSlug={eventSlug} slug={invitation.slug} />
           <Button variant="ghost" size="sm" onClick={onEdit}>
             <Pencil className="h-3.5 w-3.5" />
           </Button>

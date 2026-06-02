@@ -1,13 +1,15 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import { useParams } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation } from "convex/react"
+import { useMutation, useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
 import { type Id } from "convex/_generated/dataModel"
 import { toast } from "sonner"
-import { RefreshCw } from "lucide-react"
+import { RefreshCw, UserPlus } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -61,9 +64,27 @@ export function InvitationForm({
   open,
   onOpenChange,
 }: InvitationFormProps) {
+  const params = useParams()
+  const eventSlug = params?.eventSlug as string | undefined
   const createInvitation = useMutation(api.invitations.createInvitation)
   const updateInvitation = useMutation(api.invitations.updateInvitation)
   const regenerateSlug = useMutation(api.invitations.regenerateSlug)
+
+  const unassignedGuests = useQuery(
+    api.guests.listUnassignedByEvent,
+    mode === "create" && open ? { eventId } : "skip",
+  )
+  const [selectedGuestIds, setSelectedGuestIds] = useState<Id<"guests">[]>([])
+
+  useEffect(() => {
+    if (open && mode === "create") setSelectedGuestIds([])
+  }, [open, mode])
+
+  function toggleGuest(id: Id<"guests">) {
+    setSelectedGuestIds((prev) =>
+      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id],
+    )
+  }
 
   const {
     register,
@@ -141,6 +162,7 @@ export function InvitationForm({
           maxGuests: data.maxGuests,
           allowPlusOne: data.allowPlusOne,
           notes: data.notes,
+          guestIds: selectedGuestIds,
         })
         toast.success("Invitation created")
       } else if (mode === "edit" && invitation) {
@@ -169,6 +191,29 @@ export function InvitationForm({
             {mode === "create" ? "New Invitation" : "Edit Invitation"}
           </DialogTitle>
         </DialogHeader>
+        {mode === "create" &&
+        unassignedGuests !== undefined &&
+        unassignedGuests.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <div className="rounded-full bg-zinc-100 p-3">
+              <UserPlus className="h-6 w-6 text-zinc-500" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium text-zinc-900">No guests to invite yet</p>
+              <p className="text-sm text-zinc-500">
+                Add guests to this event first, then group them into an invitation.
+              </p>
+            </div>
+            <Button asChild>
+              <Link
+                href={`/dashboard/${eventSlug}/guests`}
+                onClick={() => onOpenChange(false)}
+              >
+                Add Guest
+              </Link>
+            </Button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="title">Title *</Label>
@@ -259,6 +304,31 @@ export function InvitationForm({
             />
           </div>
 
+          {mode === "create" && unassignedGuests && unassignedGuests.length > 0 && (
+            <div className="space-y-2">
+              <Label>Guests</Label>
+              <p className="text-xs text-zinc-500">
+                Select the un-invited guests to include in this invitation.
+              </p>
+              <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2">
+                {unassignedGuests.map((guest) => (
+                  <label
+                    key={guest._id}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-zinc-50"
+                  >
+                    <Checkbox
+                      checked={selectedGuestIds.includes(guest._id)}
+                      onCheckedChange={() => toggleGuest(guest._id)}
+                    />
+                    <span className="text-sm text-zinc-800">
+                      {guest.firstName} {guest.lastName}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
@@ -274,6 +344,7 @@ export function InvitationForm({
             </Button>
           </DialogFooter>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   )

@@ -1,8 +1,13 @@
 import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { Doc } from "./_generated/dataModel";
 import { requireUser } from "./lib/auth";
 import { requireEventAccess, requireEventMember } from "./lib/permissions";
-import { generateSlug, generateUniqueSlug } from "./lib/slug";
+import {
+  generateSlug,
+  generateUniqueSlug,
+  RESERVED_EVENT_SLUGS,
+} from "./lib/slug";
 
 export const listMyEvents = query({
   args: {},
@@ -16,7 +21,7 @@ export const listMyEvents = query({
 
     const eventIds = memberships.map((m) => m.eventId);
     const events = await Promise.all(eventIds.map((id) => ctx.db.get(id)));
-    return events.filter(Boolean);
+    return events.filter((e): e is Doc<"events"> => e !== null);
   },
 });
 
@@ -26,6 +31,20 @@ export const getEventById = query({
     const user = await requireUser(ctx);
     await requireEventAccess(ctx, args.eventId, user._id);
     return await ctx.db.get(args.eventId);
+  },
+});
+
+export const getEventBySlug = query({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    const event = await ctx.db
+      .query("events")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .unique();
+    if (!event) return null;
+    await requireEventAccess(ctx, event._id, user._id);
+    return event;
   },
 });
 
@@ -85,7 +104,7 @@ export const createEvent = mutation({
       role: "owner",
     });
 
-    return eventId;
+    return { eventId, slug };
   },
 });
 
@@ -93,6 +112,7 @@ export const updateEvent = mutation({
   args: {
     eventId: v.id("events"),
     name: v.optional(v.string()),
+    slug: v.optional(v.string()),
     date: v.optional(v.number()),
     venueName: v.optional(v.string()),
     venueAddress: v.optional(v.string()),
@@ -106,8 +126,33 @@ export const updateEvent = mutation({
     const user = await requireUser(ctx);
     await requireEventMember(ctx, args.eventId, user._id, "planner");
 
-    const { eventId, ...updates } = args;
-    await ctx.db.patch(eventId, updates);
+    const { eventId, slug, ...updates } = args;
+
+    let finalSlug: string | undefined;
+    if (slug !== undefined) {
+      const baseSlug = generateSlug(slug);
+      if (!baseSlug) {
+        throw new ConvexError("Event key cannot be empty");
+      }
+      if (RESERVED_EVENT_SLUGS.has(baseSlug)) {
+        throw new ConvexError(`"${baseSlug}" is a reserved key`);
+      }
+      // Reject (rather than silently suffix) if the key is already taken by
+      // another event — the user explicitly chose this handle.
+      const existing = await ctx.db
+        .query("events")
+        .withIndex("by_slug", (q) => q.eq("slug", baseSlug))
+        .unique();
+      if (existing && existing._id !== eventId) {
+        throw new ConvexError(`"${baseSlug}" is already taken`);
+      }
+      finalSlug = baseSlug;
+    }
+
+    await ctx.db.patch(eventId, {
+      ...updates,
+      ...(finalSlug ? { slug: finalSlug } : {}),
+    });
   },
 });
 

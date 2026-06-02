@@ -30,17 +30,30 @@ export const getTablesAndGuests = query({
 
     const sortedTables = tables.sort((a, b) => a.sortOrder - b.sortOrder);
 
-    const result = await Promise.all(
-      sortedTables.map(async (table) => {
-        const guests = await ctx.db
-          .query("guests")
-          .withIndex("by_tableId", (q) => q.eq("tableId", table._id))
-          .take(50);
-        return { ...table, guests };
-      })
-    );
+    const guests = await ctx.db
+      .query("guests")
+      .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+      .take(1000);
 
-    return result;
+    const guestsByTable: Record<string, typeof guests> = {};
+    const unassignedGuests: typeof guests = [];
+
+    for (const guest of guests) {
+      if (guest.tableId) {
+        (guestsByTable[guest.tableId] ??= []).push(guest);
+      } else {
+        unassignedGuests.push(guest);
+      }
+    }
+
+    // Order seated guests by seat for stable rendering.
+    for (const tableId of Object.keys(guestsByTable)) {
+      guestsByTable[tableId].sort(
+        (a, b) => (a.seatNumber ?? 0) - (b.seatNumber ?? 0)
+      );
+    }
+
+    return { tables: sortedTables, guestsByTable, unassignedGuests };
   },
 });
 

@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { requireUser } from "./lib/auth";
 import { requireEventAccess } from "./lib/permissions";
-import { generateSlug, generateUniqueSlug } from "./lib/slug";
+import { generateSlug, generateUniqueInvitationSlug } from "./lib/slug";
 
 export const listByEvent = query({
   args: { eventId: v.id("events") },
@@ -28,26 +28,56 @@ export const getById = query({
   },
 });
 
-export const getPublicInvitationBySlug = query({
-  args: { slug: v.string() },
+export const getPublicInvitation = query({
+  args: { eventSlug: v.string(), invitationSlug: v.string() },
   handler: async (ctx, args) => {
+    const event = await ctx.db
+      .query("events")
+      .withIndex("by_slug", (q) => q.eq("slug", args.eventSlug))
+      .unique();
+
+    if (!event) {
+      return null;
+    }
+
     const invitation = await ctx.db
       .query("invitations")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .withIndex("by_eventId_and_slug", (q) =>
+        q.eq("eventId", event._id).eq("slug", args.invitationSlug)
+      )
       .unique();
 
     if (!invitation || !invitation.isActive) {
       return null;
     }
 
+    const guests = await ctx.db
+      .query("guests")
+      .withIndex("by_invitationId", (q) =>
+        q.eq("invitationId", invitation._id)
+      )
+      .take(100);
+
     return {
-      _id: invitation._id,
-      eventId: invitation.eventId,
-      title: invitation.title,
-      slug: invitation.slug,
-      type: invitation.type,
-      maxGuests: invitation.maxGuests,
-      allowPlusOne: invitation.allowPlusOne,
+      event: {
+        name: event.name,
+        date: event.date,
+        venueName: event.venueName,
+        venueAddress: event.venueAddress,
+      },
+      invitation: {
+        _id: invitation._id,
+        title: invitation.title,
+        slug: invitation.slug,
+        type: invitation.type,
+        maxGuests: invitation.maxGuests,
+        allowPlusOne: invitation.allowPlusOne,
+      },
+      guests: guests.map((g) => ({
+        _id: g._id,
+        firstName: g.firstName,
+        lastName: g.lastName,
+      })),
     };
   },
 });
@@ -65,6 +95,7 @@ export const createInvitation = mutation({
     maxGuests: v.number(),
     allowPlusOne: v.boolean(),
     notes: v.optional(v.string()),
+    guestIds: v.optional(v.array(v.id("guests"))),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -74,46 +105,38 @@ export const createInvitation = mutation({
       ? generateSlug(args.slug)
       : generateSlug(args.title);
 
-    // Check uniqueness within event
-    const existingWithSlug = await ctx.db
-      .query("invitations")
-      .withIndex("by_eventId_and_slug", (q) =>
-        q.eq("eventId", args.eventId).eq("slug", baseSlug)
-      )
-      .unique();
+    const slug = await generateUniqueInvitationSlug(
+      ctx,
+      args.eventId,
+      baseSlug
+    );
 
-    let finalSlug = baseSlug;
-    if (existingWithSlug) {
-      let counter = 2;
-      while (true) {
-        const candidate = `${baseSlug}-${counter}`;
-        const exists = await ctx.db
-          .query("invitations")
-          .withIndex("by_eventId_and_slug", (q) =>
-            q.eq("eventId", args.eventId).eq("slug", candidate)
-          )
-          .unique();
-        if (!exists) {
-          finalSlug = candidate;
-          break;
-        }
-        counter++;
-      }
-    }
-
-    // Also ensure global slug uniqueness
-    const globalSlug = await generateUniqueSlug(ctx, "invitations", finalSlug);
-
-    return await ctx.db.insert("invitations", {
+    const invitationId = await ctx.db.insert("invitations", {
       eventId: args.eventId,
       title: args.title,
-      slug: globalSlug,
+      slug,
       type: args.type,
       maxGuests: args.maxGuests,
       allowPlusOne: args.allowPlusOne,
       isActive: true,
       notes: args.notes,
     });
+
+    // Assign selected un-invited guests to this invitation.
+    if (args.guestIds) {
+      for (const guestId of args.guestIds) {
+        const guest = await ctx.db.get(guestId);
+        if (
+          guest &&
+          guest.eventId === args.eventId &&
+          !guest.invitationId
+        ) {
+          await ctx.db.patch(guestId, { invitationId });
+        }
+      }
+    }
+
+    return invitationId;
   },
 });
 
@@ -144,9 +167,9 @@ export const updateInvitation = mutation({
 
     let finalSlug = slug;
     if (slug !== undefined) {
-      finalSlug = await generateUniqueSlug(
+      finalSlug = await generateUniqueInvitationSlug(
         ctx,
-        "invitations",
+        invitation.eventId,
         generateSlug(slug),
         id
       );
@@ -164,22 +187,15 @@ export const deleteInvitation = mutation({
     if (!invitation) throw new ConvexError("Invitation not found");
     await requireEventAccess(ctx, invitation.eventId, user._id);
 
-    // Delete all guests for this invitation
+    // Unassign guests for this invitation — they return to the un-invited
+    // pool rather than being deleted.
     const guests = await ctx.db
       .query("guests")
       .withIndex("by_invitationId", (q) => q.eq("invitationId", args.id))
       .take(500);
 
     for (const guest of guests) {
-      // Delete guest special event rsvps
-      const rsvps = await ctx.db
-        .query("guestSpecialEventRsvps")
-        .withIndex("by_guestId", (q) => q.eq("guestId", guest._id))
-        .take(100);
-      for (const rsvp of rsvps) {
-        await ctx.db.delete(rsvp._id);
-      }
-      await ctx.db.delete(guest._id);
+      await ctx.db.patch(guest._id, { invitationId: undefined });
     }
 
     // Delete invitation special event access
@@ -237,9 +253,9 @@ export const regenerateSlug = mutation({
     await requireEventAccess(ctx, invitation.eventId, user._id);
 
     const baseSlug = generateSlug(invitation.title);
-    const newSlug = await generateUniqueSlug(
+    const newSlug = await generateUniqueInvitationSlug(
       ctx,
-      "invitations",
+      invitation.eventId,
       baseSlug,
       args.id
     );

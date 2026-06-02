@@ -1,11 +1,11 @@
 "use client"
 
-import { useParams, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "convex/_generated/api"
-import { type Id } from "convex/_generated/dataModel"
 import { toast } from "sonner"
+import { useEvent } from "@/components/dashboard/event-provider"
 import {
   Mail,
   Users,
@@ -22,18 +22,18 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function EventOverviewPage() {
-  const params = useParams()
   const router = useRouter()
-  const eventId = params.eventId as Id<"events">
+  const event = useEvent()
+  const eventId = event._id
 
   const stats = useQuery(api.dashboard.getOverviewStats, { eventId })
   const seedDemo = useMutation(api.seed.seedDemoEventForCurrentUser)
 
   async function handleSeedDemo() {
     try {
-      const newEventId = await seedDemo()
+      const result = await seedDemo()
       toast.success("Demo data seeded! Redirecting…")
-      router.push(`/events/${newEventId}`)
+      router.push(`/dashboard/${result.slug}`)
     } catch (err) {
       toast.error("Failed to seed demo data")
     }
@@ -69,39 +69,39 @@ export default function EventOverviewPage() {
     },
     {
       title: "Attending",
-      value: stats.attending,
+      value: stats.attendingCount,
       icon: CheckCircle,
       description: "Confirmed guests",
     },
     {
       title: "Declined",
-      value: stats.declined,
+      value: stats.declinedCount,
       icon: XCircle,
     },
     {
       title: "Pending",
-      value: stats.pending,
+      value: stats.pendingCount,
       icon: Clock,
     },
     {
       title: "Menu Selections Missing",
-      value: stats.menuSelectionsMissing ?? 0,
+      value: stats.attendingCount - stats.menuCompletionCount,
       icon: UtensilsCrossed,
       description: "Attending without menu choice",
     },
     {
       title: "Guests Without Table",
-      value: stats.guestsWithoutTable ?? 0,
+      value: stats.totalGuests - stats.tableAssignmentCount,
       icon: AlertCircle,
       description: "Need seating assignment",
     },
   ]
 
   const quickActions = [
-    { label: "Manage Invitations", href: `/events/${eventId}/invitations`, icon: Mail },
-    { label: "View Guests", href: `/events/${eventId}/guests`, icon: Users },
-    { label: "Menu & Drinks", href: `/events/${eventId}/menu`, icon: UtensilsCrossed },
-    { label: "Tables", href: `/events/${eventId}/tables`, icon: LayoutGrid },
+    { label: "Manage Invitations", href: `/dashboard/${event.slug}/invitations`, icon: Mail },
+    { label: "View Guests", href: `/dashboard/${event.slug}/guests`, icon: Users },
+    { label: "Menu & Drinks", href: `/dashboard/${event.slug}/menu`, icon: UtensilsCrossed },
+    { label: "Tables", href: `/dashboard/${event.slug}/tables`, icon: LayoutGrid },
   ]
 
   return (

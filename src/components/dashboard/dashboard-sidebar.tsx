@@ -28,12 +28,12 @@ export function DashboardSidebar() {
   const params = useParams()
   const pathname = usePathname()
   const { user } = useUser()
-  const eventId = params?.eventId as string | undefined
+  const eventSlug = params?.eventSlug as string | undefined
 
   function getHref(segment: string) {
-    if (!eventId) return "/dashboard"
-    if (segment === "") return `/events/${eventId}`
-    return `/events/${eventId}/${segment}`
+    if (!eventSlug) return "/dashboard"
+    if (segment === "") return `/dashboard/${eventSlug}`
+    return `/dashboard/${eventSlug}/${segment}`
   }
 
   function isActive(segment: string) {

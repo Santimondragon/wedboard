@@ -33,6 +33,21 @@ export const listByInvitation = query({
   },
 });
 
+export const listUnassignedByEvent = query({
+  args: { eventId: v.id("events") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    await requireEventAccess(ctx, args.eventId, user._id);
+
+    const guests = await ctx.db
+      .query("guests")
+      .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+      .take(1000);
+
+    return guests.filter((g) => !g.invitationId);
+  },
+});
+
 export const getGuestById = query({
   args: { id: v.id("guests") },
   handler: async (ctx, args) => {
@@ -46,7 +61,8 @@ export const getGuestById = query({
 
 export const createGuest = mutation({
   args: {
-    invitationId: v.id("invitations"),
+    eventId: v.id("events"),
+    invitationId: v.optional(v.id("invitations")),
     firstName: v.string(),
     lastName: v.string(),
     email: v.optional(v.string()),
@@ -56,12 +72,17 @@ export const createGuest = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
-    const invitation = await ctx.db.get(args.invitationId);
-    if (!invitation) throw new ConvexError("Invitation not found");
-    await requireEventAccess(ctx, invitation.eventId, user._id);
+    await requireEventAccess(ctx, args.eventId, user._id);
+
+    if (args.invitationId) {
+      const invitation = await ctx.db.get(args.invitationId);
+      if (!invitation || invitation.eventId !== args.eventId) {
+        throw new ConvexError("Invitation does not belong to this event");
+      }
+    }
 
     return await ctx.db.insert("guests", {
-      eventId: invitation.eventId,
+      eventId: args.eventId,
       invitationId: args.invitationId,
       firstName: args.firstName,
       lastName: args.lastName,
@@ -164,6 +185,7 @@ export const bulkCreateGuestsForInvitation = mutation({
 
 export const submitPublicRsvp = mutation({
   args: {
+    eventSlug: v.string(),
     invitationSlug: v.string(),
     guestUpdates: v.array(
       v.object({
@@ -194,10 +216,21 @@ export const submitPublicRsvp = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    // Look up invitation by slug (public — no auth)
+    // Resolve event then invitation by slug (public — no auth).
+    const event = await ctx.db
+      .query("events")
+      .withIndex("by_slug", (q) => q.eq("slug", args.eventSlug))
+      .unique();
+
+    if (!event) {
+      throw new ConvexError("Invitation not found or not active");
+    }
+
     const invitation = await ctx.db
       .query("invitations")
-      .withIndex("by_slug", (q) => q.eq("slug", args.invitationSlug))
+      .withIndex("by_eventId_and_slug", (q) =>
+        q.eq("eventId", event._id).eq("slug", args.invitationSlug)
+      )
       .unique();
 
     if (!invitation || !invitation.isActive) {

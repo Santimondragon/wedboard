@@ -2,35 +2,24 @@
 
 import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
-import { Id } from "convex/_generated/dataModel"
-import { PublicRsvpForm } from "@/components/public-invitation/public-rsvp-form"
 import { format } from "date-fns"
 import { MapPin, Calendar } from "lucide-react"
 
 interface PublicInvitationPageProps {
-  slug: string
+  eventSlug: string
+  invitationSlug: string
 }
 
-export function PublicInvitationPage({ slug }: PublicInvitationPageProps) {
-  const invitation = useQuery(api.invitations.getPublicInvitationBySlug, { slug })
-  const guests = useQuery(
-    api.guests.listByInvitation,
-    invitation ? { invitationId: invitation._id } : "skip",
-  )
-  const menuOptions = useQuery(
-    api.menu.listMenuOptionsByEvent,
-    invitation ? { eventId: invitation.eventId } : "skip",
-  )
-  const drinkOptions = useQuery(
-    api.drinks.listDrinkOptionsByEvent,
-    invitation ? { eventId: invitation.eventId } : "skip",
-  )
-  const specialEvents = useQuery(
-    api.specialEvents.listForInvitation,
-    invitation ? { invitationId: invitation._id } : "skip",
-  )
+export function PublicInvitationPage({
+  eventSlug,
+  invitationSlug,
+}: PublicInvitationPageProps) {
+  const data = useQuery(api.invitations.getPublicInvitation, {
+    eventSlug,
+    invitationSlug,
+  })
 
-  if (invitation === undefined) {
+  if (data === undefined) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-300 border-t-zinc-700" />
@@ -38,7 +27,7 @@ export function PublicInvitationPage({ slug }: PublicInvitationPageProps) {
     )
   }
 
-  if (invitation === null) {
+  if (data === null) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
         <div className="text-center space-y-2">
@@ -51,7 +40,7 @@ export function PublicInvitationPage({ slug }: PublicInvitationPageProps) {
     )
   }
 
-  const event = (invitation as any).event
+  const { event, invitation, guests } = data
 
   return (
     <div className="min-h-screen bg-stone-50 py-12 px-4">
@@ -61,18 +50,16 @@ export function PublicInvitationPage({ slug }: PublicInvitationPageProps) {
           <p className="text-sm font-medium uppercase tracking-widest text-zinc-400">
             You are invited
           </p>
-          <h1 className="text-4xl font-semibold text-zinc-900">
-            {event?.name ?? invitation.eventId}
-          </h1>
+          <h1 className="text-4xl font-semibold text-zinc-900">{event.name}</h1>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-zinc-500 text-sm">
-            {event?.date && (
+            {event.date && (
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
                 {format(new Date(event.date), "MMMM d, yyyy")}
               </span>
             )}
-            {event?.venueName && (
+            {event.venueName && (
               <span className="flex items-center gap-1.5">
                 <MapPin className="h-4 w-4" />
                 {event.venueName}
@@ -90,20 +77,25 @@ export function PublicInvitationPage({ slug }: PublicInvitationPageProps) {
           </div>
         </div>
 
-        {/* RSVP form */}
-        {guests === undefined || menuOptions === undefined || drinkOptions === undefined ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-300 border-t-zinc-700" />
-          </div>
-        ) : (
-          <PublicRsvpForm
-            invitation={invitation}
-            guests={guests}
-            menuOptions={menuOptions ?? []}
-            drinkOptions={drinkOptions ?? []}
-            specialEvents={specialEvents ?? []}
-          />
-        )}
+        {/* Guests */}
+        <div className="rounded-xl border bg-white p-6 shadow-sm">
+          {guests.length === 0 ? (
+            <p className="text-center text-zinc-500">
+              No guests have been added to this invitation yet.
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {guests.map((guest) => (
+                <li
+                  key={guest._id}
+                  className="py-3 text-center text-lg text-zinc-800"
+                >
+                  {guest.firstName} {guest.lastName}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   )

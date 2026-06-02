@@ -1,10 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { useParams } from "next/navigation"
 import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
-import { Id } from "convex/_generated/dataModel"
+import { useEvent } from "@/components/dashboard/event-provider"
 import { TableGrid } from "@/components/tables/table-grid"
 import { AddTableDialog } from "@/components/tables/add-table-dialog"
 import { EmptyState } from "@/components/app/empty-state"
@@ -14,8 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { TableIcon, Plus } from "lucide-react"
 
 export default function TablesPage() {
-  const params = useParams()
-  const eventId = params.eventId as Id<"events">
+  const eventId = useEvent()._id
 
   const data = useQuery(api.tables.getTablesAndGuests, { eventId })
   const [addDialogOpen, setAddDialogOpen] = useState(false)

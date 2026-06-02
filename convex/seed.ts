@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
 
 export const seedDemoEvent = internalMutation({
   args: { ownerTokenIdentifier: v.string() },
@@ -457,11 +458,12 @@ export const seedDemoEventForCurrentUser = mutation({
       throw new ConvexError("Unauthorized");
     }
 
-    const eventId: string = await ctx.runMutation(
+    const eventId: Id<"events"> = await ctx.runMutation(
       internal.seed.seedDemoEvent,
       { ownerTokenIdentifier: identity.tokenIdentifier }
     );
 
-    return eventId;
+    const event = await ctx.db.get(eventId);
+    return { eventId, slug: event?.slug ?? "" };
   },
 });

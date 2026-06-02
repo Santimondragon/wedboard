@@ -38,14 +38,14 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
 
   async function onSubmit(data: EventFormData) {
     try {
-      const eventId = await createEvent({
+      const { slug } = await createEvent({
         ...data,
         date: data.date ? new Date(data.date).getTime() : undefined,
       })
       toast.success("Event created")
       reset()
       onOpenChange(false)
-      router.push(`/events/${eventId}`)
+      router.push(`/dashboard/${slug}`)
     } catch (err) {
       toast.error("Failed to create event")
     }

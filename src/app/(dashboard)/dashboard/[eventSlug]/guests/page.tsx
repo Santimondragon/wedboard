@@ -1,19 +1,26 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { useParams } from "next/navigation"
 import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
 import { Id, Doc } from "convex/_generated/dataModel"
+import { useEvent } from "@/components/dashboard/event-provider"
 import { GuestTable } from "@/components/guests/guest-table"
 import { GuestDetailsSheet } from "@/components/guests/guest-details-sheet"
+import { GuestForm } from "@/components/guests/guest-form"
 import { EmptyState } from "@/components/app/empty-state"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Users } from "lucide-react"
 
 export default function GuestsPage() {
-  const params = useParams()
-  const eventId = params.eventId as Id<"events">
+  const eventId = useEvent()._id
 
   const guests = useQuery(api.guests.listByEvent, { eventId })
   const invitations = useQuery(api.invitations.listByEvent, { eventId })
@@ -23,6 +30,7 @@ export default function GuestsPage() {
 
   const [selectedGuestId, setSelectedGuestId] = useState<Id<"guests"> | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
 
   const invitationMap = useMemo(() => {
     if (!invitations) return {}
@@ -69,7 +77,7 @@ export default function GuestsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-zinc-900">
           Guests
           {guests !== undefined && (
@@ -78,6 +86,9 @@ export default function GuestsPage() {
             </span>
           )}
         </h1>
+        <Button onClick={() => setAddOpen(true)} size="sm">
+          Add Guest
+        </Button>
       </div>
 
       {isLoading ? (
@@ -90,11 +101,21 @@ export default function GuestsPage() {
         <EmptyState
           icon={Users}
           title="No guests yet"
-          description="Guests added to invitations will appear here"
+          description="Add guests here, then group them into invitations"
+          action={{ label: "Add Guest", onClick: () => setAddOpen(true) }}
         />
       ) : (
         <GuestTable guests={enrichedGuests} onEditGuest={handleEditGuest} />
       )}
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Guest</DialogTitle>
+          </DialogHeader>
+          <GuestForm eventId={eventId} onSuccess={() => setAddOpen(false)} />
+        </DialogContent>
+      </Dialog>
 
       <GuestDetailsSheet
         guest={selectedGuest}

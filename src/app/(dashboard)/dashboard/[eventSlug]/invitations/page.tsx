@@ -1,20 +1,19 @@
 "use client"
 
 import { useState } from "react"
-import { useParams } from "next/navigation"
 import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
-import { type Id } from "convex/_generated/dataModel"
 import { Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/app/empty-state"
 import { InvitationList } from "@/components/invitations/invitation-list"
 import { InvitationForm } from "@/components/invitations/invitation-form"
+import { useEvent } from "@/components/dashboard/event-provider"
 
 export default function InvitationsPage() {
-  const params = useParams()
-  const eventId = params.eventId as Id<"events">
+  const event = useEvent()
+  const eventId = event._id
   const [createOpen, setCreateOpen] = useState(false)
 
   const invitations = useQuery(api.invitations.listByEvent, { eventId })
@@ -52,7 +51,11 @@ export default function InvitationsPage() {
             }}
           />
         ) : (
-          <InvitationList eventId={eventId} invitations={invitations} />
+          <InvitationList
+            eventId={eventId}
+            eventSlug={event.slug}
+            invitations={invitations}
+          />
         )}
       </div>
 

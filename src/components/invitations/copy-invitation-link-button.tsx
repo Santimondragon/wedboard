@@ -5,14 +5,18 @@ import { Check, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface CopyInvitationLinkButtonProps {
+  eventSlug: string
   slug: string
 }
 
-export function CopyInvitationLinkButton({ slug }: CopyInvitationLinkButtonProps) {
+export function CopyInvitationLinkButton({
+  eventSlug,
+  slug,
+}: CopyInvitationLinkButtonProps) {
   const [copied, setCopied] = useState(false)
 
   async function handleCopy() {
-    const url = `${window.location.origin}/invitations/${slug}`
+    const url = `${window.location.origin}/${eventSlug}/invitations/${slug}`
     await navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)

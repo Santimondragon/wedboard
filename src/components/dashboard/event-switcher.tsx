@@ -4,7 +4,6 @@ import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
-import { type Id } from "convex/_generated/dataModel"
 import { ChevronsUpDown, PlusCircle, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -19,14 +18,14 @@ import { CreateEventDialog } from "@/components/dashboard/create-event-dialog"
 export function EventSwitcher() {
   const router = useRouter()
   const params = useParams()
-  const eventId = params?.eventId as Id<"events"> | undefined
+  const eventSlug = params?.eventSlug as string | undefined
   const events = useQuery(api.events.listMyEvents)
   const [createOpen, setCreateOpen] = useState(false)
 
-  const currentEvent = events?.find((e) => e._id === eventId)
+  const currentEvent = events?.find((e) => e?.slug === eventSlug)
 
-  function switchToEvent(id: Id<"events">) {
-    router.push(`/events/${id}`)
+  function switchToEvent(slug: string) {
+    router.push(`/dashboard/${slug}`)
   }
 
   return (
@@ -48,13 +47,13 @@ export function EventSwitcher() {
             events.map((event) => (
               <DropdownMenuItem
                 key={event._id}
-                onClick={() => switchToEvent(event._id)}
+                onClick={() => switchToEvent(event.slug)}
                 className="flex items-center justify-between"
               >
-                <span className={cn("truncate", event._id === eventId && "font-medium")}>
+                <span className={cn("truncate", event.slug === eventSlug && "font-medium")}>
                   {event.name}
                 </span>
-                {event._id === eventId && <Check className="h-4 w-4 shrink-0 text-zinc-500" />}
+                {event.slug === eventSlug && <Check className="h-4 w-4 shrink-0 text-zinc-500" />}
               </DropdownMenuItem>
             ))
           ) : (

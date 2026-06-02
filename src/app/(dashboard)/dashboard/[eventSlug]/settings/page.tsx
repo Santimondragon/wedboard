@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
-import { useQuery, useMutation } from "convex/react"
+import { useRouter } from "next/navigation"
+import { useMutation } from "convex/react"
+import { ConvexError } from "convex/values"
 import { api } from "convex/_generated/api"
-import { Id } from "convex/_generated/dataModel"
 import { toast } from "sonner"
+import { useEvent } from "@/components/dashboard/event-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,29 +33,53 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 
 export default function SettingsPage() {
-  const params = useParams()
-  const eventId = params.eventId as Id<"events">
-
-  const event = useQuery(api.events.getEventById, { eventId })
+  const router = useRouter()
+  const event = useEvent()
+  const eventId = event._id
   const updateEvent = useMutation(api.events.updateEvent)
 
   const [name, setName] = useState("")
+  const [slug, setSlug] = useState("")
   const [date, setDate] = useState("")
   const [venueName, setVenueName] = useState("")
   const [venueAddress, setVenueAddress] = useState("")
   const [status, setStatus] = useState<"draft" | "active" | "archived">("draft")
   const [saving, setSaving] = useState(false)
+  const [savingSlug, setSavingSlug] = useState(false)
   const [archiving, setArchiving] = useState(false)
 
   useEffect(() => {
     if (event) {
       setName(event.name ?? "")
+      setSlug(event.slug ?? "")
       setDate(event.date ? new Date(event.date).toISOString().split("T")[0] : "")
       setVenueName(event.venueName ?? "")
       setVenueAddress(event.venueAddress ?? "")
       setStatus((event.status as "draft" | "active" | "archived") ?? "draft")
     }
   }, [event])
+
+  async function handleSaveSlug() {
+    if (!/^[a-z0-9-]+$/.test(slug)) {
+      toast.error("Event key may only contain lowercase letters, numbers, and hyphens")
+      return
+    }
+    setSavingSlug(true)
+    try {
+      await updateEvent({ eventId, slug })
+      toast.success("Event key updated")
+      // The slug is part of the URL — move to the new address.
+      router.replace(`/dashboard/${slug}/settings`)
+    } catch (err) {
+      toast.error(
+        err instanceof ConvexError
+          ? (err.data as string)
+          : "Failed to update event key"
+      )
+    } finally {
+      setSavingSlug(false)
+    }
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -160,6 +185,32 @@ export default function SettingsPage() {
 
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </section>
+
+          <Separator />
+
+          <section className="space-y-4">
+            <h2 className="text-base font-medium text-zinc-900">Event Key</h2>
+            <p className="text-sm text-zinc-500">
+              Your public invitation links use this key, like a handle. It must be
+              unique across all events.
+            </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="slug">Key</Label>
+              <Input
+                id="slug"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                className="font-mono text-sm"
+                placeholder="smith-wedding"
+              />
+              <p className="text-xs text-zinc-400 font-mono">
+                /{slug || "your-event"}/invitations/...
+              </p>
+            </div>
+            <Button onClick={handleSaveSlug} disabled={savingSlug} variant="outline">
+              {savingSlug ? "Saving..." : "Save Key"}
             </Button>
           </section>
 

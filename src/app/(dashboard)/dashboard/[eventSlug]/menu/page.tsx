@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { useParams } from "next/navigation"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "convex/_generated/api"
 import { Id, Doc } from "convex/_generated/dataModel"
 import { toast } from "sonner"
+import { useEvent } from "@/components/dashboard/event-provider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { MenuOptionForm } from "@/components/menu/menu-option-form"
@@ -19,8 +19,7 @@ type MenuOption = Doc<"menuOptions">
 type DrinkOption = Doc<"drinkOptions">
 
 export default function MenuPage() {
-  const params = useParams()
-  const eventId = params.eventId as Id<"events">
+  const eventId = useEvent()._id
 
   const menuOptions = useQuery(api.menu.listMenuOptionsByEventAdmin, { eventId })
   const drinkOptions = useQuery(api.drinks.listDrinkOptionsByEventAdmin, { eventId })

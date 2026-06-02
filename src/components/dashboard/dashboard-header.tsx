@@ -1,38 +1,28 @@
 "use client"
 
-import { useParams, usePathname } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { UserButton } from "@clerk/nextjs"
-import { useQuery } from "convex/react"
-import { api } from "convex/_generated/api"
-import { type Id } from "convex/_generated/dataModel"
 import { EventStatusBadge } from "@/components/dashboard/event-status-badge"
+import { useEvent } from "@/components/dashboard/event-provider"
 
 const PAGE_TITLES: Record<string, string> = {
-  "": "Overview",
-  "invitations": "Invitations",
-  "guests": "Guests",
-  "menu": "Menu & Drinks",
-  "tables": "Tables",
-  "settings": "Settings",
+  invitations: "Invitations",
+  guests: "Guests",
+  menu: "Menu & Drinks",
+  tables: "Tables",
+  settings: "Settings",
 }
 
 function getPageTitle(pathname: string): string {
+  // Paths look like /dashboard/{eventSlug}[/{section}].
   const segments = pathname.split("/").filter(Boolean)
-  const last = segments[segments.length - 1]
-  // If last segment looks like an ID (eventId), it's the overview page
-  if (!last || last.length > 20) return "Overview"
-  return PAGE_TITLES[last] ?? "Overview"
+  const section = segments[2]
+  return (section && PAGE_TITLES[section]) ?? "Overview"
 }
 
 export function DashboardHeader() {
-  const params = useParams()
   const pathname = usePathname()
-  const eventId = params?.eventId as Id<"events"> | undefined
-
-  const event = useQuery(
-    api.events.getEventById,
-    eventId ? { eventId } : "skip"
-  )
+  const event = useEvent()
 
   const pageTitle = getPageTitle(pathname)
 

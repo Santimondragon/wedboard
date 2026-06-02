@@ -68,7 +68,7 @@ export default defineSchema({
 
   guests: defineTable({
     eventId: v.id("events"),
-    invitationId: v.id("invitations"),
+    invitationId: v.optional(v.id("invitations")),
     firstName: v.string(),
     lastName: v.string(),
     email: v.optional(v.string()),
