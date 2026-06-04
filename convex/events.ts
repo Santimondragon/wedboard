@@ -156,6 +156,29 @@ export const updateEvent = mutation({
   },
 });
 
+export const setInvitationTemplate = mutation({
+  args: {
+    eventId: v.id("events"),
+    templateId: v.optional(v.string()),
+    layoutBlocks: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          type: v.string(),
+          config: v.optional(v.any()),
+        })
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    await requireEventMember(ctx, args.eventId, user._id, "planner");
+
+    const { eventId, ...updates } = args;
+    await ctx.db.patch(eventId, updates);
+  },
+});
+
 export const archiveEvent = mutation({
   args: { eventId: v.id("events") },
   handler: async (ctx, args) => {

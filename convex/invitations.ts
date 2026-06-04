@@ -64,6 +64,8 @@ export const getPublicInvitation = query({
         date: event.date,
         venueName: event.venueName,
         venueAddress: event.venueAddress,
+        templateId: event.templateId,
+        layoutBlocks: event.layoutBlocks,
       },
       invitation: {
         _id: invitation._id,

@@ -23,6 +23,17 @@ export default defineSchema({
     subdomain: v.optional(v.string()),
     customDomain: v.optional(v.string()),
     templateId: v.optional(v.string()),
+    // Ordered page-builder blocks for the public invitation (see
+    // public-invitation/blocks). Undefined means "use the default layout".
+    layoutBlocks: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          type: v.string(),
+          config: v.optional(v.any()),
+        })
+      )
+    ),
     status: v.union(
       v.literal("draft"),
       v.literal("active"),

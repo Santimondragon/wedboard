@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMutation } from "convex/react"
 import { ConvexError } from "convex/values"
@@ -236,14 +237,17 @@ export default function SettingsPage() {
 
           <Separator />
 
-          <section className="space-y-4 opacity-60 pointer-events-none select-none">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-medium text-zinc-900">Invitation Template</h2>
-              <Badge variant="outline" className="text-xs">Coming soon</Badge>
-            </div>
+          <section className="space-y-4">
+            <h2 className="text-base font-medium text-zinc-900">Invitation Template</h2>
             <p className="text-sm text-zinc-500">
-              Choose a design template for your public invitation page.
+              Choose a design template and the sections shown on your public
+              invitation page.
             </p>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/${event.slug}/template`}>
+                Manage invitation template
+              </Link>
+            </Button>
           </section>
 
           <Separator />

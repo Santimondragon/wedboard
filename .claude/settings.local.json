@@ -17,7 +17,21 @@
       "Bash(grep -rn \"params.eventId\\\\|params?.eventId\\\\|useParams\\\\|/events/\\\\$\" src/app/\\\\\\(dashboard\\\\\\)/events src/components)",
       "Bash(git mv *)",
       "Bash(grep -n 'Id<' 'src/app/\\(dashboard\\)/dashboard/[eventSlug]/__TRACKED_VAR__/page.tsx')",
-      "mcp__Claude_in_Chrome__tabs_context_mcp"
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(git commit -m ' *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/test-event/invitations/test-invitation)",
+      "Bash(curl -s http://localhost:3000/test-event/invitations/test-invitation)",
+      "Bash(curl -s -o /dev/null -w \"public:%{http_code} template:\" http://localhost:3000/test-event/invitations/test-invitation)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/dashboard/test-event/template)",
+      "Bash(grep -n \"templateId\\\\|Future\\\\b\\\\|getPublicInvitation\\\\` \\\\|archiveEvent\\\\|/settings       Event\\\\|First public template\\\\|Multiple/custom templates\" CLAUDE.md)",
+      "Bash(npx eslint *)",
+      "Bash(curl -s -o /dev/null -w \"public:%{http_code}\\\\n\" http://localhost:3000/test-event/invitations/test-invitation)",
+      "Bash(node -e \"const p=require\\('./package.json'\\);const d={...p.dependencies,...p.devDependencies};for\\(const k of Object.keys\\(d\\)\\) if\\(/tailwind|@tailwindcss/.test\\(k\\)\\) console.log\\(k, d[k]\\)\")",
+      "Bash(node -e \"console.log\\('tailwindcss', require\\('tailwindcss/package.json'\\).version\\)\")",
+      "Bash(node -e \"try{console.log\\('@tailwindcss/postcss', require\\('@tailwindcss/postcss/package.json'\\).version\\)}catch\\(e\\){}\")",
+      "WebFetch(domain:www.figma.com)",
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "Bash(echo \"exit $?\")"
     ]
   }
 }

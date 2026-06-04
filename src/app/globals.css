@@ -4,9 +4,19 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* "Elegant" invitation template (Xoom design) palette. */
+@theme {
+  --color-wedding-gold: #c5a46d;
+  --color-wedding-ink: #3c3c3c;
+  --color-wedding-soft: #ececec;
+  --color-wedding-muted: #d9d9d9;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --font-script: var(--font-script);
+  --font-elegant: var(--font-serif-elegant);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);

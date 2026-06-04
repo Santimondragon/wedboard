@@ -89,7 +89,8 @@ Top-level board. One event = one wedding/occasion.
 | venueAddress | string? | |
 | subdomain | string? | Future |
 | customDomain | string? | Future |
-| templateId | string? | Future |
+| templateId | string? | Public invitation template id (`"classic" \| "modern" \| "romantic"`); defaults to classic when unset |
+| layoutBlocks | `{id,type,config?}[]`? | Ordered page-builder blocks for the public invitation (see `public-invitation/blocks`). Undefined = default layout. `config` is `v.any()` (per-instance content, e.g. text headline/body) |
 | status | `"draft" \| "active" \| "archived"` |
 
 Indexes: `by_ownerUserId`, `by_slug`, `by_subdomain`, `by_customDomain`
@@ -265,6 +266,7 @@ Index: `by_eventId`
 | `getEventSummary` | query — event + counts |
 | `createEvent` | mutation — creates eventMember with owner role; returns `{ eventId, slug }` |
 | `updateEvent` | mutation — accepts optional `slug` (validates format, reserved words, global uniqueness) |
+| `setInvitationTemplate` | mutation — sets `templateId` and/or `layoutBlocks` (min role planner) |
 | `archiveEvent` | mutation |
 
 ### `convex/invitations.ts`
@@ -272,7 +274,7 @@ Index: `by_eventId`
 |---|---|---|
 | `listByEvent` | query | Auth required |
 | `getById` | query | Auth required |
-| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; returns `{event, invitation, guests:[{firstName,lastName}]}` |
+| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; returns `{event (incl. templateId, layoutBlocks), invitation, guests:[{firstName,lastName}]}` |
 | `createInvitation` | mutation | Per-event-unique slug; optional `guestIds` links selected un-invited guests |
 | `updateInvitation` | mutation | |
 | `deleteInvitation` | mutation | **Unassigns** its guests (sets invitationId undefined), does not delete them |
@@ -334,6 +336,7 @@ Same shape as `menu.ts`.
 /dashboard/[eventSlug]/guests         Guest table with search/filter + detail sheet + Add Guest
 /dashboard/[eventSlug]/menu           Food & drink option management
 /dashboard/[eventSlug]/tables         Drag-free seat assignment grid
+/dashboard/[eventSlug]/template       Template picker + block page-builder (add/reorder/duplicate/remove/edit) + live preview (dummy data)
 /dashboard/[eventSlug]/settings       Event metadata + editable event key + archive
 
 /[eventSlug]/invitations/[invitationSlug]   Public invitation page (guest names) — no auth required
@@ -398,12 +401,61 @@ src/components/
     add-table-dialog.tsx        Create table dialog
 
   public-invitation/
-    public-invitation-page.tsx  Loads {eventSlug, invitationSlug} via getPublicInvitation, renders event + guest names
+    public-invitation-page.tsx  Loads {eventSlug, invitationSlug} via getPublicInvitation; handles loading/not-found, then renders InvitationTemplate with event.templateId + event.layoutBlocks
+    types.ts                    Local PublicEvent/PublicInvitation/PublicGuest/PublicInvitationData types for the template
+    blocks.ts                   Page-builder model: BlockType union, LayoutBlock, BLOCK_DEFS (label + editable config fields per type), BLOCK_PALETTE, createBlock(), defaultLayout(), resolveLayout(), getConfigString()
+    template-theme.tsx          "use client" — TemplateTheme tokens for classic/modern/romantic; TemplateThemeProvider + useTemplateTheme (consumed by the default frame/blocks)
+    templates/
+      template-registry.ts      Source of truth for templates: TemplateDef ({id,label,description,theme, optional Frame, per-block overrides, optional defaultLayout}), TEMPLATES, TEMPLATE_LIST, DEFAULT_TEMPLATE_ID (="elegant"), resolveTemplate()
+      default-blocks.tsx        "use client" — DefaultFrame (themed divided card) + DEFAULT_BLOCKS (BlockType→component); the shared fallback markup. Defines BlockComponentProps/FrameProps
+      invitation-template.tsx   "use client" — resolves the template, renders its Frame (or DefaultFrame), and for each LayoutBlock its override component (or DEFAULT_BLOCKS); layout = saved blocks ?? template.defaultLayout() ?? defaultLayout()
+      dummy-data.ts             DUMMY_INVITATION_DATA sample used by the live preview
+      elegant/                  First official template (Figma "Xoom cargo" design, node 452:172) — its own markup, not the default sections
+        frame.tsx               ElegantFrame — phone-width card, NO global gap (each block owns padding)
+        blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/stayInvite/footer) + primitives (ElegantSection, WeddingButton, CheckRow, seal/photo placeholders). Spanish copy from the design
+        default-layout.ts       elegantDefaultLayout() — preset blocks in the design's order
+        index.ts                Re-exports ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout
+    sections/
+      section.tsx               Shared eyebrow/heading/spacing wrapper; pulls colors/fonts from useTemplateTheme
+      hero-section.tsx          Event name, date, "Dear {invitation.title}" (themed)
+      location-section.tsx      Venue name + address (placeholder if absent)
+      message-section.tsx       Optional headline + body — backs the "text" block
+      countdown-section.tsx     "use client" — live ticking countdown to event date (themed)
+      itinerary-section.tsx     Time/title schedule (placeholder items — no backend model yet)
+      dress-code-section.tsx    Dress code + note (from block config)
+      special-invitation-section.tsx  Eyebrow/title/description/date/location from block config (placeholder defaults)
+      rsvp-section.tsx          Per-guest attending/declines radios (draft — not wired)
+      allergies-section.tsx     Per-guest allergies text input (draft — not wired)
+      menu-selection-section.tsx   Per-guest menu select (placeholder options — not wired)
+      drink-selection-section.tsx  Per-guest drink select (placeholder options — not wired)
+      footer-section.tsx        Event name + closing line (themed)
+
+  template-selection/
+    template-settings.tsx       "use client" — template picker + block page-builder (add via Select, reorder up/down, duplicate, remove, edit text fields) + live InvitationTemplate preview (dummy data); saves via events.setInvitationTemplate. Rendered by /dashboard/[eventSlug]/template
 ```
 
-> RSVP UI (public-rsvp-form, guest-rsvp-card, special-event-rsvp-section) was removed when
-> the public page was simplified to guest-names-only. The `submitPublicRsvp` mutation remains
-> for when the RSVP/templating feature is rebuilt.
+> **Public template (page builder):** the public invitation is a **page builder** — an ordered list
+> of `LayoutBlock`s (`{id, type, config?}`) defined in `blocks.ts`. Block types (hero, text, location,
+> countdown, itinerary, dressCode, specialInvitation, rsvp, allergies, menuSelection, drinkSelection,
+> stayInvite, footer) may repeat (e.g. several `text` blocks). `hero`, `text`, `dressCode`,
+> `specialInvitation` and `stayInvite` carry editable content in `config`; the rest are data-driven.
+> The owner builds the layout at `/dashboard/[eventSlug]/template` (pick template +
+> add/reorder/duplicate/remove/edit + live preview). Layout is stored on `events.layoutBlocks`
+> (undefined = the selected template's `defaultLayout()`, then the global `defaultLayout()`).
+>
+> **Templates own their markup.** A `TemplateDef` (template-registry) can supply its own page `Frame`,
+> a per-`BlockType` component map, and a preset `defaultLayout`; the renderer falls back to
+> `DefaultFrame` / `DEFAULT_BLOCKS` for anything a template doesn't override. So templates differ in
+> **markup and structure**, not just theme.
+>
+> - **`elegant`** is the **first official template** (default), implementing the Figma "Xoom cargo"
+>   design under `templates/elegant/`: its own `Frame` + a component per section, gold/serif styling
+>   via the `wedding-*` palette and `font-script`/`font-elegant` (see globals.css + layout.tsx), and a
+>   preset Spanish layout. Per the design, **each block owns its vertical padding** (`ElegantSection`)
+>   — the frame has no global gap. Images are placeholders and the form controls (RSVP/food/stay) are
+>   not yet wired to `submitPublicRsvp`.
+> - **`classic` / `modern` / `romantic`** remain theme-only over the default sections (plain-text
+>   drafts); give one its own markup by adding a `Frame`/`blocks` to its `TemplateDef`.
 
 ---
 

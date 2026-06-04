@@ -10,6 +10,7 @@ const PAGE_TITLES: Record<string, string> = {
   guests: "Guests",
   menu: "Menu & Drinks",
   tables: "Tables",
+  template: "Invitation Template",
   settings: "Settings",
 }
 

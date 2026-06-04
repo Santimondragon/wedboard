@@ -1,10 +1,29 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Figtree } from "next/font/google";
+import {
+  Geist,
+  Geist_Mono,
+  Figtree,
+  Fleur_De_Leah,
+  Gowun_Batang,
+} from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { RootProviders } from "@/components/providers/root-providers";
 
 const figtree = Figtree({ subsets: ["latin"], variable: "--font-sans" });
+
+// Fonts for the "elegant" invitation template (Xoom design).
+const fleurDeLeah = Fleur_De_Leah({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-script",
+});
+
+const gowunBatang = Gowun_Batang({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  variable: "--font-serif-elegant",
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,7 +54,9 @@ export default function RootLayout({
         geistSans.variable,
         geistMono.variable,
         "font-sans",
-        figtree.variable
+        figtree.variable,
+        fleurDeLeah.variable,
+        gowunBatang.variable
       )}
     >
       <body className="min-h-full flex flex-col">

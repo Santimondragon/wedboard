@@ -9,6 +9,7 @@ import {
   Users,
   UtensilsCrossed,
   LayoutGrid,
+  Palette,
   Settings,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { label: "Guests", icon: Users, segment: "guests" },
   { label: "Menu & Drinks", icon: UtensilsCrossed, segment: "menu" },
   { label: "Tables", icon: LayoutGrid, segment: "tables" },
+  { label: "Invitation Template", icon: Palette, segment: "template" },
   { label: "Settings", icon: Settings, segment: "settings" },
 ]
 
