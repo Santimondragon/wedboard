@@ -1,9 +1,10 @@
+# pnpm 11+ blocks dependency install/build scripts by default. Each
+# script-bearing dependency must be explicitly allowed (true) or denied
+# (false) so non-interactive installs (Vercel, CI) don't fail.
 allowBuilds:
-  '@clerk/shared': set this to true or false
-  esbuild: set this to true or false
+  '@clerk/shared': true
+  '@tailwindcss/oxide': true
+  esbuild: true
+  sharp: false
+  unrs-resolver: false
   msw: false
-  sharp: set this to true or false
-  unrs-resolver: set this to true or false
-ignoredBuiltDependencies:
-  - sharp
-  - unrs-resolver
