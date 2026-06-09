@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMutation } from "convex/react"
@@ -49,7 +49,12 @@ export default function SettingsPage() {
   const [savingSlug, setSavingSlug] = useState(false)
   const [archiving, setArchiving] = useState(false)
 
-  useEffect(() => {
+  // Sync form fields from the loaded event during render (guarded by a
+  // previous-value check) rather than in an effect — avoids the cascading
+  // re-render that synchronous setState in useEffect triggers.
+  const [syncedEvent, setSyncedEvent] = useState(event)
+  if (event !== syncedEvent) {
+    setSyncedEvent(event)
     if (event) {
       setName(event.name ?? "")
       setSlug(event.slug ?? "")
@@ -58,7 +63,7 @@ export default function SettingsPage() {
       setVenueAddress(event.venueAddress ?? "")
       setStatus((event.status as "draft" | "active" | "archived") ?? "draft")
     }
-  }, [event])
+  }
 
   async function handleSaveSlug() {
     if (!/^[a-z0-9-]+$/.test(slug)) {

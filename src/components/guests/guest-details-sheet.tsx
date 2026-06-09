@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useMutation } from "convex/react"
 import { api } from "convex/_generated/api"
 import { Doc, Id } from "convex/_generated/dataModel"
@@ -67,7 +67,12 @@ export function GuestDetailsSheet({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
+  // Sync form fields from the selected guest during render (guarded by a
+  // previous-value check) rather than in an effect — avoids the cascading
+  // re-render that synchronous setState in useEffect triggers.
+  const [syncedGuest, setSyncedGuest] = useState(guest)
+  if (guest !== syncedGuest) {
+    setSyncedGuest(guest)
     if (guest) {
       setFirstName(guest.firstName)
       setLastName(guest.lastName)
@@ -79,7 +84,7 @@ export function GuestDetailsSheet({
       setMenuOptionId(guest.menuOptionId ?? undefined)
       setDrinkOptionId(guest.drinkOptionId ?? undefined)
     }
-  }, [guest])
+  }
 
   async function handleSave() {
     if (!guest) return

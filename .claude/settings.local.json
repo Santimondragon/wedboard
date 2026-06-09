@@ -31,7 +31,11 @@
       "Bash(node -e \"try{console.log\\('@tailwindcss/postcss', require\\('@tailwindcss/postcss/package.json'\\).version\\)}catch\\(e\\){}\")",
       "WebFetch(domain:www.figma.com)",
       "mcp__Claude_in_Chrome__list_connected_browsers",
-      "Bash(echo \"exit $?\")"
+      "Bash(echo \"exit $?\")",
+      "Bash(pnpm -v)",
+      "Bash(pnpm lint *)",
+      "Bash(echo \"lint exit: $?\")",
+      "Bash(NEXT_PUBLIC_CONVEX_URL='https://placeholder.convex.cloud' NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY='pk_test_cGxhY2Vob2xkZXItcGxhY2Vob2xkZXItMTIzNDUkk' CLERK_SECRET_KEY='sk_test_placeholder' CLERK_FRONTEND_API_URL='https://placeholder.clerk.accounts.dev' pnpm build)"
     ]
   }
 }
