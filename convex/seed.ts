@@ -458,6 +458,25 @@ export const seedDemoEventForCurrentUser = mutation({
       throw new ConvexError("Unauthorized");
     }
 
+    // Guard against demo-event spam: refuse once the user owns 3+ events.
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_tokenIdentifier", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier)
+      )
+      .unique();
+    if (user) {
+      const owned = await ctx.db
+        .query("events")
+        .withIndex("by_ownerUserId", (q) => q.eq("ownerUserId", user._id))
+        .take(3);
+      if (owned.length >= 3) {
+        throw new ConvexError(
+          "Demo event limit reached — you already have several events"
+        );
+      }
+    }
+
     const eventId: Id<"events"> = await ctx.runMutation(
       internal.seed.seedDemoEvent,
       { ownerTokenIdentifier: identity.tokenIdentifier }

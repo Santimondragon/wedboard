@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
 import { QueryCtx, MutationCtx } from "../_generated/server";
-import { Id } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
+import { requireUser } from "./auth";
 
 const ROLE_HIERARCHY: Record<string, number> = {
   owner: 4,
@@ -30,6 +31,20 @@ export async function requireEventAccess(
   if (!member) {
     throw new ConvexError("Unauthorized");
   }
+}
+
+/**
+ * The standard guard for event-scoped functions: authenticates the caller and
+ * verifies event access in one call. Replaces the repeated
+ * requireUser + requireEventAccess pair.
+ */
+export async function requireEventEditor(
+  ctx: QueryCtx | MutationCtx,
+  eventId: Id<"events">
+): Promise<Doc<"users">> {
+  const user = await requireUser(ctx);
+  await requireEventAccess(ctx, eventId, user._id);
+  return user;
 }
 
 export async function requireEventMember(

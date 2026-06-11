@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useQuery, useMutation } from "convex/react"
+import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
 import { Id, Doc } from "convex/_generated/dataModel"
-import { toast } from "sonner"
+import { useToastMutation } from "@/hooks/use-toast-mutation"
 import { useEvent } from "@/components/dashboard/event-provider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -23,10 +23,16 @@ export default function MenuPage() {
 
   const menuOptions = useQuery(api.menu.listMenuOptionsByEventAdmin, { eventId })
   const drinkOptions = useQuery(api.drinks.listDrinkOptionsByEventAdmin, { eventId })
-  const guests = useQuery(api.guests.listByEvent, { eventId })
+  const selectionCounts = useQuery(api.menu.getSelectionCounts, { eventId })
 
-  const deleteMenuOption = useMutation(api.menu.deleteMenuOption)
-  const deleteDrinkOption = useMutation(api.drinks.deleteDrinkOption)
+  const deleteMenuOption = useToastMutation(api.menu.deleteMenuOption, {
+    success: "Menu option deleted",
+    error: "Failed to delete menu option",
+  })
+  const deleteDrinkOption = useToastMutation(api.drinks.deleteDrinkOption, {
+    success: "Drink option deleted",
+    error: "Failed to delete drink option",
+  })
 
   const [formOpen, setFormOpen] = useState(false)
   const [formType, setFormType] = useState<"menu" | "drink">("menu")
@@ -50,21 +56,11 @@ export default function MenuPage() {
   }
 
   async function handleDeleteMenu(id: Id<"menuOptions">) {
-    try {
-      await deleteMenuOption({ id })
-      toast.success("Menu option deleted")
-    } catch {
-      toast.error("Failed to delete menu option")
-    }
+    await deleteMenuOption.run({ id })
   }
 
   async function handleDeleteDrink(id: Id<"drinkOptions">) {
-    try {
-      await deleteDrinkOption({ id })
-      toast.success("Drink option deleted")
-    } catch {
-      toast.error("Failed to delete drink option")
-    }
+    await deleteDrinkOption.run({ id })
   }
 
   const isLoading = menuOptions === undefined || drinkOptions === undefined
@@ -112,8 +108,12 @@ export default function MenuPage() {
                 onEdit={(o) => openEdit(o, "menu")}
                 onDelete={(id) => handleDeleteMenu(id as Id<"menuOptions">)}
               />
-              {guests && guests.length > 0 && (
-                <SelectionSummary options={menuOptions} guests={guests} type="menu" />
+              {selectionCounts && selectionCounts.totalGuests > 0 && (
+                <SelectionSummary
+                  options={menuOptions}
+                  counts={selectionCounts.menuCounts}
+                  unassigned={selectionCounts.menuUnassigned}
+                />
               )}
             </>
           )}
@@ -146,8 +146,12 @@ export default function MenuPage() {
                 onEdit={(o) => openEdit(o, "drink")}
                 onDelete={(id) => handleDeleteDrink(id as Id<"drinkOptions">)}
               />
-              {guests && guests.length > 0 && (
-                <SelectionSummary options={drinkOptions} guests={guests} type="drink" />
+              {selectionCounts && selectionCounts.totalGuests > 0 && (
+                <SelectionSummary
+                  options={drinkOptions}
+                  counts={selectionCounts.drinkCounts}
+                  unassigned={selectionCounts.drinkUnassigned}
+                />
               )}
             </>
           )}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { memo, useState } from "react"
 import { useMutation } from "convex/react"
 import { api } from "convex/_generated/api"
 import { Doc, Id } from "convex/_generated/dataModel"
@@ -37,7 +37,9 @@ interface TableCardProps {
   onDelete: (id: Id<"tables">) => void
 }
 
-export function TableCard({
+// Memoized: with stable callbacks from TableGrid, a seat change in one table
+// no longer re-renders every other card.
+export const TableCard = memo(function TableCard({
   table,
   assignedGuests,
   unassignedGuests,
@@ -196,4 +198,4 @@ export function TableCard({
       </CardContent>
     </Card>
   )
-}
+})

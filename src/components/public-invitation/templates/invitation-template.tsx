@@ -8,7 +8,7 @@ import { resolveTemplate } from "./template-registry"
 
 interface InvitationTemplateProps {
   data: PublicInvitationData
-  /** Template id; falls back to the classic template when unknown/absent. */
+  /** Template id; falls back to the elegant template when unknown/absent. */
   templateId?: string | null
   /** Ordered layout blocks; null/undefined falls back to the default layout. */
   blocks?: LayoutBlock[] | null

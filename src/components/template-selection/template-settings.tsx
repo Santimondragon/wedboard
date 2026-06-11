@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { useMutation } from "convex/react"
+import { useMemo, useState } from "react"
+import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
-import { toast } from "sonner"
+import { useToastMutation } from "@/hooks/use-toast-mutation"
 import {
   ChevronUp,
   ChevronDown,
@@ -13,8 +13,6 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -36,12 +34,17 @@ import {
   type BlockType,
   type LayoutBlock,
 } from "@/components/public-invitation/blocks"
+import { ConfigFieldInput } from "@/components/template-selection/config-field-input"
 import { InvitationTemplate } from "@/components/public-invitation/templates/invitation-template"
 import { DUMMY_INVITATION_DATA } from "@/components/public-invitation/templates/dummy-data"
 
 export function TemplateSettings() {
   const event = useEvent()
-  const setTemplate = useMutation(api.events.setInvitationTemplate)
+  const media = useQuery(api.media.listByEvent, { eventId: event._id })
+  const setTemplate = useToastMutation(api.events.setInvitationTemplate, {
+    success: "Invitation layout saved",
+    error: "Failed to save layout",
+  })
 
   const [templateId, setTemplateId] = useState<string>(
     event.templateId ?? DEFAULT_TEMPLATE_ID
@@ -52,10 +55,15 @@ export function TemplateSettings() {
     const preset = resolveTemplate(event.templateId ?? DEFAULT_TEMPLATE_ID)
     return preset.defaultLayout?.() ?? defaultLayout()
   })
-  const [saving, setSaving] = useState(false)
-
   function addBlock(type: BlockType) {
-    setBlocks((prev) => [...prev, createBlock(type)])
+    // Pre-fill the new block with the template's default copy so its text is
+    // editable from the start.
+    const seed = resolveTemplate(templateId).defaultBlockConfig?.[type]
+    setBlocks((prev) => {
+      const block = createBlock(type)
+      if (seed) block.config = { ...seed }
+      return [...prev, block]
+    })
   }
 
   function removeBlock(id: string) {
@@ -88,7 +96,7 @@ export function TemplateSettings() {
     })
   }
 
-  function updateConfig(id: string, key: string, value: string) {
+  function updateConfig(id: string, key: string, value: unknown) {
     setBlocks((prev) =>
       prev.map((b) =>
         b.id === id ? { ...b, config: { ...b.config, [key]: value } } : b
@@ -96,45 +104,74 @@ export function TemplateSettings() {
     )
   }
 
-  async function handleSave() {
-    setSaving(true)
-    try {
-      await setTemplate({ eventId: event._id, templateId, layoutBlocks: blocks })
-      toast.success("Invitation layout saved")
-    } catch {
-      toast.error("Failed to save layout")
-    } finally {
-      setSaving(false)
+  // Media id → URL so the live preview renders the chosen images.
+  const previewMediaUrls = useMemo(() => {
+    const urls: Record<string, string> = {}
+    for (const item of media ?? []) {
+      if (item.url) urls[item._id] = item.url
     }
+    return urls
+  }, [media])
+
+  // Preview the real event details (names, date, venue, map link) when set,
+  // falling back to the dummy sample so empty fields still render something.
+  const previewData = useMemo(
+    () => ({
+      ...DUMMY_INVITATION_DATA,
+      event: {
+        ...DUMMY_INVITATION_DATA.event,
+        name: event.name || DUMMY_INVITATION_DATA.event.name,
+        brideName: event.brideName || DUMMY_INVITATION_DATA.event.brideName,
+        groomName: event.groomName || DUMMY_INVITATION_DATA.event.groomName,
+        date: event.date ?? DUMMY_INVITATION_DATA.event.date,
+        venueName: event.venueName || DUMMY_INVITATION_DATA.event.venueName,
+        venueAddress:
+          event.venueAddress || DUMMY_INVITATION_DATA.event.venueAddress,
+        venueMapUrl: event.venueMapUrl || DUMMY_INVITATION_DATA.event.venueMapUrl,
+      },
+      mediaUrls: previewMediaUrls,
+    }),
+    [event, previewMediaUrls]
+  )
+
+  async function handleSave() {
+    await setTemplate.run({
+      eventId: event._id,
+      templateId,
+      layoutBlocks: blocks,
+    })
   }
 
   return (
     <div className="grid gap-8 lg:grid-cols-[24rem_1fr]">
       {/* Controls */}
       <div className="space-y-8">
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-900">Template</h2>
-          <div className="space-y-2">
-            {TEMPLATE_LIST.map((template) => (
-              <button
-                key={template.id}
-                type="button"
-                onClick={() => setTemplateId(template.id)}
-                className={cn(
-                  "w-full rounded-lg border p-3 text-left transition-colors",
-                  templateId === template.id
-                    ? "border-zinc-900 bg-zinc-50"
-                    : "border-zinc-200 hover:bg-zinc-50"
-                )}
-              >
-                <p className="text-sm font-medium text-zinc-900">
-                  {template.label}
-                </p>
-                <p className="text-xs text-zinc-500">{template.description}</p>
-              </button>
-            ))}
-          </div>
-        </section>
+        {/* Only show the template picker when there's a real choice to make. */}
+        {TEMPLATE_LIST.length > 1 && (
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-zinc-900">Template</h2>
+            <div className="space-y-2">
+              {TEMPLATE_LIST.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  onClick={() => setTemplateId(template.id)}
+                  className={cn(
+                    "w-full rounded-lg border p-3 text-left transition-colors",
+                    templateId === template.id
+                      ? "border-zinc-900 bg-zinc-50"
+                      : "border-zinc-200 hover:bg-zinc-50"
+                  )}
+                >
+                  <p className="text-sm font-medium text-zinc-900">
+                    {template.label}
+                  </p>
+                  <p className="text-xs text-zinc-500">{template.description}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
@@ -196,32 +233,18 @@ export function TemplateSettings() {
 
                   {def.fields.length > 0 && (
                     <div className="space-y-2 pt-1">
-                      {def.fields.map((field) => {
-                        const value =
-                          (block.config?.[field.key] as string | undefined) ?? ""
-                        return field.input === "textarea" ? (
-                          <Textarea
-                            key={field.key}
-                            value={value}
-                            placeholder={field.placeholder}
-                            aria-label={field.label}
-                            rows={3}
-                            onChange={(e) =>
-                              updateConfig(block.id, field.key, e.target.value)
-                            }
-                          />
-                        ) : (
-                          <Input
-                            key={field.key}
-                            value={value}
-                            placeholder={field.placeholder}
-                            aria-label={field.label}
-                            onChange={(e) =>
-                              updateConfig(block.id, field.key, e.target.value)
-                            }
-                          />
-                        )
-                      })}
+                      {def.fields.map((field) => (
+                        <ConfigFieldInput
+                          key={field.key}
+                          field={field}
+                          value={block.config?.[field.key]}
+                          eventId={event._id}
+                          media={media}
+                          onChange={(value) =>
+                            updateConfig(block.id, field.key, value)
+                          }
+                        />
+                      ))}
                     </div>
                   )}
                 </li>
@@ -245,27 +268,31 @@ export function TemplateSettings() {
             </SelectContent>
           </Select>
         </section>
-
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save layout"}
-        </Button>
       </div>
 
-      {/* Live preview */}
-      <div className="space-y-2">
+      {/* Live preview — sticks to the top while the blocks list scrolls. */}
+      <div className="sticky top-0 self-start space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-zinc-900">Live preview</h2>
           <span className="text-xs text-zinc-400">Sample data</span>
         </div>
         <div className="overflow-hidden rounded-xl border bg-white">
-          <div className="max-h-[75vh] overflow-y-auto">
+          <div className="max-h-[70vh] overflow-y-auto">
             <InvitationTemplate
-              data={DUMMY_INVITATION_DATA}
+              data={previewData}
               templateId={templateId}
               blocks={blocks}
             />
           </div>
         </div>
+        <Button
+          size="lg"
+          className="w-full"
+          onClick={handleSave}
+          disabled={setTemplate.pending}
+        >
+          {setTemplate.pending ? "Saving…" : "Save layout"}
+        </Button>
       </div>
     </div>
   )

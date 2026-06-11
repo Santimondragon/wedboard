@@ -20,6 +20,7 @@ export const listMyEvents = query({
       .take(100);
 
     const eventIds = memberships.map((m) => m.eventId);
+    // Per-id get fan-out is bounded by the take(100) above — fine at this scale.
     const events = await Promise.all(eventIds.map((id) => ctx.db.get(id)));
     return events.filter((e): e is Doc<"events"> => e !== null);
   },
@@ -78,9 +79,12 @@ export const getEventSummary = query({
 export const createEvent = mutation({
   args: {
     name: v.string(),
+    brideName: v.optional(v.string()),
+    groomName: v.optional(v.string()),
     date: v.optional(v.number()),
     venueName: v.optional(v.string()),
     venueAddress: v.optional(v.string()),
+    venueMapUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -92,9 +96,12 @@ export const createEvent = mutation({
       name: args.name,
       slug,
       ownerUserId: user._id,
+      brideName: args.brideName,
+      groomName: args.groomName,
       date: args.date,
       venueName: args.venueName,
       venueAddress: args.venueAddress,
+      venueMapUrl: args.venueMapUrl,
       status: "draft",
     });
 
@@ -113,9 +120,12 @@ export const updateEvent = mutation({
     eventId: v.id("events"),
     name: v.optional(v.string()),
     slug: v.optional(v.string()),
+    brideName: v.optional(v.string()),
+    groomName: v.optional(v.string()),
     date: v.optional(v.number()),
     venueName: v.optional(v.string()),
     venueAddress: v.optional(v.string()),
+    venueMapUrl: v.optional(v.string()),
     status: v.optional(
       v.union(v.literal("draft"), v.literal("active"), v.literal("archived"))
     ),

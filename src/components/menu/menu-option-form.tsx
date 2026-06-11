@@ -3,10 +3,9 @@
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation } from "convex/react"
 import { api } from "convex/_generated/api"
 import { Doc, Id } from "convex/_generated/dataModel"
-import { toast } from "sonner"
+import { useToastMutation } from "@/hooks/use-toast-mutation"
 import { menuOptionSchema, type MenuOptionFormData } from "@/lib/validations/menu"
 import {
   Dialog,
@@ -41,10 +40,23 @@ export function MenuOptionForm({
   open,
   onOpenChange,
 }: MenuOptionFormProps) {
-  const createMenuOption = useMutation(api.menu.createMenuOption)
-  const updateMenuOption = useMutation(api.menu.updateMenuOption)
-  const createDrinkOption = useMutation(api.drinks.createDrinkOption)
-  const updateDrinkOption = useMutation(api.drinks.updateDrinkOption)
+  const label = type === "menu" ? "Menu" : "Drink"
+  const createMenuOption = useToastMutation(api.menu.createMenuOption, {
+    success: `${label} option created`,
+    error: "Failed to create option",
+  })
+  const updateMenuOption = useToastMutation(api.menu.updateMenuOption, {
+    success: `${label} option updated`,
+    error: "Failed to update option",
+  })
+  const createDrinkOption = useToastMutation(api.drinks.createDrinkOption, {
+    success: `${label} option created`,
+    error: "Failed to create option",
+  })
+  const updateDrinkOption = useToastMutation(api.drinks.updateDrinkOption, {
+    success: `${label} option updated`,
+    error: "Failed to update option",
+  })
 
   const {
     register,
@@ -73,48 +85,34 @@ export function MenuOptionForm({
   }, [open, option, mode, reset])
 
   async function onSubmit(data: MenuOptionFormData) {
-    try {
-      if (mode === "create") {
-        if (type === "menu") {
-          await createMenuOption({
-            eventId,
-            name: data.name,
-            description: data.description || undefined,
-          })
-        } else {
-          await createDrinkOption({
-            eventId,
-            name: data.name,
-            description: data.description || undefined,
-          })
-        }
-        toast.success(`${type === "menu" ? "Menu" : "Drink"} option created`)
-      } else {
-        if (!option) return
-        if (type === "menu") {
-          await updateMenuOption({
-            id: option._id as Id<"menuOptions">,
-            name: data.name,
-            description: data.description || undefined,
-            isActive: data.isActive,
-          })
-        } else {
-          await updateDrinkOption({
-            id: option._id as Id<"drinkOptions">,
-            name: data.name,
-            description: data.description || undefined,
-            isActive: data.isActive,
-          })
-        }
-        toast.success(`${type === "menu" ? "Menu" : "Drink"} option updated`)
-      }
-      onOpenChange(false)
-    } catch {
-      toast.error(`Failed to ${mode} option`)
+    if (mode === "create") {
+      const createOption =
+        type === "menu" ? createMenuOption : createDrinkOption
+      const result = await createOption.run({
+        eventId,
+        name: data.name,
+        description: data.description || undefined,
+      })
+      if (result.ok) onOpenChange(false)
+    } else {
+      if (!option) return
+      const result =
+        type === "menu"
+          ? await updateMenuOption.run({
+              id: option._id as Id<"menuOptions">,
+              name: data.name,
+              description: data.description || undefined,
+              isActive: data.isActive,
+            })
+          : await updateDrinkOption.run({
+              id: option._id as Id<"drinkOptions">,
+              name: data.name,
+              description: data.description || undefined,
+              isActive: data.isActive,
+            })
+      if (result.ok) onOpenChange(false)
     }
   }
-
-  const label = type === "menu" ? "Menu" : "Drink"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

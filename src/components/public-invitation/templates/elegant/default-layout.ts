@@ -1,15 +1,9 @@
 import type { BlockType, LayoutBlock } from "../../blocks"
+import { ELEGANT_BLOCK_CONFIG } from "./default-copy"
 
 // Canonical layout of the official "elegant" template, mirroring the Figma
-// design's section order and copy. Used when an event has no saved layout.
-function block(
-  type: BlockType,
-  config: Record<string, unknown>,
-  i: number
-): LayoutBlock {
-  return { id: `elegant-${type}-${i}`, type, config }
-}
-
+// design's section order. Each block is seeded with the design's copy so all
+// text is immediately editable in the page builder.
 export function elegantDefaultLayout(): LayoutBlock[] {
   return [
     "hero",
@@ -23,13 +17,9 @@ export function elegantDefaultLayout(): LayoutBlock[] {
     "specialInvitation",
     "stayInvite",
     "footer",
-  ].map((type, i) =>
-    block(
-      type as BlockType,
-      // The "text" block is the "Lluvia de sobres" gift section; everything else
-      // pulls its default copy from the block components.
-      type === "text" ? { headline: "Lluvia de sobres" } : {},
-      i
-    )
-  )
+  ].map((type, i) => ({
+    id: `elegant-${type}-${i}`,
+    type: type as BlockType,
+    config: { ...(ELEGANT_BLOCK_CONFIG[type] ?? {}) },
+  }))
 }

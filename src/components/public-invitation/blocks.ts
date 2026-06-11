@@ -28,8 +28,15 @@ export interface LayoutBlock {
 export interface ConfigField {
   key: string
   label: string
-  input: "text" | "textarea"
+  /** "image" stores a media id (string) referencing the event's media table. */
+  input: "text" | "textarea" | "list" | "image"
   placeholder?: string
+  /**
+   * For "list" fields: shape of each item. Omit for a plain string list
+   * (e.g. food options); set for structured rows (e.g. itinerary
+   * {time,label} entries).
+   */
+  itemFields?: { key: string; label: string }[]
 }
 
 interface BlockDef {
@@ -45,6 +52,7 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
     description: "Event name, date, photo and greeting.",
     fields: [
       { key: "body", label: "Greeting", input: "textarea", placeholder: "Intro paragraph…" },
+      { key: "heroImage", label: "Photo", input: "image" },
     ],
   },
   text: {
@@ -58,7 +66,7 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
   location: {
     label: "Location & Address",
     description: "Venue name and address.",
-    fields: [],
+    fields: [{ key: "mapImage", label: "Map image", input: "image" }],
   },
   countdown: {
     label: "Countdown",
@@ -67,15 +75,26 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
   },
   itinerary: {
     label: "Itinerary",
-    description: "Schedule of the day (placeholder).",
-    fields: [],
+    description: "Schedule of the day.",
+    fields: [
+      {
+        key: "items",
+        label: "Schedule",
+        input: "list",
+        itemFields: [
+          { key: "time", label: "Time" },
+          { key: "label", label: "Activity" },
+        ],
+      },
+    ],
   },
   dressCode: {
     label: "Dress Code",
     description: "Dress code and a short note.",
     fields: [
-      { key: "dressCode", label: "Dress code", input: "text", placeholder: "Formal / Black Tie" },
-      { key: "note", label: "Note", input: "text", placeholder: "Optional note" },
+      { key: "dressCode", label: "Dress code", input: "textarea", placeholder: "Formal / Black Tie" },
+      { key: "note", label: "Note", input: "textarea", placeholder: "Optional note" },
+      { key: "photo", label: "Photo", input: "image" },
     ],
   },
   specialInvitation: {
@@ -92,12 +111,18 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
   rsvp: {
     label: "RSVP (per guest)",
     description: "Attending / declines toggle per guest.",
-    fields: [],
+    fields: [
+      { key: "body", label: "Note", input: "textarea", placeholder: "Thank-you note shown above the RSVP controls…" },
+    ],
   },
   allergies: {
     label: "Allergies (per guest)",
     description: "Dietary restrictions input per guest.",
-    fields: [],
+    fields: [
+      { key: "headline", label: "Headline", input: "text", placeholder: "Food" },
+      { key: "note", label: "Note", input: "textarea", placeholder: "Tell us about any allergies…" },
+      { key: "options", label: "Options", input: "list" },
+    ],
   },
   menuSelection: {
     label: "Menu Selection (per guest)",
@@ -115,12 +140,15 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
     fields: [
       { key: "headline", label: "Headline", input: "text", placeholder: "Continúa la celebración" },
       { key: "body", label: "Message", input: "textarea", placeholder: "Details about accommodation…" },
+      { key: "image", label: "Image", input: "image" },
     ],
   },
   footer: {
     label: "Footer",
     description: "Closing line with the event name.",
-    fields: [],
+    fields: [
+      { key: "body", label: "Closing line", input: "textarea", placeholder: "We can't wait to celebrate with you…" },
+    ],
   },
 }
 
@@ -177,6 +205,25 @@ export function createBlock(type: BlockType): LayoutBlock {
  */
 export function defaultLayout(): LayoutBlock[] {
   return DEFAULT_ORDER.map((type, i) => ({ id: `${type}-default-${i}`, type, config: {} }))
+}
+
+/**
+ * Reads a list config value. Plain string lists return string[]; structured
+ * lists return one record per row. Returns undefined when missing/empty or
+ * the stored value has an unexpected shape.
+ */
+export function getConfigList(
+  block: LayoutBlock,
+  key: string
+): (string | Record<string, string>)[] | undefined {
+  const value = block.config?.[key]
+  if (!Array.isArray(value) || value.length === 0) return undefined
+  const items = value.filter(
+    (item): item is string | Record<string, string> =>
+      typeof item === "string" ||
+      (typeof item === "object" && item !== null && !Array.isArray(item))
+  )
+  return items.length > 0 ? items : undefined
 }
 
 /** Reads a string config value, returning undefined when empty/missing. */

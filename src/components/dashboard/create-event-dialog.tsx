@@ -3,9 +3,8 @@
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
-import { useMutation } from "convex/react"
 import { api } from "convex/_generated/api"
-import { toast } from "sonner"
+import { useToastMutation } from "@/hooks/use-toast-mutation"
 import {
   Dialog,
   DialogContent,
@@ -25,7 +24,10 @@ interface CreateEventDialogProps {
 
 export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps) {
   const router = useRouter()
-  const createEvent = useMutation(api.events.createEvent)
+  const createEvent = useToastMutation(api.events.createEvent, {
+    success: "Event created",
+    error: "Failed to create event",
+  })
 
   const {
     register,
@@ -37,17 +39,14 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
   })
 
   async function onSubmit(data: EventFormData) {
-    try {
-      const { slug } = await createEvent({
-        ...data,
-        date: data.date ? new Date(data.date).getTime() : undefined,
-      })
-      toast.success("Event created")
+    const result = await createEvent.run({
+      ...data,
+      date: data.date ? new Date(data.date).getTime() : undefined,
+    })
+    if (result.ok) {
       reset()
       onOpenChange(false)
-      router.push(`/dashboard/${slug}`)
-    } catch (err) {
-      toast.error("Failed to create event")
+      router.push(`/dashboard/${result.value.slug}`)
     }
   }
 

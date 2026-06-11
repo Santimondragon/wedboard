@@ -2,10 +2,9 @@
 
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation } from "convex/react"
 import { api } from "convex/_generated/api"
 import { Id } from "convex/_generated/dataModel"
-import { toast } from "sonner"
+import { useToastMutation } from "@/hooks/use-toast-mutation"
 import { tableSchema, type TableFormData } from "@/lib/validations/table"
 import {
   Dialog,
@@ -25,7 +24,10 @@ interface AddTableDialogProps {
 }
 
 export function AddTableDialog({ eventId, open, onOpenChange }: AddTableDialogProps) {
-  const createTable = useMutation(api.tables.createTable)
+  const createTable = useToastMutation(api.tables.createTable, {
+    success: "Table created",
+    error: "Failed to create table",
+  })
 
   const {
     register,
@@ -38,17 +40,14 @@ export function AddTableDialog({ eventId, open, onOpenChange }: AddTableDialogPr
   })
 
   async function onSubmit(data: TableFormData) {
-    try {
-      await createTable({
-        eventId,
-        name: data.name,
-        seatsCount: data.seatsCount,
-      })
-      toast.success("Table created")
+    const result = await createTable.run({
+      eventId,
+      name: data.name,
+      seatsCount: data.seatsCount,
+    })
+    if (result.ok) {
       reset()
       onOpenChange(false)
-    } catch {
-      toast.error("Failed to create table")
     }
   }
 

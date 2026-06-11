@@ -1,39 +1,26 @@
 "use client"
 
-import { Doc, Id } from "convex/_generated/dataModel"
+import { Doc } from "convex/_generated/dataModel"
 
 type MenuOption = Doc<"menuOptions">
 type DrinkOption = Doc<"drinkOptions">
-type Guest = Doc<"guests">
 
 interface SelectionSummaryProps {
   options: Array<MenuOption | DrinkOption>
-  guests: Guest[]
-  type: "menu" | "drink"
+  /** Guest count per option id (from api.menu.getSelectionCounts). */
+  counts: Record<string, number>
+  unassigned: number
 }
 
-export function SelectionSummary({ options, guests, type }: SelectionSummaryProps) {
-  const counts = options.map((option) => {
-    const count = guests.filter((g) => {
-      if (type === "menu") return g.menuOptionId === option._id
-      return g.drinkOptionId === option._id
-    }).length
-    return { name: option.name, count }
-  })
-
-  const unassigned = guests.filter((g) => {
-    if (type === "menu") return !g.menuOptionId
-    return !g.drinkOptionId
-  }).length
-
+export function SelectionSummary({ options, counts, unassigned }: SelectionSummaryProps) {
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium text-zinc-700">Guest Selections</p>
       <div className="divide-y divide-zinc-100 rounded-md border text-sm">
-        {counts.map((item) => (
-          <div key={item.name} className="flex items-center justify-between px-3 py-2">
-            <span className="text-zinc-700">{item.name}</span>
-            <span className="font-medium text-zinc-900">{item.count}</span>
+        {options.map((option) => (
+          <div key={option._id} className="flex items-center justify-between px-3 py-2">
+            <span className="text-zinc-700">{option.name}</span>
+            <span className="font-medium text-zinc-900">{counts[option._id] ?? 0}</span>
           </div>
         ))}
         <div className="flex items-center justify-between px-3 py-2">

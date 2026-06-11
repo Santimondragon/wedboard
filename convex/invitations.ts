@@ -1,14 +1,13 @@
 import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
-import { requireUser } from "./lib/auth";
-import { requireEventAccess } from "./lib/permissions";
+import { requireEventEditor } from "./lib/permissions";
 import { generateSlug, generateUniqueInvitationSlug } from "./lib/slug";
+import { resolvePublicEvent, resolvePublicInvitation } from "./lib/public";
 
 export const listByEvent = query({
   args: { eventId: v.id("events") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventAccess(ctx, args.eventId, user._id);
+    await requireEventEditor(ctx, args.eventId);
 
     return await ctx.db
       .query("invitations")
@@ -20,10 +19,9 @@ export const listByEvent = query({
 export const getById = query({
   args: { id: v.id("invitations") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
     const invitation = await ctx.db.get(args.id);
     if (!invitation) throw new ConvexError("Invitation not found");
-    await requireEventAccess(ctx, invitation.eventId, user._id);
+    await requireEventEditor(ctx, invitation.eventId);
     return invitation;
   },
 });
@@ -31,23 +29,17 @@ export const getById = query({
 export const getPublicInvitation = query({
   args: { eventSlug: v.string(), invitationSlug: v.string() },
   handler: async (ctx, args) => {
-    const event = await ctx.db
-      .query("events")
-      .withIndex("by_slug", (q) => q.eq("slug", args.eventSlug))
-      .unique();
-
+    const event = await resolvePublicEvent(ctx, args.eventSlug);
     if (!event) {
       return null;
     }
 
-    const invitation = await ctx.db
-      .query("invitations")
-      .withIndex("by_eventId_and_slug", (q) =>
-        q.eq("eventId", event._id).eq("slug", args.invitationSlug)
-      )
-      .unique();
-
-    if (!invitation || !invitation.isActive) {
+    const invitation = await resolvePublicInvitation(
+      ctx,
+      event,
+      args.invitationSlug
+    );
+    if (!invitation) {
       return null;
     }
 
@@ -58,12 +50,32 @@ export const getPublicInvitation = query({
       )
       .take(100);
 
+    // Resolve media references in the layout config ("image" fields store a
+    // media id string) to signed URLs so the public page can render them.
+    const mediaUrls: Record<string, string> = {};
+    for (const block of event.layoutBlocks ?? []) {
+      for (const value of Object.values(
+        (block.config ?? {}) as Record<string, unknown>
+      )) {
+        if (typeof value !== "string" || value in mediaUrls) continue;
+        const mediaId = ctx.db.normalizeId("media", value);
+        if (!mediaId) continue;
+        const media = await ctx.db.get(mediaId);
+        if (!media || media.eventId !== event._id) continue;
+        const url = await ctx.storage.getUrl(media.storageId);
+        if (url) mediaUrls[value] = url;
+      }
+    }
+
     return {
       event: {
         name: event.name,
+        brideName: event.brideName,
+        groomName: event.groomName,
         date: event.date,
         venueName: event.venueName,
         venueAddress: event.venueAddress,
+        venueMapUrl: event.venueMapUrl,
         templateId: event.templateId,
         layoutBlocks: event.layoutBlocks,
       },
@@ -80,6 +92,7 @@ export const getPublicInvitation = query({
         firstName: g.firstName,
         lastName: g.lastName,
       })),
+      mediaUrls,
     };
   },
 });
@@ -100,8 +113,7 @@ export const createInvitation = mutation({
     guestIds: v.optional(v.array(v.id("guests"))),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventAccess(ctx, args.eventId, user._id);
+    await requireEventEditor(ctx, args.eventId);
 
     const baseSlug = args.slug
       ? generateSlug(args.slug)
@@ -125,6 +137,9 @@ export const createInvitation = mutation({
     });
 
     // Assign selected un-invited guests to this invitation.
+    if (args.guestIds && args.guestIds.length > 20) {
+      throw new ConvexError("Cannot link more than 20 guests at once");
+    }
     if (args.guestIds) {
       for (const guestId of args.guestIds) {
         const guest = await ctx.db.get(guestId);
@@ -160,10 +175,9 @@ export const updateInvitation = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
     const invitation = await ctx.db.get(args.id);
     if (!invitation) throw new ConvexError("Invitation not found");
-    await requireEventAccess(ctx, invitation.eventId, user._id);
+    await requireEventEditor(ctx, invitation.eventId);
 
     const { id, slug, ...rest } = args;
 
@@ -184,10 +198,9 @@ export const updateInvitation = mutation({
 export const deleteInvitation = mutation({
   args: { id: v.id("invitations") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
     const invitation = await ctx.db.get(args.id);
     if (!invitation) throw new ConvexError("Invitation not found");
-    await requireEventAccess(ctx, invitation.eventId, user._id);
+    await requireEventEditor(ctx, invitation.eventId);
 
     // Unassign guests for this invitation — they return to the un-invited
     // pool rather than being deleted.
@@ -220,10 +233,14 @@ export const setSpecialEventAccess = mutation({
     hasAccess: v.boolean(),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
     const invitation = await ctx.db.get(args.invitationId);
     if (!invitation) throw new ConvexError("Invitation not found");
-    await requireEventAccess(ctx, invitation.eventId, user._id);
+    await requireEventEditor(ctx, invitation.eventId);
+
+    const specialEvent = await ctx.db.get(args.specialEventId);
+    if (!specialEvent || specialEvent.eventId !== invitation.eventId) {
+      throw new ConvexError("Special event does not belong to this event");
+    }
 
     const existing = await ctx.db
       .query("invitationSpecialEventAccess")
@@ -249,10 +266,9 @@ export const setSpecialEventAccess = mutation({
 export const regenerateSlug = mutation({
   args: { id: v.id("invitations") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
     const invitation = await ctx.db.get(args.id);
     if (!invitation) throw new ConvexError("Invitation not found");
-    await requireEventAccess(ctx, invitation.eventId, user._id);
+    await requireEventEditor(ctx, invitation.eventId);
 
     const baseSlug = generateSlug(invitation.title);
     const newSlug = await generateUniqueInvitationSlug(

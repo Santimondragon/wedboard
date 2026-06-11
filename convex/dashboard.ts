@@ -1,23 +1,25 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
-import { requireUser } from "./lib/auth";
-import { requireEventAccess } from "./lib/permissions";
+import { requireEventEditor } from "./lib/permissions";
 
 export const getOverviewStats = query({
   args: { eventId: v.id("events") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventAccess(ctx, args.eventId, user._id);
+    await requireEventEditor(ctx, args.eventId);
 
-    const invitations = await ctx.db
-      .query("invitations")
-      .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-      .take(1000);
-
-    const guests = await ctx.db
-      .query("guests")
-      .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-      .take(1000);
+    // Bounded scan is fine at wedding scale (≤ ~1000 guests). If events ever
+    // outgrow this, move to denormalized counters in an eventStats table
+    // updated transactionally by the guest/invitation mutations.
+    const [invitations, guests] = await Promise.all([
+      ctx.db
+        .query("invitations")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(1000),
+      ctx.db
+        .query("guests")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(1000),
+    ]);
 
     const totalInvitations = invitations.length;
     const totalGuests = guests.length;

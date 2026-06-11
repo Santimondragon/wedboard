@@ -10,6 +10,7 @@ import {
   UtensilsCrossed,
   LayoutGrid,
   Palette,
+  Image as ImageIcon,
   Settings,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { label: "Menu & Drinks", icon: UtensilsCrossed, segment: "menu" },
   { label: "Tables", icon: LayoutGrid, segment: "tables" },
   { label: "Invitation Template", icon: Palette, segment: "template" },
+  { label: "Media", icon: ImageIcon, segment: "media" },
   { label: "Settings", icon: Settings, segment: "settings" },
 ]
 

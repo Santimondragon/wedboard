@@ -3,9 +3,13 @@
 
 export interface PublicEvent {
   name: string
+  brideName?: string
+  groomName?: string
   date?: number
   venueName?: string
   venueAddress?: string
+  /** Google Maps (or any maps) link for the venue. */
+  venueMapUrl?: string
 }
 
 export interface PublicInvitation {
@@ -27,4 +31,6 @@ export interface PublicInvitationData {
   event: PublicEvent
   invitation: PublicInvitation
   guests: PublicGuest[]
+  /** Media id → signed URL for images referenced by the layout config. */
+  mediaUrls?: Record<string, string>
 }

@@ -2,10 +2,9 @@
 
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation } from "convex/react"
 import { api } from "convex/_generated/api"
 import { Id } from "convex/_generated/dataModel"
-import { toast } from "sonner"
+import { useToastMutation } from "@/hooks/use-toast-mutation"
 import { guestSchema, type GuestFormData } from "@/lib/validations/guest"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,7 +18,10 @@ interface GuestFormProps {
 }
 
 export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) {
-  const createGuest = useMutation(api.guests.createGuest)
+  const createGuest = useToastMutation(api.guests.createGuest, {
+    success: "Guest added successfully",
+    error: "Failed to add guest",
+  })
 
   const {
     register,
@@ -40,22 +42,19 @@ export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) 
   const isPlusOne = watch("isPlusOne")
 
   async function onSubmit(data: GuestFormData) {
-    try {
-      await createGuest({
-        eventId,
-        invitationId,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email || undefined,
-        phone: data.phone || undefined,
-        isPrimaryContact: data.isPrimaryContact,
-        isPlusOne: data.isPlusOne,
-      })
-      toast.success("Guest added successfully")
+    const result = await createGuest.run({
+      eventId,
+      invitationId,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email || undefined,
+      phone: data.phone || undefined,
+      isPrimaryContact: data.isPrimaryContact,
+      isPlusOne: data.isPlusOne,
+    })
+    if (result.ok) {
       reset()
       onSuccess()
-    } catch {
-      toast.error("Failed to add guest")
     }
   }
 

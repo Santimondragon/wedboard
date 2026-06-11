@@ -7,6 +7,7 @@ import { TEMPLATE_THEMES, type TemplateTheme } from "../template-theme"
 import type { BlockType, LayoutBlock } from "../blocks"
 import type { BlockComponent, FrameComponent } from "./default-blocks"
 import { ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout } from "./elegant"
+import { ELEGANT_BLOCK_CONFIG } from "./elegant/default-copy"
 
 export interface TemplateDef {
   id: string
@@ -20,13 +21,17 @@ export interface TemplateDef {
   blocks?: Partial<Record<BlockType, BlockComponent>>
   /** Preset layout used when an event has no saved layout. */
   defaultLayout?: () => LayoutBlock[]
+  /**
+   * Per-block default config used to pre-fill newly added blocks in the
+   * editor (so the template's copy is editable from the start).
+   */
+  defaultBlockConfig?: Partial<Record<BlockType, Record<string, unknown>>>
 }
 
 /**
- * `elegant` is the first official template (Xoom design): it ships its own page
- * frame, a block component per section, and a preset layout. `classic`,
- * `modern` and `romantic` remain as theme-only templates over the default
- * blocks (set a `Frame`/`blocks` to give them their own markup).
+ * `elegant` is the only official template: it ships its own page frame, a block
+ * component per section, and a preset layout. Add more templates here by giving
+ * each its own `Frame`/`blocks` to define their markup.
  */
 export const TEMPLATES: Record<string, TemplateDef> = {
   elegant: {
@@ -37,24 +42,7 @@ export const TEMPLATES: Record<string, TemplateDef> = {
     Frame: ElegantFrame,
     blocks: ELEGANT_BLOCKS,
     defaultLayout: elegantDefaultLayout,
-  },
-  classic: {
-    id: "classic",
-    label: TEMPLATE_THEMES.classic.label,
-    description: TEMPLATE_THEMES.classic.description,
-    theme: TEMPLATE_THEMES.classic,
-  },
-  modern: {
-    id: "modern",
-    label: TEMPLATE_THEMES.modern.label,
-    description: TEMPLATE_THEMES.modern.description,
-    theme: TEMPLATE_THEMES.modern,
-  },
-  romantic: {
-    id: "romantic",
-    label: TEMPLATE_THEMES.romantic.label,
-    description: TEMPLATE_THEMES.romantic.description,
-    theme: TEMPLATE_THEMES.romantic,
+    defaultBlockConfig: ELEGANT_BLOCK_CONFIG,
   },
 }
 

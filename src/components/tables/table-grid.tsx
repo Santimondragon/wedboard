@@ -1,9 +1,9 @@
 "use client"
 
-import { useMutation } from "convex/react"
+import { useCallback } from "react"
 import { api } from "convex/_generated/api"
 import { Doc, Id } from "convex/_generated/dataModel"
-import { toast } from "sonner"
+import { useToastMutation } from "@/hooks/use-toast-mutation"
 import { TableCard } from "@/components/tables/table-card"
 
 interface TableGridProps {
@@ -14,47 +14,52 @@ interface TableGridProps {
 }
 
 export function TableGrid({ tables, guestsByTable, unassignedGuests }: TableGridProps) {
-  const assignGuestToSeat = useMutation(api.tables.assignGuestToSeat)
-  const unassignGuestFromSeat = useMutation(api.tables.unassignGuestFromSeat)
-  const updateTableSeats = useMutation(api.tables.updateTableSeats)
-  const deleteTable = useMutation(api.tables.deleteTable)
+  const { run: assignGuestToSeat } = useToastMutation(
+    api.tables.assignGuestToSeat,
+    { error: "Failed to assign guest to seat" },
+  )
+  const { run: unassignGuestFromSeat } = useToastMutation(
+    api.tables.unassignGuestFromSeat,
+    { error: "Failed to unassign guest" },
+  )
+  const { run: updateTableSeats } = useToastMutation(
+    api.tables.updateTableSeats,
+    { error: "Failed to update seat count" },
+  )
+  const { run: deleteTable } = useToastMutation(api.tables.deleteTable, {
+    success: "Table deleted",
+    error: "Failed to delete table",
+  })
 
-  async function handleAssign(
-    guestId: Id<"guests">,
-    tableId: Id<"tables">,
-    seatNumber: number,
-  ) {
-    try {
+  // Stable callbacks so memoized TableCards only re-render when their own
+  // table/guest data changes.
+  const handleAssign = useCallback(
+    async (guestId: Id<"guests">, tableId: Id<"tables">, seatNumber: number) => {
       await assignGuestToSeat({ guestId, tableId, seatNumber })
-    } catch {
-      toast.error("Failed to assign guest to seat")
-    }
-  }
+    },
+    [assignGuestToSeat],
+  )
 
-  async function handleUnassign(guestId: Id<"guests">) {
-    try {
+  const handleUnassign = useCallback(
+    async (guestId: Id<"guests">) => {
       await unassignGuestFromSeat({ guestId })
-    } catch {
-      toast.error("Failed to unassign guest")
-    }
-  }
+    },
+    [unassignGuestFromSeat],
+  )
 
-  async function handleUpdateSeats(id: Id<"tables">, seatsCount: number) {
-    try {
+  const handleUpdateSeats = useCallback(
+    async (id: Id<"tables">, seatsCount: number) => {
       await updateTableSeats({ id, seatsCount })
-    } catch {
-      toast.error("Failed to update seat count")
-    }
-  }
+    },
+    [updateTableSeats],
+  )
 
-  async function handleDelete(id: Id<"tables">) {
-    try {
+  const handleDelete = useCallback(
+    async (id: Id<"tables">) => {
       await deleteTable({ id })
-      toast.success("Table deleted")
-    } catch {
-      toast.error("Failed to delete table")
-    }
-  }
+    },
+    [deleteTable],
+  )
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

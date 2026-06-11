@@ -4,10 +4,13 @@ import type { PublicInvitationData } from "../types"
 export const DUMMY_INVITATION_DATA: PublicInvitationData = {
   event: {
     name: "Ava & Liam",
+    brideName: "Ava",
+    groomName: "Liam",
     // ~4 months out so the countdown shows non-zero values.
     date: Date.now() + 1000 * 60 * 60 * 24 * 120,
     venueName: "The Grand Hall",
     venueAddress: "123 Rosewood Avenue, Springfield",
+    venueMapUrl: "https://maps.google.com/?q=The+Grand+Hall",
   },
   invitation: {
     _id: "preview-invitation",

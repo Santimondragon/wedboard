@@ -17,9 +17,13 @@ export default defineSchema({
     name: v.string(),
     slug: v.string(),
     ownerUserId: v.id("users"),
+    brideName: v.optional(v.string()),
+    groomName: v.optional(v.string()),
     date: v.optional(v.number()),
     venueName: v.optional(v.string()),
     venueAddress: v.optional(v.string()),
+    // Google Maps (or any maps) link for the venue, shown on the public invitation.
+    venueMapUrl: v.optional(v.string()),
     subdomain: v.optional(v.string()),
     customDomain: v.optional(v.string()),
     templateId: v.optional(v.string()),
@@ -99,6 +103,7 @@ export default defineSchema({
     seatNumber: v.optional(v.number()),
   })
     .index("by_eventId", ["eventId"])
+    .index("by_eventId_and_invitationId", ["eventId", "invitationId"])
     .index("by_invitationId", ["invitationId"])
     .index("by_tableId", ["tableId"])
     .index("by_tableId_and_seatNumber", ["tableId", "seatNumber"])
@@ -154,6 +159,16 @@ export default defineSchema({
     description: v.optional(v.string()),
     isActive: v.boolean(),
     sortOrder: v.number(),
+  }).index("by_eventId", ["eventId"]),
+
+  // Per-event image library (template photos, maps, etc.). Blobs live in
+  // Convex file storage; this table is the catalog.
+  media: defineTable({
+    eventId: v.id("events"),
+    storageId: v.id("_storage"),
+    name: v.string(),
+    mimeType: v.string(),
+    size: v.number(),
   }).index("by_eventId", ["eventId"]),
 
   tables: defineTable({

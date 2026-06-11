@@ -12,7 +12,7 @@ import { RootProviders } from "@/components/providers/root-providers";
 
 const figtree = Figtree({ subsets: ["latin"], variable: "--font-sans" });
 
-// Fonts for the "elegant" invitation template (Xoom design).
+// Fonts for the "elegant" invitation template.
 const fleurDeLeah = Fleur_De_Leah({
   weight: "400",
   subsets: ["latin"],

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
 import { Id, Doc } from "convex/_generated/dataModel"
@@ -22,11 +22,12 @@ import { Users } from "lucide-react"
 export default function GuestsPage() {
   const eventId = useEvent()._id
 
-  const guests = useQuery(api.guests.listByEvent, { eventId })
-  const invitations = useQuery(api.invitations.listByEvent, { eventId })
-  const menuOptions = useQuery(api.menu.listMenuOptionsByEventAdmin, { eventId })
-  const drinkOptions = useQuery(api.drinks.listDrinkOptionsByEventAdmin, { eventId })
-  const tables = useQuery(api.tables.listTablesByEvent, { eventId })
+  const pageData = useQuery(api.guests.getGuestsPageData, { eventId })
+  const guests = pageData?.guests
+  const invitations = pageData?.invitations
+  const menuOptions = pageData?.menuOptions
+  const drinkOptions = pageData?.drinkOptions
+  const tables = pageData?.tables
 
   const [selectedGuestId, setSelectedGuestId] = useState<Id<"guests"> | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -68,10 +69,11 @@ export default function GuestsPage() {
     return enrichedGuests.find((g) => g._id === selectedGuestId) ?? null
   }, [selectedGuestId, enrichedGuests])
 
-  function handleEditGuest(guestId: Id<"guests">) {
+  // Stable callback so GuestTable's memoized columns don't rebuild each render.
+  const handleEditGuest = useCallback((guestId: Id<"guests">) => {
     setSelectedGuestId(guestId)
     setSheetOpen(true)
-  }
+  }, [])
 
   const isLoading = guests === undefined
 

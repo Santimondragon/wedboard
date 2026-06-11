@@ -10,9 +10,16 @@ export const eventSchema = z.object({
       "Event key may only contain lowercase letters, numbers, and hyphens"
     )
     .optional(),
+  brideName: z.string().optional(),
+  groomName: z.string().optional(),
   date: z.string().optional(),
   venueName: z.string().optional(),
   venueAddress: z.string().optional(),
+  venueMapUrl: z
+    .string()
+    .url("Enter a valid URL (e.g. https://maps.google.com/...)")
+    .optional()
+    .or(z.literal("")),
 })
 
 export type EventFormData = z.infer<typeof eventSchema>

@@ -84,12 +84,15 @@ Top-level board. One event = one wedding/occasion.
 | name | string |
 | slug | string | Handle-style **event key**, globally unique, editable in settings. Used in public URLs. |
 | ownerUserId | Id<"users"> |
+| brideName | string? | Shown on the public invitation (hero) |
+| groomName | string? | Shown on the public invitation (hero) |
 | date | number? | Unix ms timestamp |
 | venueName | string? | |
 | venueAddress | string? | |
+| venueMapUrl | string? | Google Maps (or any maps) link; backs the location "Ver mapa" button |
 | subdomain | string? | Future |
 | customDomain | string? | Future |
-| templateId | string? | Public invitation template id (`"classic" \| "modern" \| "romantic"`); defaults to classic when unset |
+| templateId | string? | Public invitation template id (`"elegant"`); defaults to elegant when unset |
 | layoutBlocks | `{id,type,config?}[]`? | Ordered page-builder blocks for the public invitation (see `public-invitation/blocks`). Undefined = default layout. `config` is `v.any()` (per-instance content, e.g. text headline/body) |
 | status | `"draft" \| "active" \| "archived"` |
 
@@ -151,7 +154,7 @@ A guest with no `invitationId` is "un-invited" and can be selected when creating
 | tableId | Id<"tables">? |
 | seatNumber | number? | 0-based internally, 1-based in UI |
 
-Indexes: `by_eventId`, `by_invitationId`, `by_tableId`, `by_tableId_and_seatNumber`, `by_eventId_and_rsvpStatus`
+Indexes: `by_eventId`, `by_eventId_and_invitationId` (powers the un-invited guests query via `eq("invitationId", undefined)`), `by_invitationId`, `by_tableId`, `by_tableId_and_seatNumber`, `by_eventId_and_rsvpStatus`
 
 ---
 
@@ -220,6 +223,21 @@ Index: `by_eventId`
 
 ---
 
+### `media`
+Per-event image library (template photos, maps, etc.). Blobs live in Convex file storage; this table is the catalog. Only image mime types (jpeg/png/svg+xml/webp/gif), ≤ 5MB, max 50 per event (enforced in `media.register`).
+
+| Field | Type |
+|---|---|
+| eventId | Id<"events"> |
+| storageId | Id<"_storage"> |
+| name | string |
+| mimeType | string |
+| size | number |
+
+Index: `by_eventId`
+
+---
+
 ### `tables`
 Seating tables. Seat assignments live on `guests` (tableId + seatNumber).
 
@@ -242,7 +260,15 @@ Index: `by_eventId`
 
 ### `convex/lib/permissions.ts`
 - `requireEventAccess(ctx, eventId, userId)` — verifies eventMembers membership or ownership
+- `requireEventEditor(ctx, eventId)` — **the standard guard**: `requireUser` + `requireEventAccess` in one call, returns the user doc. Used by nearly all event-scoped functions
 - `requireEventMember(ctx, eventId, userId, minRole?)` — enforces role hierarchy
+
+### `convex/lib/public.ts`
+- `resolvePublicEvent(ctx, eventSlug)` — public (unauthenticated) event lookup by slug; returns null for archived events (draft allowed for preview). Reuse for any future public resolver (e.g. custom-domain lookup)
+- `resolvePublicInvitation(ctx, event, invitationSlug)` — active invitation within a resolved public event
+
+### `convex/lib/options.ts`
+Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPublicOptions`, `listAdminOptions`, `createOption`, `updateOption`, `deleteOption`, plus `nextSortOrder(ctx, table, eventId)` (also used by `tables.createTable`).
 
 ### `convex/lib/slug.ts`
 - `generateSlug(text)` — lowercases and hyphenates
@@ -274,11 +300,11 @@ Index: `by_eventId`
 |---|---|---|
 | `listByEvent` | query | Auth required |
 | `getById` | query | Auth required |
-| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; returns `{event (incl. templateId, layoutBlocks), invitation, guests:[{firstName,lastName}]}` |
-| `createInvitation` | mutation | Per-event-unique slug; optional `guestIds` links selected un-invited guests |
+| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; resolves via `lib/public.ts` (null for archived events / inactive invitations); returns `{event (incl. brideName, groomName, venueMapUrl, templateId, layoutBlocks), invitation, guests:[{firstName,lastName}], mediaUrls}` where `mediaUrls` maps media ids referenced in layout config → signed URLs |
+| `createInvitation` | mutation | Per-event-unique slug; optional `guestIds` (≤20) links selected un-invited guests |
 | `updateInvitation` | mutation | |
 | `deleteInvitation` | mutation | **Unassigns** its guests (sets invitationId undefined), does not delete them |
-| `setSpecialEventAccess` | mutation | Adds/removes invitationSpecialEventAccess row |
+| `setSpecialEventAccess` | mutation | Adds/removes invitationSpecialEventAccess row; verifies the special event belongs to the same event |
 | `regenerateSlug` | mutation | |
 
 ### `convex/guests.ts`
@@ -286,22 +312,32 @@ Index: `by_eventId`
 |---|---|---|
 | `listByEvent` | query | Auth required |
 | `listByInvitation` | query | Auth required |
-| `listUnassignedByEvent` | query | Auth required — event guests with no `invitationId` |
+| `listUnassignedByEvent` | query | Auth required — event guests with no `invitationId` (uses `by_eventId_and_invitationId` with `eq(undefined)`) |
+| `getGuestsPageData` | query | Auth required — `{guests, invitations, menuOptions, drinkOptions, tables}` in one round trip; powers the guests dashboard page |
 | `getGuestById` | query | |
 | `createGuest` | mutation | Requires `eventId`; optional `invitationId` (creates un-invited guest if omitted) |
 | `updateGuest` | mutation | |
 | `deleteGuest` | mutation | Cascades to guestSpecialEventRsvps |
-| `bulkCreateGuestsForInvitation` | mutation | |
-| `submitPublicRsvp` | mutation | **Public** — resolves via `{eventSlug, invitationSlug}` (RSVP UI currently deferred) |
+| `bulkCreateGuestsForInvitation` | mutation | ≤20 guests per call |
+| `submitPublicRsvp` | mutation | **Public** — resolves via `{eventSlug, invitationSlug}`; only patches whitelisted RSVP fields, validates menu/drink option ownership + `invitationSpecialEventAccess`, bounds arrays (≤20 guest updates) and strings (≤1000 chars). RSVP UI currently deferred |
 
 ### `convex/specialEvents.ts`
 `listByEvent` (auth), `listForInvitation` (**public**), `createSpecialEvent`, `updateSpecialEvent`, `deleteSpecialEvent` (cascades access + RSVPs)
 
 ### `convex/menu.ts`
-`listMenuOptionsByEvent` (**public**), `listMenuOptionsByEventAdmin` (auth), `createMenuOption`, `updateMenuOption`, `deleteMenuOption`
+`listMenuOptionsByEvent` (**public**), `listMenuOptionsByEventAdmin` (auth), `getSelectionCounts` (auth — `{menuCounts, drinkCounts, menuUnassigned, drinkUnassigned, totalGuests}` so the menu page never ships the full guest list), `createMenuOption`, `updateMenuOption`, `deleteMenuOption`. Shared logic lives in `lib/options.ts`.
 
 ### `convex/drinks.ts`
-Same shape as `menu.ts`.
+Same shape as `menu.ts` (thin wrappers over `lib/options.ts`).
+
+### `convex/media.ts`
+| Function | Notes |
+|---|---|
+| `generateUploadUrl` | mutation (auth + event access) — Convex storage upload URL |
+| `register` | mutation — catalogs an uploaded blob; validates image mime whitelist, ≤5MB (against actual blob metadata), ≤50 per event |
+| `listByEvent` | query (auth) — media rows + resolved `url`, newest first |
+| `rename` | mutation |
+| `remove` | mutation — deletes the row **and** the storage blob |
 
 ### `convex/tables.ts`
 | Function | Notes |
@@ -319,7 +355,7 @@ Same shape as `menu.ts`.
 `getOverviewStats` — returns `{totalInvitations, guestCapacity, totalGuests, attendingCount, declinedCount, pendingCount, allergyCount, menuCompletionCount, tableAssignmentCount}`
 
 ### `convex/seed.ts`
-`seedDemoEventForCurrentUser` (**public mutation**) — creates a full demo event (5 invitations, 15 guests, 2 special events, 3 menu options, 3 drink options, 6 tables) and returns the new `eventId`.
+`seedDemoEventForCurrentUser` (**public mutation**) — creates a full demo event (5 invitations, 15 guests, 2 special events, 3 menu options, 3 drink options, 6 tables) and returns the new `eventId`. Refuses once the user already owns 3+ events (spam guard).
 
 ---
 
@@ -336,7 +372,8 @@ Same shape as `menu.ts`.
 /dashboard/[eventSlug]/guests         Guest table with search/filter + detail sheet + Add Guest
 /dashboard/[eventSlug]/menu           Food & drink option management
 /dashboard/[eventSlug]/tables         Drag-free seat assignment grid
-/dashboard/[eventSlug]/template       Template picker + block page-builder (add/reorder/duplicate/remove/edit) + live preview (dummy data)
+/dashboard/[eventSlug]/template       Template picker + block page-builder (add/reorder/duplicate/remove/edit incl. list + image fields) + live preview (dummy data + real media)
+/dashboard/[eventSlug]/media          Per-event image library — upload (Convex storage), rename, delete
 /dashboard/[eventSlug]/settings       Event metadata + editable event key + archive
 
 /[eventSlug]/invitations/[invitationSlug]   Public invitation page (guest names) — no auth required
@@ -392,7 +429,12 @@ src/components/
   menu/
     menu-option-list.tsx        List of options with active toggle + edit/delete
     menu-option-form.tsx        Create/edit dialog for menu or drink option
-    selection-summary.tsx       Option → guest count breakdown
+    selection-summary.tsx       Option → guest count breakdown (props: options + counts/unassigned from menu.getSelectionCounts)
+
+  media/
+    media-grid.tsx              Thumbnail grid with inline rename + delete (exports MediaItem type)
+    upload-button.tsx           File input → Convex upload URL → media.register (client-side type/size checks)
+    media-picker-dialog.tsx     Pick (or upload) one image from the event library — used by the template editor's image fields
 
   tables/
     table-grid.tsx              Responsive grid of TableCards
@@ -402,18 +444,19 @@ src/components/
 
   public-invitation/
     public-invitation-page.tsx  Loads {eventSlug, invitationSlug} via getPublicInvitation; handles loading/not-found, then renders InvitationTemplate with event.templateId + event.layoutBlocks
-    types.ts                    Local PublicEvent/PublicInvitation/PublicGuest/PublicInvitationData types for the template
-    blocks.ts                   Page-builder model: BlockType union, LayoutBlock, BLOCK_DEFS (label + editable config fields per type), BLOCK_PALETTE, createBlock(), defaultLayout(), resolveLayout(), getConfigString()
-    template-theme.tsx          "use client" — TemplateTheme tokens for classic/modern/romantic; TemplateThemeProvider + useTemplateTheme (consumed by the default frame/blocks)
+    types.ts                    Local PublicEvent/PublicInvitation/PublicGuest/PublicInvitationData (incl. mediaUrls) types for the template
+    blocks.ts                   Page-builder model: BlockType union, LayoutBlock, ConfigField (input: text | textarea | list | image; list supports itemFields for structured rows), BLOCK_DEFS, BLOCK_PALETTE, createBlock(), defaultLayout(), resolveLayout(), getConfigString(), getConfigList()
+    template-theme.tsx          "use client" — TemplateTheme tokens for elegant; TemplateThemeProvider + useTemplateTheme (consumed by the default frame/blocks)
     templates/
-      template-registry.ts      Source of truth for templates: TemplateDef ({id,label,description,theme, optional Frame, per-block overrides, optional defaultLayout}), TEMPLATES, TEMPLATE_LIST, DEFAULT_TEMPLATE_ID (="elegant"), resolveTemplate()
+      template-registry.ts      Source of truth for templates: TemplateDef ({id,label,description,theme, optional Frame, per-block overrides, optional defaultLayout, optional defaultBlockConfig used to seed configs of newly added blocks}), TEMPLATES, TEMPLATE_LIST, DEFAULT_TEMPLATE_ID (="elegant"), resolveTemplate()
       default-blocks.tsx        "use client" — DefaultFrame (themed divided card) + DEFAULT_BLOCKS (BlockType→component); the shared fallback markup. Defines BlockComponentProps/FrameProps
       invitation-template.tsx   "use client" — resolves the template, renders its Frame (or DefaultFrame), and for each LayoutBlock its override component (or DEFAULT_BLOCKS); layout = saved blocks ?? template.defaultLayout() ?? defaultLayout()
       dummy-data.ts             DUMMY_INVITATION_DATA sample used by the live preview
-      elegant/                  First official template (Figma "Xoom cargo" design, node 452:172) — its own markup, not the default sections
+      elegant/                  The official template (Figma design, node 452:172) — its own markup, not the default sections
         frame.tsx               ElegantFrame — phone-width card, NO global gap (each block owns padding)
-        blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/stayInvite/footer) + primitives (ElegantSection, WeddingButton, CheckRow, seal/photo placeholders). Spanish copy from the design
-        default-layout.ts       elegantDefaultLayout() — preset blocks in the design's order
+        blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/stayInvite/footer) + primitives (ElegantSection, WeddingButton, CheckRow, CircularPhoto/ImagePlaceholder render real images from mediaUrls when an "image" config field is set). All copy reads block.config first, falling back to ELEGANT_COPY
+        default-copy.ts         ELEGANT_COPY (the design's Spanish copy) + ELEGANT_BLOCK_CONFIG (per-block default configs)
+        default-layout.ts       elegantDefaultLayout() — preset blocks in the design's order, configs seeded from ELEGANT_BLOCK_CONFIG
         index.ts                Re-exports ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout
     sections/
       section.tsx               Shared eyebrow/heading/spacing wrapper; pulls colors/fonts from useTemplateTheme
@@ -431,14 +474,25 @@ src/components/
       footer-section.tsx        Event name + closing line (themed)
 
   template-selection/
-    template-settings.tsx       "use client" — template picker + block page-builder (add via Select, reorder up/down, duplicate, remove, edit text fields) + live InvitationTemplate preview (dummy data); saves via events.setInvitationTemplate. Rendered by /dashboard/[eventSlug]/template
+    template-settings.tsx       "use client" — template picker + block page-builder (add via Select with template-seeded config, reorder up/down, duplicate, remove, edit fields) + live InvitationTemplate preview (dummy data + the event's real media URLs); saves via events.setInvitationTemplate. Rendered by /dashboard/[eventSlug]/template
+    config-field-input.tsx      "use client" — ConfigFieldInput: renders one block-config field switching on field.input (text / textarea / list with add-remove rows / image via MediaPickerDialog)
+
+src/hooks/
+  use-toast-mutation.ts         useToastMutation(ref, {success?, error}) — wraps useMutation with the try/catch + sonner toast convention; returns {run, pending}; run never throws, returns {ok, value} | {ok:false}
 ```
 
 > **Public template (page builder):** the public invitation is a **page builder** — an ordered list
 > of `LayoutBlock`s (`{id, type, config?}`) defined in `blocks.ts`. Block types (hero, text, location,
 > countdown, itinerary, dressCode, specialInvitation, rsvp, allergies, menuSelection, drinkSelection,
-> stayInvite, footer) may repeat (e.g. several `text` blocks). `hero`, `text`, `dressCode`,
-> `specialInvitation` and `stayInvite` carry editable content in `config`; the rest are data-driven.
+> stayInvite, footer) may repeat (e.g. several `text` blocks). **All non-derived text is authorable**:
+> every block with copy carries it in `config` (incl. `rsvp.body`, `footer.body`, `allergies`
+> headline/note/options string-list, `itinerary.items` `{time,label}` list); only derived data (event
+> name/bride/groom names/date/venue/map link, guest names — managed in event settings) is not. The
+> hero shows the couple via `event.brideName`/`groomName` (falling back to splitting the event name),
+> and the location "Ver mapa" button links to `event.venueMapUrl` (falling back to a Google Maps search
+> of the address). Image slots are `config` fields of input kind `"image"`
+> storing a media id (`hero.heroImage`, `location.mapImage`, `dressCode.photo`, `stayInvite.image`),
+> resolved to URLs via `getPublicInvitation.mediaUrls`.
 > The owner builds the layout at `/dashboard/[eventSlug]/template` (pick template +
 > add/reorder/duplicate/remove/edit + live preview). Layout is stored on `events.layoutBlocks`
 > (undefined = the selected template's `defaultLayout()`, then the global `defaultLayout()`).
@@ -448,14 +502,15 @@ src/components/
 > `DefaultFrame` / `DEFAULT_BLOCKS` for anything a template doesn't override. So templates differ in
 > **markup and structure**, not just theme.
 >
-> - **`elegant`** is the **first official template** (default), implementing the Figma "Xoom cargo"
+> - **`elegant`** is the **only official template** (default), implementing the Figma
 >   design under `templates/elegant/`: its own `Frame` + a component per section, gold/serif styling
 >   via the `wedding-*` palette and `font-script`/`font-elegant` (see globals.css + layout.tsx), and a
->   preset Spanish layout. Per the design, **each block owns its vertical padding** (`ElegantSection`)
->   — the frame has no global gap. Images are placeholders and the form controls (RSVP/food/stay) are
->   not yet wired to `submitPublicRsvp`.
-> - **`classic` / `modern` / `romantic`** remain theme-only over the default sections (plain-text
->   drafts); give one its own markup by adding a `Frame`/`blocks` to its `TemplateDef`.
+>   preset Spanish layout (configs seeded from `default-copy.ts`). Per the design, **each block owns
+>   its vertical padding** (`ElegantSection`) — the frame has no global gap. Image slots render the
+>   configured media image or a placeholder; the form controls (RSVP/food/stay) are not yet wired to
+>   `submitPublicRsvp`.
+> - Add more templates by giving each its own `Frame`/`blocks` (and optional `defaultLayout`) in its
+>   `TemplateDef`; anything left unset falls back to `DefaultFrame` / `DEFAULT_BLOCKS`.
 
 ---
 
@@ -469,6 +524,14 @@ src/components/
 6. `UserSync` (inside `<Authenticated>`) calls `upsertCurrentUser` on mount → creates/updates the `users` table row
 7. All protected Convex functions call `requireUser(ctx)` which reads `ctx.auth.getUserIdentity()` and looks up by `tokenIdentifier`
 8. Public routes (`/[eventSlug]/invitations/[invitationSlug]`, matched in middleware as `/:eventSlug/invitations/:invitationSlug`) skip auth entirely — Convex functions for those use no auth checks
+
+## Future: Custom Domains (design only — not implemented)
+
+`events.subdomain` / `events.customDomain` (+ indexes) already exist. The agreed design:
+- Middleware reads the `Host` header; non-primary hosts rewrite `https://customdomain.com/invitations/{slug}` → internal route `/_domain/[host]/invitations/[invitationSlug]` which resolves the event server-side.
+- New public query `events.getEventByDomain({host})`: exact `by_customDomain` match, else extract the subdomain for `by_subdomain` (wildcard `*.<root>` configured once in Vercel). Must reuse the archived-event gating in `convex/lib/public.ts`.
+- Settings page gains a "Custom domain" field → Next.js route handler calling the Vercel Domains API (`POST /v10/projects/{id}/domains` with `VERCEL_TOKEN`), surfacing DNS verification records + a status poll.
+- Media URLs are absolute Convex URLs, so they are domain-independent.
 
 ## Documentation Rule
 
@@ -494,14 +557,15 @@ Since AGENTS.md is a copy of CLAUDE.md, both must be kept in sync. Update one, t
 - **Shadcn/app imports**: use `@/*` alias (e.g. `import { Button } from "@/components/ui/button"`).
 - **No `.collect()`**: use `.take(n)` for bounded queries per Convex guidelines.
 - **No `.filter()`**: always use `.withIndex()`.
-- **Mutations always toast**: success with `toast.success(...)`, failure with `toast.error(...)` inside try/catch.
+- **Mutations always toast**: use `useToastMutation` (`src/hooks/use-toast-mutation.ts`) instead of hand-rolled try/catch — it wraps `useMutation` with the success/error sonner toasts and a `pending` flag; `run()` returns `{ok, value}` for branching.
+- **Convex auth guard**: event-scoped functions call `requireEventEditor(ctx, eventId)` (or load the doc first, then guard on `doc.eventId`); public slug-based functions resolve via `convex/lib/public.ts` so archived-event gating stays centralized.
 - **Client components**: any file using Convex hooks, Clerk hooks, or browser APIs needs `"use client"` at the top.
 
 ## Zod Validations (`src/lib/validations/`)
 
 | File | Schema | Key rules |
 |---|---|---|
-| `event.ts` | `eventSchema` | name min 2 chars, optional `slug` (`/^[a-z0-9-]+$/`, min 2), date optional string |
+| `event.ts` | `eventSchema` | name min 2 chars, optional `slug` (`/^[a-z0-9-]+$/`, min 2), date optional string, optional brideName/groomName, optional `venueMapUrl` (valid URL or empty) |
 | `invitation.ts` | `invitationSchema` | slug: `/^[a-z0-9-]+$/`, maxGuests 1–10 |
 | `guest.ts` | `guestSchema` | firstName/lastName required, email optional |
 | `menu.ts` | `menuOptionSchema` | name required, isActive boolean |

@@ -1,13 +1,13 @@
 import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
-import { requireUser } from "./lib/auth";
-import { requireEventAccess } from "./lib/permissions";
+import { requireEventEditor } from "./lib/permissions";
+import { resolvePublicEvent, resolvePublicInvitation } from "./lib/public";
+import { Doc } from "./_generated/dataModel";
 
 export const listByEvent = query({
   args: { eventId: v.id("events") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventAccess(ctx, args.eventId, user._id);
+    await requireEventEditor(ctx, args.eventId);
 
     return await ctx.db
       .query("guests")
@@ -19,10 +19,9 @@ export const listByEvent = query({
 export const listByInvitation = query({
   args: { invitationId: v.id("invitations") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
     const invitation = await ctx.db.get(args.invitationId);
     if (!invitation) throw new ConvexError("Invitation not found");
-    await requireEventAccess(ctx, invitation.eventId, user._id);
+    await requireEventEditor(ctx, invitation.eventId);
 
     return await ctx.db
       .query("guests")
@@ -36,25 +35,66 @@ export const listByInvitation = query({
 export const listUnassignedByEvent = query({
   args: { eventId: v.id("events") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventAccess(ctx, args.eventId, user._id);
+    await requireEventEditor(ctx, args.eventId);
 
-    const guests = await ctx.db
+    // Index on (eventId, invitationId) lets us match the "no invitation"
+    // rows directly instead of scanning every guest in the event.
+    return await ctx.db
       .query("guests")
-      .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-      .take(1000);
+      .withIndex("by_eventId_and_invitationId", (q) =>
+        q.eq("eventId", args.eventId).eq("invitationId", undefined)
+      )
+      .take(200);
+  },
+});
 
-    return guests.filter((g) => !g.invitationId);
+// Everything the guests dashboard page needs in a single round trip,
+// instead of five separate subscriptions.
+export const getGuestsPageData = query({
+  args: { eventId: v.id("events") },
+  handler: async (ctx, args) => {
+    await requireEventEditor(ctx, args.eventId);
+
+    const [guests, invitations, menuOptions, drinkOptions, tables] =
+      await Promise.all([
+        ctx.db
+          .query("guests")
+          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+          .take(1000),
+        ctx.db
+          .query("invitations")
+          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+          .take(500),
+        ctx.db
+          .query("menuOptions")
+          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+          .take(100),
+        ctx.db
+          .query("drinkOptions")
+          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+          .take(100),
+        ctx.db
+          .query("tables")
+          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+          .take(200),
+      ]);
+
+    return {
+      guests,
+      invitations,
+      menuOptions: menuOptions.sort((a, b) => a.sortOrder - b.sortOrder),
+      drinkOptions: drinkOptions.sort((a, b) => a.sortOrder - b.sortOrder),
+      tables: tables.sort((a, b) => a.sortOrder - b.sortOrder),
+    };
   },
 });
 
 export const getGuestById = query({
   args: { id: v.id("guests") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
     const guest = await ctx.db.get(args.id);
     if (!guest) throw new ConvexError("Guest not found");
-    await requireEventAccess(ctx, guest.eventId, user._id);
+    await requireEventEditor(ctx, guest.eventId);
     return guest;
   },
 });
@@ -71,8 +111,7 @@ export const createGuest = mutation({
     isPlusOne: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventAccess(ctx, args.eventId, user._id);
+    await requireEventEditor(ctx, args.eventId);
 
     if (args.invitationId) {
       const invitation = await ctx.db.get(args.invitationId);
@@ -117,10 +156,9 @@ export const updateGuest = mutation({
     seatNumber: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
     const guest = await ctx.db.get(args.id);
     if (!guest) throw new ConvexError("Guest not found");
-    await requireEventAccess(ctx, guest.eventId, user._id);
+    await requireEventEditor(ctx, guest.eventId);
 
     const { id, ...updates } = args;
     await ctx.db.patch(id, updates);
@@ -130,10 +168,9 @@ export const updateGuest = mutation({
 export const deleteGuest = mutation({
   args: { id: v.id("guests") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
     const guest = await ctx.db.get(args.id);
     if (!guest) throw new ConvexError("Guest not found");
-    await requireEventAccess(ctx, guest.eventId, user._id);
+    await requireEventEditor(ctx, guest.eventId);
 
     // Delete special event RSVPs for this guest
     const rsvps = await ctx.db
@@ -161,10 +198,12 @@ export const bulkCreateGuestsForInvitation = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
+    if (args.guests.length > 20) {
+      throw new ConvexError("Cannot create more than 20 guests at once");
+    }
     const invitation = await ctx.db.get(args.invitationId);
     if (!invitation) throw new ConvexError("Invitation not found");
-    await requireEventAccess(ctx, invitation.eventId, user._id);
+    await requireEventEditor(ctx, invitation.eventId);
 
     const ids = [];
     for (const g of args.guests) {
@@ -216,24 +255,25 @@ export const submitPublicRsvp = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    // Resolve event then invitation by slug (public — no auth).
-    const event = await ctx.db
-      .query("events")
-      .withIndex("by_slug", (q) => q.eq("slug", args.eventSlug))
-      .unique();
+    if (args.guestUpdates.length > 20) {
+      throw new ConvexError("Too many guest updates");
+    }
+    if (args.specialEventRsvps && args.specialEventRsvps.length > 100) {
+      throw new ConvexError("Too many special event RSVPs");
+    }
 
+    // Resolve event then invitation by slug (public — no auth).
+    const event = await resolvePublicEvent(ctx, args.eventSlug);
     if (!event) {
       throw new ConvexError("Invitation not found or not active");
     }
 
-    const invitation = await ctx.db
-      .query("invitations")
-      .withIndex("by_eventId_and_slug", (q) =>
-        q.eq("eventId", event._id).eq("slug", args.invitationSlug)
-      )
-      .unique();
-
-    if (!invitation || !invitation.isActive) {
+    const invitation = await resolvePublicInvitation(
+      ctx,
+      event,
+      args.invitationSlug
+    );
+    if (!invitation) {
       throw new ConvexError("Invitation not found or not active");
     }
 
@@ -247,13 +287,40 @@ export const submitPublicRsvp = mutation({
 
     const validGuestIds = new Set(invitationGuests.map((g) => g._id));
 
-    // Update guests
+    // Update guests — only RSVP-related fields, never seating/contact data.
     for (const update of args.guestUpdates) {
       if (!validGuestIds.has(update.guestId)) {
         throw new ConvexError("Guest does not belong to this invitation");
       }
-      const { guestId, ...fields } = update;
-      await ctx.db.patch(guestId, fields);
+      if ((update.allergies?.length ?? 0) > 1000) {
+        throw new ConvexError("Allergies text is too long");
+      }
+      if ((update.specialRequests?.length ?? 0) > 1000) {
+        throw new ConvexError("Special requests text is too long");
+      }
+
+      if (update.menuOptionId) {
+        const option = await ctx.db.get(update.menuOptionId);
+        if (!option || option.eventId !== event._id || !option.isActive) {
+          throw new ConvexError("Menu option does not belong to this event");
+        }
+      }
+      if (update.drinkOptionId) {
+        const option = await ctx.db.get(update.drinkOptionId);
+        if (!option || option.eventId !== event._id || !option.isActive) {
+          throw new ConvexError("Drink option does not belong to this event");
+        }
+      }
+
+      // Build the patch explicitly so omitted optional fields are left
+      // untouched (patching `undefined` would unset them).
+      const patch: Partial<Doc<"guests">> = { rsvpStatus: update.rsvpStatus };
+      if ("menuOptionId" in update) patch.menuOptionId = update.menuOptionId;
+      if ("drinkOptionId" in update) patch.drinkOptionId = update.drinkOptionId;
+      if ("allergies" in update) patch.allergies = update.allergies;
+      if ("specialRequests" in update)
+        patch.specialRequests = update.specialRequests;
+      await ctx.db.patch(update.guestId, patch);
     }
 
     // Handle special event RSVPs
@@ -261,6 +328,32 @@ export const submitPublicRsvp = mutation({
       for (const rsvp of args.specialEventRsvps) {
         if (!validGuestIds.has(rsvp.guestId)) {
           throw new ConvexError("Guest does not belong to this invitation");
+        }
+
+        const specialEvent = await ctx.db.get(rsvp.specialEventId);
+        if (
+          !specialEvent ||
+          specialEvent.eventId !== event._id ||
+          !specialEvent.isActive
+        ) {
+          throw new ConvexError(
+            "Special event does not belong to this event"
+          );
+        }
+
+        // The invitation must have been granted access to this special event.
+        const access = await ctx.db
+          .query("invitationSpecialEventAccess")
+          .withIndex("by_invitationId_and_specialEventId", (q) =>
+            q
+              .eq("invitationId", invitation._id)
+              .eq("specialEventId", rsvp.specialEventId)
+          )
+          .unique();
+        if (!access) {
+          throw new ConvexError(
+            "Invitation does not have access to this special event"
+          );
         }
 
         const existing = await ctx.db

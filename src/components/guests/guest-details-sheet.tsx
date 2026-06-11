@@ -1,10 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { useMutation } from "convex/react"
 import { api } from "convex/_generated/api"
 import { Doc, Id } from "convex/_generated/dataModel"
-import { toast } from "sonner"
+import { useToastMutation } from "@/hooks/use-toast-mutation"
 import {
   Sheet,
   SheetContent,
@@ -52,8 +51,14 @@ export function GuestDetailsSheet({
   menuOptions,
   drinkOptions,
 }: GuestDetailsSheetProps) {
-  const updateGuest = useMutation(api.guests.updateGuest)
-  const deleteGuest = useMutation(api.guests.deleteGuest)
+  const updateGuest = useToastMutation(api.guests.updateGuest, {
+    success: "Guest updated successfully",
+    error: "Failed to update guest",
+  })
+  const deleteGuest = useToastMutation(api.guests.deleteGuest, {
+    success: "Guest deleted",
+    error: "Failed to delete guest",
+  })
 
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
@@ -64,8 +69,8 @@ export function GuestDetailsSheet({
   const [specialRequests, setSpecialRequests] = useState("")
   const [menuOptionId, setMenuOptionId] = useState<string | undefined>(undefined)
   const [drinkOptionId, setDrinkOptionId] = useState<string | undefined>(undefined)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const saving = updateGuest.pending
+  const deleting = deleteGuest.pending
 
   // Sync form fields from the selected guest during render (guarded by a
   // previous-value check) rather than in an effect — avoids the cascading
@@ -88,41 +93,25 @@ export function GuestDetailsSheet({
 
   async function handleSave() {
     if (!guest) return
-    setSaving(true)
-    try {
-      await updateGuest({
-        id: guest._id,
-        firstName,
-        lastName,
-        email: email || undefined,
-        phone: phone || undefined,
-        rsvpStatus,
-        allergies: allergies || undefined,
-        specialRequests: specialRequests || undefined,
-        menuOptionId: menuOptionId as Id<"menuOptions"> | undefined,
-        drinkOptionId: drinkOptionId as Id<"drinkOptions"> | undefined,
-      })
-      toast.success("Guest updated successfully")
-      onOpenChange(false)
-    } catch {
-      toast.error("Failed to update guest")
-    } finally {
-      setSaving(false)
-    }
+    const result = await updateGuest.run({
+      id: guest._id,
+      firstName,
+      lastName,
+      email: email || undefined,
+      phone: phone || undefined,
+      rsvpStatus,
+      allergies: allergies || undefined,
+      specialRequests: specialRequests || undefined,
+      menuOptionId: menuOptionId as Id<"menuOptions"> | undefined,
+      drinkOptionId: drinkOptionId as Id<"drinkOptions"> | undefined,
+    })
+    if (result.ok) onOpenChange(false)
   }
 
   async function handleDelete() {
     if (!guest) return
-    setDeleting(true)
-    try {
-      await deleteGuest({ id: guest._id })
-      toast.success("Guest deleted")
-      onOpenChange(false)
-    } catch {
-      toast.error("Failed to delete guest")
-    } finally {
-      setDeleting(false)
-    }
+    const result = await deleteGuest.run({ id: guest._id })
+    if (result.ok) onOpenChange(false)
   }
 
   return (

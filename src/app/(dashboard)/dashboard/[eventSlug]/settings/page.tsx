@@ -41,9 +41,12 @@ export default function SettingsPage() {
 
   const [name, setName] = useState("")
   const [slug, setSlug] = useState("")
+  const [brideName, setBrideName] = useState("")
+  const [groomName, setGroomName] = useState("")
   const [date, setDate] = useState("")
   const [venueName, setVenueName] = useState("")
   const [venueAddress, setVenueAddress] = useState("")
+  const [venueMapUrl, setVenueMapUrl] = useState("")
   const [status, setStatus] = useState<"draft" | "active" | "archived">("draft")
   const [saving, setSaving] = useState(false)
   const [savingSlug, setSavingSlug] = useState(false)
@@ -58,9 +61,12 @@ export default function SettingsPage() {
     if (event) {
       setName(event.name ?? "")
       setSlug(event.slug ?? "")
+      setBrideName(event.brideName ?? "")
+      setGroomName(event.groomName ?? "")
       setDate(event.date ? new Date(event.date).toISOString().split("T")[0] : "")
       setVenueName(event.venueName ?? "")
       setVenueAddress(event.venueAddress ?? "")
+      setVenueMapUrl(event.venueMapUrl ?? "")
       setStatus((event.status as "draft" | "active" | "archived") ?? "draft")
     }
   }
@@ -88,14 +94,22 @@ export default function SettingsPage() {
   }
 
   async function handleSave() {
+    const trimmedMapUrl = venueMapUrl.trim()
+    if (trimmedMapUrl && !/^https?:\/\//i.test(trimmedMapUrl)) {
+      toast.error("Location link must start with http:// or https://")
+      return
+    }
     setSaving(true)
     try {
       await updateEvent({
         eventId,
         name,
+        brideName: brideName || undefined,
+        groomName: groomName || undefined,
         date: date ? new Date(date).getTime() : undefined,
         venueName: venueName || undefined,
         venueAddress: venueAddress || undefined,
+        venueMapUrl: trimmedMapUrl || undefined,
         status,
       })
       toast.success("Settings saved")
@@ -144,6 +158,27 @@ export default function SettingsPage() {
               />
             </div>
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="brideName">Bride&apos;s Name</Label>
+                <Input
+                  id="brideName"
+                  value={brideName}
+                  onChange={(e) => setBrideName(e.target.value)}
+                  placeholder="Ava"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="groomName">Groom&apos;s Name</Label>
+                <Input
+                  id="groomName"
+                  value={groomName}
+                  onChange={(e) => setGroomName(e.target.value)}
+                  placeholder="Liam"
+                />
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="date">Date</Label>
               <Input
@@ -170,6 +205,21 @@ export default function SettingsPage() {
                 value={venueAddress}
                 onChange={(e) => setVenueAddress(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="venueMapUrl">Location Link (Google Maps)</Label>
+              <Input
+                id="venueMapUrl"
+                type="url"
+                inputMode="url"
+                value={venueMapUrl}
+                onChange={(e) => setVenueMapUrl(e.target.value)}
+                placeholder="https://maps.google.com/?q=..."
+              />
+              <p className="text-xs text-zinc-400">
+                Guests tap &ldquo;View map&rdquo; on the invitation to open this link.
+              </p>
             </div>
 
             <div className="space-y-1.5">

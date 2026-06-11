@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { getConfigString, type BlockType } from "../../blocks"
+import { getConfigList, getConfigString, type BlockType } from "../../blocks"
 import type { BlockComponent, BlockComponentProps } from "../default-blocks"
+import { ELEGANT_COPY } from "./default-copy"
 
 // ---------------------------------------------------------------------------
 // Primitives — shared by the elegant blocks. Each block applies its own padding
@@ -22,12 +23,29 @@ function ElegantSection({
   return <section className={cn("px-[30px] py-6", className)}>{children}</section>
 }
 
-function WeddingButton({ children }: { children: React.ReactNode }) {
+function WeddingButton({
+  children,
+  href,
+}: {
+  children: React.ReactNode
+  href?: string
+}) {
+  const className =
+    "inline-flex items-center justify-center rounded bg-wedding-soft px-4 py-1.5 font-elegant text-[16px] text-wedding-ink"
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+      >
+        {children}
+      </a>
+    )
+  }
   return (
-    <button
-      type="button"
-      className="inline-flex items-center justify-center rounded bg-wedding-soft px-4 py-1.5 font-elegant text-[16px] text-wedding-ink"
-    >
+    <button type="button" className={className}>
       {children}
     </button>
   )
@@ -48,8 +66,21 @@ function SealStamp({ className }: { className?: string }) {
   )
 }
 
-/** Placeholder for an event photo (circular). Real photos are wired later. */
-function CircularPhoto({ className }: { className?: string }) {
+/** Circular event photo — renders the image when set, a placeholder otherwise. */
+function CircularPhoto({ className, src, alt }: { className?: string; src?: string; alt?: string }) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt ?? ""}
+        className={cn(
+          "rounded-full object-cover ring-8 ring-white shadow-sm",
+          className
+        )}
+      />
+    )
+  }
   return (
     <div
       aria-hidden
@@ -61,9 +92,25 @@ function CircularPhoto({ className }: { className?: string }) {
   )
 }
 
-/** Placeholder for a rectangular image (map, hero of a section). */
-function ImagePlaceholder({ className }: { className?: string }) {
+/** Rectangular image (map, hero of a section) with a muted placeholder fallback. */
+function ImagePlaceholder({ className, src, alt }: { className?: string; src?: string; alt?: string }) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={alt ?? ""} className={cn("object-cover", className)} />
+    )
+  }
   return <div aria-hidden className={cn("bg-wedding-muted", className)} />
+}
+
+/** Resolves an "image" config field (media id) to its signed URL. */
+function getConfigImage(
+  data: BlockComponentProps["data"],
+  block: BlockComponentProps["block"],
+  key: string
+): string | undefined {
+  const id = getConfigString(block, key)
+  return id ? data.mediaUrls?.[id] : undefined
 }
 
 function CheckRow({ label }: { label: string }) {
@@ -79,6 +126,24 @@ function splitNames(name: string): [string, string | null] {
   const parts = name.split(/[&y]/i).map((p) => p.trim()).filter(Boolean)
   if (parts.length >= 2) return [parts[0], parts.slice(1).join(" & ")]
   return [name, null]
+}
+
+/**
+ * The couple's display names. Prefers the explicit bride/groom fields when set,
+ * otherwise falls back to splitting the event name (e.g. "Ava & Liam").
+ */
+function coupleNames(event: BlockComponentProps["data"]["event"]): [string, string | null] {
+  const bride = event.brideName?.trim()
+  const groom = event.groomName?.trim()
+  if (bride && groom) return [bride, groom]
+  if (bride || groom) return [(bride || groom) as string, null]
+  return splitNames(event.name)
+}
+
+/** Builds a maps URL: the configured link, else a Google Maps search of the address. */
+function mapHref(event: BlockComponentProps["data"]["event"], address: string): string {
+  if (event.venueMapUrl?.trim()) return event.venueMapUrl.trim()
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
 }
 
 function formatDate(date?: number): string {
@@ -107,50 +172,28 @@ function useRemaining(date?: number) {
   return remaining
 }
 
-// Default copy from the design (used when a block carries no config).
-const HERO_INTRO =
-  "Con mucha alegría en el corazón, queremos invitarte a acompañarnos en uno de los momentos más importantes de nuestras vidas. Será un día para celebrar el amor, la unión y el comienzo de una nueva historia que soñamos compartir con quienes más queremos."
-const RSVP_NOTE =
-  "Gracias por confirmar tu asistencia y por acompañarnos en este día tan especial para nosotros."
-const FOOD_NOTE =
-  "Por favor, indícanos si tienes alguna alergia o restricción alimentaria para tenerlo en cuenta:"
-const FOOD_OPTIONS = [
-  "Frutos secos",
-  "Mariscos / pescados",
-  "Lácteos",
-  "Gluten",
-  "Huevo",
-  "Vegetariano / Vegano",
-]
-const DRESS_CODE =
-  "Hombres: Smoking (traje y corbatín)\nMujeres: Vestido formal de un solo tono\n\nAgradecemos evitar el color vinotinto, el blanco y sus tonalidades afines, tanto en vestuario femenino como masculino."
-const DINNER_DESC =
-  "Porque los mejores momentos comienzan alrededor de una mesa, los esperamos para compartir una cena especial y comenzar juntos este fin de semana inolvidable."
-const STAY_BODY =
-  "Después de una noche inolvidable, queremos que puedas descansar y disfrutar con tranquilidad. Si deseas hospedarte en la hacienda, por favor confírmanos tu asistencia."
-const FOOTER_NOTE =
-  "Esperamos celebrar juntos este comienzo tan importante en nuestras vidas."
-const ITINERARY_ITEMS = [
-  { time: "00:00 pm", label: "Ceremonia" },
-  { time: "00:00 pm", label: "Recepción" },
-  { time: "00:00 pm", label: "Cocktail de bienvenida" },
-  { time: "00:00 pm", label: "Fiesta" },
-]
+// Default copy lives in ./default-copy (ELEGANT_COPY); blocks read their text
+// from block.config first and fall back to it for layouts saved before the
+// copy became authorable.
 
 // ---------------------------------------------------------------------------
 // Blocks
 // ---------------------------------------------------------------------------
 
 function ElegantHero({ data, block }: BlockComponentProps) {
-  const [first, second] = splitNames(data.event.name)
-  const intro = getConfigString(block, "body") ?? HERO_INTRO
+  const [first, second] = coupleNames(data.event)
+  const intro = getConfigString(block, "body") ?? ELEGANT_COPY.heroIntro
   return (
     <ElegantSection className="flex flex-col items-center gap-4 pt-10 text-center">
       <p className="font-script text-[20px] text-wedding-ink">
         {formatDate(data.event.date)}
       </p>
       <div className="relative">
-        <CircularPhoto className="size-[236px]" />
+        <CircularPhoto
+          className="size-[236px]"
+          src={getConfigImage(data, block, "heroImage")}
+          alt={data.event.name}
+        />
         <SealStamp className="absolute -bottom-1 right-2" />
       </div>
       <h1 className="font-script text-[48px] leading-[1.15] text-wedding-gold">
@@ -169,7 +212,7 @@ function ElegantHero({ data, block }: BlockComponentProps) {
   )
 }
 
-function ElegantLocation({ data }: BlockComponentProps) {
+function ElegantLocation({ data, block }: BlockComponentProps) {
   const { venueName, venueAddress } = data.event
   const address =
     [venueName, venueAddress].filter(Boolean).join(", ") ||
@@ -179,17 +222,21 @@ function ElegantLocation({ data }: BlockComponentProps) {
       <h2 className="font-elegant text-[24px] font-bold text-wedding-ink">
         Ubicación
       </h2>
-      <ImagePlaceholder className="h-[200px] w-full rounded" />
+      <ImagePlaceholder
+        className="h-[200px] w-full rounded"
+        src={getConfigImage(data, block, "mapImage")}
+        alt="Mapa"
+      />
       <p className="font-elegant text-[24px] leading-snug text-wedding-ink">
         {address}
       </p>
-      <WeddingButton>Ver mapa</WeddingButton>
+      <WeddingButton href={mapHref(data.event, address)}>Ver mapa</WeddingButton>
     </ElegantSection>
   )
 }
 
 function ElegantRsvp({ block }: BlockComponentProps) {
-  const note = getConfigString(block, "body") ?? RSVP_NOTE
+  const note = getConfigString(block, "body") ?? ELEGANT_COPY.rsvpNote
   return (
     <ElegantSection className="text-center">
       <p className="font-elegant text-[20px] leading-relaxed text-wedding-ink">
@@ -218,7 +265,14 @@ function ElegantCountdown({ data }: BlockComponentProps) {
   )
 }
 
-function ElegantItinerary({ data }: BlockComponentProps) {
+function ElegantItinerary({ data, block }: BlockComponentProps) {
+  const configItems = getConfigList(block, "items")
+  const items = configItems
+    ? configItems
+        .filter((i): i is Record<string, string> => typeof i !== "string")
+        .map((i) => ({ time: i.time ?? "", label: i.label ?? "" }))
+        .filter((i) => i.time || i.label)
+    : [...ELEGANT_COPY.itineraryItems]
   return (
     <ElegantSection className="flex flex-col items-center gap-6 text-center">
       <div className="space-y-1">
@@ -230,8 +284,8 @@ function ElegantItinerary({ data }: BlockComponentProps) {
         </p>
       </div>
       <ul className="space-y-6">
-        {ITINERARY_ITEMS.map((item) => (
-          <li key={item.label} className="flex flex-col items-center gap-1">
+        {items.map((item, i) => (
+          <li key={`${item.label}-${i}`} className="flex flex-col items-center gap-1">
             <span
               aria-hidden
               className="mb-1 size-10 rounded-full border border-wedding-gold/40"
@@ -270,19 +324,25 @@ function ElegantText({ block }: BlockComponentProps) {
 }
 
 /** "allergies" block — the design's "Comida" food/allergies section. */
-function ElegantAllergies() {
+function ElegantAllergies({ block }: BlockComponentProps) {
+  const headline = getConfigString(block, "headline") ?? ELEGANT_COPY.foodHeadline
+  const note = getConfigString(block, "note") ?? ELEGANT_COPY.foodNote
+  const configOptions = getConfigList(block, "options")
+  const options = configOptions
+    ? configOptions.filter((o): o is string => typeof o === "string")
+    : [...ELEGANT_COPY.foodOptions]
   return (
     <ElegantSection className="space-y-4">
       <div className="space-y-2">
         <h2 className="font-elegant text-[24px] font-bold text-wedding-ink">
-          Comida
+          {headline}
         </h2>
         <p className="font-elegant text-[16px] font-bold text-wedding-ink">
-          {FOOD_NOTE}
+          {note}
         </p>
       </div>
       <div className="space-y-3">
-        {FOOD_OPTIONS.map((option) => (
+        {options.map((option) => (
           <CheckRow key={option} label={option} />
         ))}
         <label className="flex items-center gap-2 font-elegant text-[16px] font-bold text-wedding-ink">
@@ -298,8 +358,8 @@ function ElegantAllergies() {
   )
 }
 
-function ElegantDressCode({ block }: BlockComponentProps) {
-  const body = getConfigString(block, "dressCode") ?? DRESS_CODE
+function ElegantDressCode({ data, block }: BlockComponentProps) {
+  const body = getConfigString(block, "dressCode") ?? ELEGANT_COPY.dressCode
   const note = getConfigString(block, "note")
   return (
     <ElegantSection className="flex flex-col items-center gap-4 text-center">
@@ -307,7 +367,11 @@ function ElegantDressCode({ block }: BlockComponentProps) {
         Dress code
       </h2>
       <div className="relative">
-        <CircularPhoto className="size-[222px]" />
+        <CircularPhoto
+          className="size-[222px]"
+          src={getConfigImage(data, block, "photo")}
+          alt="Dress code"
+        />
         <SealStamp className="absolute -bottom-1 right-1" />
       </div>
       <p className="whitespace-pre-line font-elegant text-[16px] leading-relaxed text-wedding-ink">
@@ -324,8 +388,8 @@ function ElegantDressCode({ block }: BlockComponentProps) {
 
 /** "specialInvitation" block — the design's dinner invite. */
 function ElegantSpecialInvitation({ block }: BlockComponentProps) {
-  const description = getConfigString(block, "description") ?? DINNER_DESC
-  const name = getConfigString(block, "name") ?? "Una Noche para Compartir"
+  const description = getConfigString(block, "description") ?? ELEGANT_COPY.dinnerDescription
+  const name = getConfigString(block, "name") ?? ELEGANT_COPY.dinnerName
   return (
     <ElegantSection className="flex flex-col items-center gap-4 py-10 text-center">
       <p className="font-elegant text-[16px] font-bold leading-relaxed text-wedding-ink">
@@ -339,12 +403,16 @@ function ElegantSpecialInvitation({ block }: BlockComponentProps) {
 }
 
 /** "stayInvite" block — accommodation invite with full-bleed image. */
-function ElegantStayInvite({ block }: BlockComponentProps) {
-  const headline = getConfigString(block, "headline") ?? "Continúa la celebración"
-  const body = getConfigString(block, "body") ?? STAY_BODY
+function ElegantStayInvite({ data, block }: BlockComponentProps) {
+  const headline = getConfigString(block, "headline") ?? ELEGANT_COPY.stayHeadline
+  const body = getConfigString(block, "body") ?? ELEGANT_COPY.stayBody
   return (
     <section className="py-6">
-      <ImagePlaceholder className="h-[200px] w-full" />
+      <ImagePlaceholder
+        className="h-[200px] w-full"
+        src={getConfigImage(data, block, "image")}
+        alt={headline}
+      />
       <div className="space-y-4 px-[30px] pt-5">
         <h2 className="font-script text-[48px] leading-tight text-wedding-gold">
           {headline}
@@ -363,7 +431,7 @@ function ElegantStayInvite({ block }: BlockComponentProps) {
 }
 
 function ElegantFooter({ block }: BlockComponentProps) {
-  const note = getConfigString(block, "body") ?? FOOTER_NOTE
+  const note = getConfigString(block, "body") ?? ELEGANT_COPY.footerNote
   return (
     <ElegantSection className="py-8 text-center">
       <p className="font-elegant text-[24px] font-bold leading-relaxed text-wedding-gold">

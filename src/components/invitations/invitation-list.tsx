@@ -1,10 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { useMutation } from "convex/react"
 import { api } from "convex/_generated/api"
 import { type Id } from "convex/_generated/dataModel"
-import { toast } from "sonner"
+import { useToastMutation } from "@/hooks/use-toast-mutation"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,18 +37,15 @@ interface InvitationListProps {
 export function InvitationList({ eventId, eventSlug, invitations }: InvitationListProps) {
   const [editTarget, setEditTarget] = useState<Invitation | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Id<"invitations"> | null>(null)
-  const deleteInvitation = useMutation(api.invitations.deleteInvitation)
+  const deleteInvitation = useToastMutation(api.invitations.deleteInvitation, {
+    success: "Invitation deleted",
+    error: "Failed to delete invitation",
+  })
 
   async function handleDelete() {
     if (!deleteTarget) return
-    try {
-      await deleteInvitation({ id: deleteTarget })
-      toast.success("Invitation deleted")
-    } catch (err) {
-      toast.error("Failed to delete invitation")
-    } finally {
-      setDeleteTarget(null)
-    }
+    await deleteInvitation.run({ id: deleteTarget })
+    setDeleteTarget(null)
   }
 
   return (

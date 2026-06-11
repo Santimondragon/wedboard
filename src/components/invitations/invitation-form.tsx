@@ -5,10 +5,10 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation, useQuery } from "convex/react"
+import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
 import { type Id } from "convex/_generated/dataModel"
-import { toast } from "sonner"
+import { useToastMutation } from "@/hooks/use-toast-mutation"
 import { RefreshCw, UserPlus } from "lucide-react"
 import {
   Dialog,
@@ -66,9 +66,17 @@ export function InvitationForm({
 }: InvitationFormProps) {
   const params = useParams()
   const eventSlug = params?.eventSlug as string | undefined
-  const createInvitation = useMutation(api.invitations.createInvitation)
-  const updateInvitation = useMutation(api.invitations.updateInvitation)
-  const regenerateSlug = useMutation(api.invitations.regenerateSlug)
+  const createInvitation = useToastMutation(api.invitations.createInvitation, {
+    success: "Invitation created",
+    error: "Failed to create invitation",
+  })
+  const updateInvitation = useToastMutation(api.invitations.updateInvitation, {
+    success: "Invitation updated",
+    error: "Failed to update invitation",
+  })
+  const regenerateSlug = useToastMutation(api.invitations.regenerateSlug, {
+    error: "Failed to regenerate slug",
+  })
 
   const unassignedGuests = useQuery(
     api.guests.listUnassignedByEvent,
@@ -138,13 +146,9 @@ export function InvitationForm({
 
   async function handleRegenerateSlug() {
     if (mode === "edit" && invitation) {
-      try {
-        const result = await regenerateSlug({ id: invitation._id })
-        if (result && typeof result === "object" && "slug" in result) {
-          setValue("slug", (result as { slug: string }).slug)
-        }
-      } catch (err) {
-        toast.error("Failed to regenerate slug")
+      const result = await regenerateSlug.run({ id: invitation._id })
+      if (result.ok && typeof result.value === "string") {
+        setValue("slug", result.value)
       }
     } else {
       setValue("slug", slugify(title) + "-" + Math.random().toString(36).slice(2, 6))
@@ -152,35 +156,30 @@ export function InvitationForm({
   }
 
   async function onSubmit(data: InvitationFormData) {
-    try {
-      if (mode === "create") {
-        await createInvitation({
-          eventId,
-          title: data.title,
-          slug: data.slug,
-          type: data.type,
-          maxGuests: data.maxGuests,
-          allowPlusOne: data.allowPlusOne,
-          notes: data.notes,
-          guestIds: selectedGuestIds,
-        })
-        toast.success("Invitation created")
-      } else if (mode === "edit" && invitation) {
-        await updateInvitation({
-          id: invitation._id,
-          title: data.title,
-          slug: data.slug,
-          type: data.type,
-          maxGuests: data.maxGuests,
-          allowPlusOne: data.allowPlusOne,
-          notes: data.notes,
-        })
-        toast.success("Invitation updated")
-      }
-      onOpenChange(false)
-    } catch (err) {
-      toast.error(mode === "create" ? "Failed to create invitation" : "Failed to update invitation")
+    let result
+    if (mode === "create") {
+      result = await createInvitation.run({
+        eventId,
+        title: data.title,
+        slug: data.slug,
+        type: data.type,
+        maxGuests: data.maxGuests,
+        allowPlusOne: data.allowPlusOne,
+        notes: data.notes,
+        guestIds: selectedGuestIds,
+      })
+    } else if (mode === "edit" && invitation) {
+      result = await updateInvitation.run({
+        id: invitation._id,
+        title: data.title,
+        slug: data.slug,
+        type: data.type,
+        maxGuests: data.maxGuests,
+        allowPlusOne: data.allowPlusOne,
+        notes: data.notes,
+      })
     }
+    if (result?.ok) onOpenChange(false)
   }
 
   return (

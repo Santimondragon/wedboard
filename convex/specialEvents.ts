@@ -1,13 +1,11 @@
 import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
-import { requireUser } from "./lib/auth";
-import { requireEventAccess } from "./lib/permissions";
+import { requireEventEditor } from "./lib/permissions";
 
 export const listByEvent = query({
   args: { eventId: v.id("events") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventAccess(ctx, args.eventId, user._id);
+    await requireEventEditor(ctx, args.eventId);
 
     return await ctx.db
       .query("specialEvents")
@@ -27,6 +25,7 @@ export const listForInvitation = query({
       )
       .take(100);
 
+    // Per-id get fan-out is bounded by the take(100) above — fine at this scale.
     const specialEvents = await Promise.all(
       accesses.map((a) => ctx.db.get(a.specialEventId))
     );
@@ -46,8 +45,7 @@ export const createSpecialEvent = mutation({
     location: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventAccess(ctx, args.eventId, user._id);
+    await requireEventEditor(ctx, args.eventId);
 
     return await ctx.db.insert("specialEvents", {
       eventId: args.eventId,
@@ -70,10 +68,9 @@ export const updateSpecialEvent = mutation({
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
     const specialEvent = await ctx.db.get(args.id);
     if (!specialEvent) throw new ConvexError("Special event not found");
-    await requireEventAccess(ctx, specialEvent.eventId, user._id);
+    await requireEventEditor(ctx, specialEvent.eventId);
 
     const { id, ...updates } = args;
     await ctx.db.patch(id, updates);
@@ -83,10 +80,9 @@ export const updateSpecialEvent = mutation({
 export const deleteSpecialEvent = mutation({
   args: { id: v.id("specialEvents") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
     const specialEvent = await ctx.db.get(args.id);
     if (!specialEvent) throw new ConvexError("Special event not found");
-    await requireEventAccess(ctx, specialEvent.eventId, user._id);
+    await requireEventEditor(ctx, specialEvent.eventId);
 
     // Clean up invitationSpecialEventAccess
     const accesses = await ctx.db

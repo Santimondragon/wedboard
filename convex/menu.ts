@@ -1,33 +1,68 @@
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
-import { requireUser } from "./lib/auth";
-import { requireEventAccess } from "./lib/permissions";
+import { requireEventEditor } from "./lib/permissions";
+import {
+  listPublicOptions,
+  listAdminOptions,
+  createOption,
+  updateOption,
+  deleteOption,
+} from "./lib/options";
 
 export const listMenuOptionsByEvent = query({
   args: { eventId: v.id("events") },
   handler: async (ctx, args) => {
     // Public-accessible for guest RSVP page
-    const options = await ctx.db
-      .query("menuOptions")
-      .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-      .take(100);
-    return options
-      .filter((o) => o.isActive)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
+    return await listPublicOptions(ctx, "menuOptions", args.eventId);
   },
 });
 
 export const listMenuOptionsByEventAdmin = query({
   args: { eventId: v.id("events") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventAccess(ctx, args.eventId, user._id);
+    return await listAdminOptions(ctx, "menuOptions", args.eventId);
+  },
+});
 
-    const options = await ctx.db
-      .query("menuOptions")
+// Per-option guest selection counts for the menu page, so the client
+// doesn't need the full guest list just to show tallies.
+export const getSelectionCounts = query({
+  args: { eventId: v.id("events") },
+  handler: async (ctx, args) => {
+    await requireEventEditor(ctx, args.eventId);
+
+    const guests = await ctx.db
+      .query("guests")
       .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-      .take(100);
-    return options.sort((a, b) => a.sortOrder - b.sortOrder);
+      .take(1000);
+
+    const menuCounts: Record<string, number> = {};
+    const drinkCounts: Record<string, number> = {};
+    let menuUnassigned = 0;
+    let drinkUnassigned = 0;
+
+    for (const guest of guests) {
+      if (guest.menuOptionId) {
+        menuCounts[guest.menuOptionId] =
+          (menuCounts[guest.menuOptionId] ?? 0) + 1;
+      } else {
+        menuUnassigned++;
+      }
+      if (guest.drinkOptionId) {
+        drinkCounts[guest.drinkOptionId] =
+          (drinkCounts[guest.drinkOptionId] ?? 0) + 1;
+      } else {
+        drinkUnassigned++;
+      }
+    }
+
+    return {
+      menuCounts,
+      drinkCounts,
+      menuUnassigned,
+      drinkUnassigned,
+      totalGuests: guests.length,
+    };
   },
 });
 
@@ -39,25 +74,7 @@ export const createMenuOption = mutation({
     sortOrder: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventAccess(ctx, args.eventId, user._id);
-
-    const existing = await ctx.db
-      .query("menuOptions")
-      .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-      .take(100);
-    const maxSort = existing.reduce(
-      (max, o) => Math.max(max, o.sortOrder),
-      0
-    );
-
-    return await ctx.db.insert("menuOptions", {
-      eventId: args.eventId,
-      name: args.name,
-      description: args.description,
-      isActive: true,
-      sortOrder: args.sortOrder ?? maxSort + 1,
-    });
+    return await createOption(ctx, "menuOptions", args);
   },
 });
 
@@ -70,23 +87,13 @@ export const updateMenuOption = mutation({
     sortOrder: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const option = await ctx.db.get(args.id);
-    if (!option) throw new ConvexError("Menu option not found");
-    await requireEventAccess(ctx, option.eventId, user._id);
-
-    const { id, ...updates } = args;
-    await ctx.db.patch(id, updates);
+    await updateOption(ctx, args);
   },
 });
 
 export const deleteMenuOption = mutation({
   args: { id: v.id("menuOptions") },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    const option = await ctx.db.get(args.id);
-    if (!option) throw new ConvexError("Menu option not found");
-    await requireEventAccess(ctx, option.eventId, user._id);
-    await ctx.db.delete(args.id);
+    await deleteOption(ctx, args);
   },
 });
