@@ -12,7 +12,10 @@ import { ELEGANT_COPY } from "./default-copy"
 // via <ElegantSection> so there is no global spacing on the frame.
 // ---------------------------------------------------------------------------
 
-/** 30px horizontal padding matches the design (330px content in a 390px frame). */
+/**
+ * 24px horizontal padding matches the design (342px content in a 390px frame).
+ * Each block sets its own vertical padding + gap (the design has no global gap).
+ */
 function ElegantSection({
   className,
   children,
@@ -20,7 +23,7 @@ function ElegantSection({
   className?: string
   children: React.ReactNode
 }) {
-  return <section className={cn("px-[30px] py-6", className)}>{children}</section>
+  return <section className={cn("px-6 py-6", className)}>{children}</section>
 }
 
 function WeddingButton({
@@ -113,10 +116,52 @@ function getConfigImage(
   return id ? data.mediaUrls?.[id] : undefined
 }
 
-function CheckRow({ label }: { label: string }) {
+function CheckRow({
+  label,
+  checked,
+  onChange,
+  type = "checkbox",
+  name,
+}: {
+  label: string
+  checked?: boolean
+  onChange?: (checked: boolean) => void
+  type?: "checkbox" | "radio"
+  name?: string
+}) {
   return (
-    <label className="flex items-center gap-3 font-elegant text-[16px] font-bold text-wedding-ink">
-      <span aria-hidden className="size-6 shrink-0 bg-wedding-muted" />
+    <label className="flex cursor-pointer items-center gap-3 font-elegant text-[16px] font-bold text-wedding-ink">
+      <span
+        className={cn(
+          "flex size-6 shrink-0 items-center justify-center border border-wedding-gold/60 bg-white transition-colors",
+          type === "radio" ? "rounded-full" : "rounded-sm",
+          checked && "bg-wedding-gold text-white"
+        )}
+      >
+        <input
+          type={type}
+          name={name}
+          checked={checked}
+          onChange={(e) => onChange?.(e.target.checked)}
+          className="sr-only"
+        />
+        {checked && (
+          <svg
+            viewBox="0 0 16 16"
+            fill="none"
+            className="size-4"
+            aria-hidden
+          >
+            <path
+              d="M3 8.5l3.2 3.2L13 5"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
+      </span>
       <span>{label}</span>
     </label>
   )
@@ -176,6 +221,18 @@ function useRemaining(date?: number) {
 // from block.config first and fall back to it for layouts saved before the
 // copy became authorable.
 
+// Decorative assets exported from the Figma design (file heSJxDYKECFLtzVd9F1LyJ,
+// frame 525:3) — gold line-art ornaments (PNG) and itinerary item icons (SVG),
+// served from /public/templates/elegant.
+const ASSET_BASE = "/templates/elegant"
+/** One illustrated icon per itinerary item, in the design's order. */
+const ITINERARY_ICONS = [
+  `${ASSET_BASE}/itinerary-1.svg`,
+  `${ASSET_BASE}/itinerary-2.svg`,
+  `${ASSET_BASE}/itinerary-3.svg`,
+  `${ASSET_BASE}/itinerary-4.svg`,
+]
+
 // ---------------------------------------------------------------------------
 // Blocks
 // ---------------------------------------------------------------------------
@@ -184,7 +241,7 @@ function ElegantHero({ data, block }: BlockComponentProps) {
   const [first, second] = coupleNames(data.event)
   const intro = getConfigString(block, "body") ?? ELEGANT_COPY.heroIntro
   return (
-    <ElegantSection className="flex flex-col items-center gap-4 pt-10 text-center">
+    <ElegantSection className="flex flex-col items-center gap-4 py-10 text-center">
       <p className="font-script text-[20px] text-wedding-ink">
         {formatDate(data.event.date)}
       </p>
@@ -196,10 +253,12 @@ function ElegantHero({ data, block }: BlockComponentProps) {
         />
         <SealStamp className="absolute -bottom-1 right-2" />
       </div>
-      <h1 className="font-script text-[48px] leading-[1.15] text-wedding-gold">
+      <h1 className="font-script text-[48px] leading-[1.05] text-wedding-gold">
         {second ? (
           <>
-            {first} <span className="px-1">&amp;</span> {second}
+            {first}
+            <br />
+            <span className="px-1">&amp;</span> {second}
           </>
         ) : (
           data.event.name
@@ -218,10 +277,17 @@ function ElegantLocation({ data, block }: BlockComponentProps) {
     [venueName, venueAddress].filter(Boolean).join(", ") ||
     "Cra 123 # 123 - 123 Cali, Valle del Cauca"
   return (
-    <ElegantSection className="flex flex-col items-center gap-4 text-center">
+    <ElegantSection className="flex flex-col items-center gap-4 pt-24 pb-6 text-center">
       <h2 className="font-elegant text-[24px] font-bold text-wedding-ink">
         Ubicación
       </h2>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        aria-hidden
+        src={`${ASSET_BASE}/location-flourish.png`}
+        alt=""
+        className="h-10 w-auto object-contain"
+      />
       <ImagePlaceholder
         className="h-[200px] w-full rounded"
         src={getConfigImage(data, block, "mapImage")}
@@ -238,7 +304,14 @@ function ElegantLocation({ data, block }: BlockComponentProps) {
 function ElegantRsvp({ block }: BlockComponentProps) {
   const note = getConfigString(block, "body") ?? ELEGANT_COPY.rsvpNote
   return (
-    <ElegantSection className="text-center">
+    <ElegantSection className="flex flex-col items-center gap-2.5 px-10 py-12 text-center">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        aria-hidden
+        src={`${ASSET_BASE}/rsvp-sprig.png`}
+        alt=""
+        className="h-16 w-auto object-contain"
+      />
       <p className="font-elegant text-[20px] leading-relaxed text-wedding-ink">
         {note}
       </p>
@@ -249,7 +322,7 @@ function ElegantRsvp({ block }: BlockComponentProps) {
 function ElegantCountdown({ data }: BlockComponentProps) {
   const { days, hours, minutes } = useRemaining(data.event.date)
   return (
-    <ElegantSection className="flex flex-col items-center gap-3 text-center">
+    <ElegantSection className="flex flex-col items-center gap-4 text-center">
       <h2 className="font-script text-[48px] leading-tight text-wedding-gold">
         Faltan
       </h2>
@@ -274,7 +347,7 @@ function ElegantItinerary({ data, block }: BlockComponentProps) {
         .filter((i) => i.time || i.label)
     : [...ELEGANT_COPY.itineraryItems]
   return (
-    <ElegantSection className="flex flex-col items-center gap-6 text-center">
+    <ElegantSection className="flex flex-col items-center gap-4 text-center">
       <div className="space-y-1">
         <h2 className="font-script text-[48px] leading-tight text-wedding-gold">
           Itinerario
@@ -286,9 +359,12 @@ function ElegantItinerary({ data, block }: BlockComponentProps) {
       <ul className="space-y-6">
         {items.map((item, i) => (
           <li key={`${item.label}-${i}`} className="flex flex-col items-center gap-1">
-            <span
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               aria-hidden
-              className="mb-1 size-10 rounded-full border border-wedding-gold/40"
+              src={ITINERARY_ICONS[i % ITINERARY_ICONS.length]}
+              alt=""
+              className="mb-1 h-20 w-auto object-contain"
             />
             <span className="font-elegant text-[16px] font-bold text-wedding-ink">
               {item.time}
@@ -331,8 +407,10 @@ function ElegantAllergies({ block }: BlockComponentProps) {
   const options = configOptions
     ? configOptions.filter((o): o is string => typeof o === "string")
     : [...ELEGANT_COPY.foodOptions]
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [other, setOther] = useState("")
   return (
-    <ElegantSection className="space-y-4">
+    <ElegantSection className="space-y-6">
       <div className="space-y-2">
         <h2 className="font-elegant text-[24px] font-bold text-wedding-ink">
           {headline}
@@ -343,12 +421,26 @@ function ElegantAllergies({ block }: BlockComponentProps) {
       </div>
       <div className="space-y-3">
         {options.map((option) => (
-          <CheckRow key={option} label={option} />
+          <CheckRow
+            key={option}
+            label={option}
+            checked={selected.has(option)}
+            onChange={(checked) =>
+              setSelected((prev) => {
+                const next = new Set(prev)
+                if (checked) next.add(option)
+                else next.delete(option)
+                return next
+              })
+            }
+          />
         ))}
         <label className="flex items-center gap-2 font-elegant text-[16px] font-bold text-wedding-ink">
           Otro:
           <input
             type="text"
+            value={other}
+            onChange={(e) => setOther(e.target.value)}
             className="flex-1 border-b border-wedding-muted bg-transparent outline-none"
           />
         </label>
@@ -391,13 +483,23 @@ function ElegantSpecialInvitation({ block }: BlockComponentProps) {
   const description = getConfigString(block, "description") ?? ELEGANT_COPY.dinnerDescription
   const name = getConfigString(block, "name") ?? ELEGANT_COPY.dinnerName
   return (
-    <ElegantSection className="flex flex-col items-center gap-4 py-10 text-center">
-      <p className="font-elegant text-[16px] font-bold leading-relaxed text-wedding-ink">
-        {description}
-      </p>
-      <h2 className="font-script text-[48px] leading-tight text-wedding-ink">
-        {name}
-      </h2>
+    <ElegantSection className="relative px-16 py-40 text-center">
+      {/* Floral border frame from the design — sits behind the content. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        aria-hidden
+        src={`${ASSET_BASE}/special-invite-frame.png`}
+        alt=""
+        className="pointer-events-none absolute inset-0 h-full w-full object-fill"
+      />
+      <div className="relative flex flex-col items-center gap-2.5">
+        <p className="font-elegant text-[16px] font-bold leading-relaxed text-wedding-ink">
+          {description}
+        </p>
+        <h2 className="font-script text-[48px] leading-tight text-wedding-ink">
+          {name}
+        </h2>
+      </div>
     </ElegantSection>
   )
 }
@@ -406,6 +508,7 @@ function ElegantSpecialInvitation({ block }: BlockComponentProps) {
 function ElegantStayInvite({ data, block }: BlockComponentProps) {
   const headline = getConfigString(block, "headline") ?? ELEGANT_COPY.stayHeadline
   const body = getConfigString(block, "body") ?? ELEGANT_COPY.stayBody
+  const [stay, setStay] = useState<"yes" | "no" | null>(null)
   return (
     <section className="py-6">
       <ImagePlaceholder
@@ -413,7 +516,7 @@ function ElegantStayInvite({ data, block }: BlockComponentProps) {
         src={getConfigImage(data, block, "image")}
         alt={headline}
       />
-      <div className="space-y-4 px-[30px] pt-5">
+      <div className="space-y-4 px-6 pt-5">
         <h2 className="font-script text-[48px] leading-tight text-wedding-gold">
           {headline}
         </h2>
@@ -421,8 +524,20 @@ function ElegantStayInvite({ data, block }: BlockComponentProps) {
           {body}
         </p>
         <div className="space-y-3">
-          <CheckRow label="Sí, reservar mi alojamiento" />
-          <CheckRow label="No necesitaré alojamiento" />
+          <CheckRow
+            type="radio"
+            name="stay"
+            label="Sí, reservar mi alojamiento"
+            checked={stay === "yes"}
+            onChange={() => setStay("yes")}
+          />
+          <CheckRow
+            type="radio"
+            name="stay"
+            label="No necesitaré alojamiento"
+            checked={stay === "no"}
+            onChange={() => setStay("no")}
+          />
         </div>
         <WeddingButton>Enviar</WeddingButton>
       </div>
@@ -433,7 +548,14 @@ function ElegantStayInvite({ data, block }: BlockComponentProps) {
 function ElegantFooter({ block }: BlockComponentProps) {
   const note = getConfigString(block, "body") ?? ELEGANT_COPY.footerNote
   return (
-    <ElegantSection className="py-8 text-center">
+    <ElegantSection className="flex flex-col items-center gap-6 py-10 text-center">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        aria-hidden
+        src={`${ASSET_BASE}/footer-flourish.png`}
+        alt=""
+        className="h-12 w-auto object-contain"
+      />
       <p className="font-elegant text-[24px] font-bold leading-relaxed text-wedding-gold">
         {note}
       </p>

@@ -454,7 +454,7 @@ src/components/
       dummy-data.ts             DUMMY_INVITATION_DATA sample used by the live preview
       elegant/                  The official template (Figma design, node 452:172) — its own markup, not the default sections
         frame.tsx               ElegantFrame — phone-width card, NO global gap (each block owns padding)
-        blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/stayInvite/footer) + primitives (ElegantSection, WeddingButton, CheckRow, CircularPhoto/ImagePlaceholder render real images from mediaUrls when an "image" config field is set). All copy reads block.config first, falling back to ELEGANT_COPY
+        blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/stayInvite/footer) + primitives (ElegantSection [24px horizontal padding; each block sets its own vertical padding/gap], WeddingButton [renders an `<a>` when given `href` — location "Ver mapa" links to `event.venueMapUrl`], CheckRow [real interactive checkbox/radio], CircularPhoto/ImagePlaceholder render real images from mediaUrls when an "image" config field is set). Hero uses `event.brideName`/`groomName` (stacked on two lines). All copy reads block.config first, falling back to ELEGANT_COPY
         default-copy.ts         ELEGANT_COPY (the design's Spanish copy) + ELEGANT_BLOCK_CONFIG (per-block default configs)
         default-layout.ts       elegantDefaultLayout() — preset blocks in the design's order, configs seeded from ELEGANT_BLOCK_CONFIG
         index.ts                Re-exports ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout
@@ -503,12 +503,18 @@ src/hooks/
 > **markup and structure**, not just theme.
 >
 > - **`elegant`** is the **only official template** (default), implementing the Figma
->   design under `templates/elegant/`: its own `Frame` + a component per section, gold/serif styling
->   via the `wedding-*` palette and `font-script`/`font-elegant` (see globals.css + layout.tsx), and a
->   preset Spanish layout (configs seeded from `default-copy.ts`). Per the design, **each block owns
->   its vertical padding** (`ElegantSection`) — the frame has no global gap. Image slots render the
->   configured media image or a placeholder; the form controls (RSVP/food/stay) are not yet wired to
->   `submitPublicRsvp`.
+>   design (file `heSJxDYKECFLtzVd9F1LyJ`, frame `525:3`) under `templates/elegant/`: its own `Frame`
+>   + a component per section, gold/serif styling via the `wedding-*` palette and
+>   `font-script`/`font-elegant` (see globals.css + layout.tsx), and a preset Spanish layout (configs
+>   seeded from `default-copy.ts`). **Spacing mirrors the Figma frame exactly**: 390px-wide white card
+>   on `wedding-soft` (`ElegantFrame`); 24px horizontal padding on every block (`ElegantSection` base
+>   `px-6`); and **each block owns its vertical padding + gap** (the frame has no global gap) per the
+>   design's per-section values (e.g. hero `py-10`, location `pt-24 pb-6`, rsvp `px-10 py-12`, special
+>   invite `px-16 py-40`, footer `py-10`). Palette/fonts already matched the design (gold `#c5a46d`,
+>   ink `#3c3c3c`, soft `#ececec`, muted `#d9d9d9`; Fleur De Leah / Gowun Batang). Checkboxes are real
+>   interactive controls (`CheckRow` — `checkbox` for food multi-select, `radio` for stay); the form
+>   controls are not yet wired to `submitPublicRsvp`. Image slots render the configured media image or
+>   a placeholder.
 > - Add more templates by giving each its own `Frame`/`blocks` (and optional `defaultLayout`) in its
 >   `TemplateDef`; anything left unset falls back to `DefaultFrame` / `DEFAULT_BLOCKS`.
 

@@ -37,7 +37,10 @@
       "Bash(echo \"lint exit: $?\")",
       "Bash(NEXT_PUBLIC_CONVEX_URL='https://placeholder.convex.cloud' NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY='pk_test_cGxhY2Vob2xkZXItcGxhY2Vob2xkZXItMTIzNDUkk' CLERK_SECRET_KEY='sk_test_placeholder' CLERK_FRONTEND_API_URL='https://placeholder.clerk.accounts.dev' pnpm build)",
       "Bash(pnpm install *)",
-      "Bash(echo \"install exit: $?\")"
+      "Bash(echo \"install exit: $?\")",
+      "Bash(cd /tmp && jq -r ' *)",
+      "Bash(npm run *)",
+      "Bash(rm -f /tmp/frame.json /tmp/figma_node.json /tmp/figma_525_3.png 2>/dev/null; echo \"temp cleaned\"; echo \"=== public assets ===\"; ls /Users/santimondragon/development/personal/wedding-management-app/public/templates/elegant/; echo \"=== leftover assets dir? ===\"; ls /Users/santimondragon/development/personal/wedding-management-app/src/components/public-invitation/templates/elegant/assets 2>&1 | head -1)"
     ]
   }
 }

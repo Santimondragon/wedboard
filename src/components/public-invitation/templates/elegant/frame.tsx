@@ -9,7 +9,7 @@ import type { FrameProps } from "../default-blocks"
 export function ElegantFrame({ children }: FrameProps) {
   return (
     <div className="min-h-screen bg-wedding-soft/40 py-8">
-      <div className="mx-auto w-full max-w-[420px] bg-white text-wedding-ink shadow-sm">
+      <div className="mx-auto w-full max-w-[390px] bg-white text-wedding-ink shadow-sm">
         {children}
       </div>
     </div>
