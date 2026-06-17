@@ -18,7 +18,7 @@ export function ElegantHero({ data, block }: BlockComponentProps) {
   
   return (
     <ElegantSection className="Hero flex flex-col items-center gap-4 pt-12 pb-10 text-center">
-      <p className="font-script text-[20px] text-wedding-ink">
+      <p className="font-script text-xl text-wedding-ink">
         {formatDate(data.event.date)}
       </p>
       <SealedPhoto
