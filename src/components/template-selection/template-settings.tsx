@@ -7,6 +7,7 @@ import { useToastMutation } from "@/hooks/use-toast-mutation"
 import {
   ChevronUp,
   ChevronDown,
+  ChevronRight,
   Copy,
   Trash2,
   Plus,
@@ -92,6 +93,17 @@ export function TemplateSettings() {
     }
   )
   const [activeVariant, setActiveVariant] = useState<RsvpVariant>("pending")
+  // Blocks are collapsed by default; track the ids the user has expanded.
+  const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(
+    () => new Set()
+  )
+  const toggleExpanded = (id: string) =>
+    setExpandedBlocks((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   // The active variant's block list, plus a setter that only touches it.
   const blocks = variants[activeVariant]
@@ -188,12 +200,12 @@ export function TemplateSettings() {
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[24rem_1fr]">
-      {/* Controls */}
-      <div className="space-y-8">
+    <div className="grid min-h-0 flex-1 gap-8 lg:grid-cols-[24rem_1fr]">
+      {/* Controls — header, tabs and "add block" stay put; only the list scrolls. */}
+      <div className="flex min-h-0 flex-col gap-4">
         {/* Only show the template picker when there's a real choice to make. */}
         {TEMPLATE_LIST.length > 1 && (
-          <section className="space-y-3">
+          <section className="shrink-0 space-y-3">
             <h2 className="text-sm font-semibold text-zinc-900">Template</h2>
             <div className="space-y-2">
               {TEMPLATE_LIST.map((template) => (
@@ -218,7 +230,7 @@ export function TemplateSettings() {
           </section>
         )}
 
-        <section className="space-y-3">
+        <div className="shrink-0 space-y-3">
           <Tabs
             value={activeVariant}
             onValueChange={(v) => setActiveVariant(v as RsvpVariant)}
@@ -251,18 +263,47 @@ export function TemplateSettings() {
             </button>
           </div>
 
-          <ul className="space-y-2">
+          <Select value="" onValueChange={(v) => addBlock(v as BlockType)}>
+            <SelectTrigger className="w-full">
+              <span className="flex items-center gap-2 text-zinc-600">
+                <Plus className="h-4 w-4" />
+                <SelectValue placeholder="Add block" />
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              {BLOCK_PALETTE.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {BLOCK_DEFS[type].label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pb-2">
             {blocks.map((block, index) => {
               const def = BLOCK_DEFS[block.type]
+              const isExpanded = expandedBlocks.has(block.id)
               return (
                 <li
                   key={block.id}
                   className="rounded-lg border border-zinc-200 p-4 space-y-2"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-zinc-900">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(block.id)}
+                      aria-expanded={isExpanded}
+                      className="flex flex-1 items-center gap-1.5 text-left text-sm font-medium text-zinc-900 cursor-pointer"
+                    >
+                      <ChevronRight
+                        className={cn(
+                          "h-4 w-4 text-zinc-400 transition-transform",
+                          isExpanded && "rotate-90"
+                        )}
+                      />
                       {def.label}
-                    </span>
+                    </button>
                     <div className="flex items-center gap-0.5">
                       <IconButton
                         label="Move up"
@@ -293,7 +334,7 @@ export function TemplateSettings() {
                     </div>
                   </div>
 
-                  {(() => {
+                  {isExpanded && (() => {
                     const visibleFields = def.fields.filter(
                       (field) =>
                         !field.showWhen ||
@@ -324,32 +365,15 @@ export function TemplateSettings() {
               )
             })}
           </ul>
-
-          <Select value="" onValueChange={(v) => addBlock(v as BlockType)}>
-            <SelectTrigger className="w-full">
-              <span className="flex items-center gap-2 text-zinc-600">
-                <Plus className="h-4 w-4" />
-                <SelectValue placeholder="Add block" />
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              {BLOCK_PALETTE.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {BLOCK_DEFS[type].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </section>
       </div>
 
-      {/* Live preview — sticks to the top while the blocks list scrolls. */}
-      <div className="sticky top-0 self-start space-y-3">
-        <div className="flex items-center justify-between">
+      {/* Live preview — stays in view while the blocks list scrolls. */}
+      <div className="flex min-h-0 flex-col space-y-3">
+        <div className="flex shrink-0 items-center justify-between">
           <h2 className="text-sm font-semibold text-zinc-900">Live preview</h2>
         </div>
-        <div className="overflow-hidden rounded-xl border bg-white">
-          <div className="max-h-[70vh] overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-hidden rounded-xl border bg-white">
+          <div className="h-full overflow-y-auto">
             <InvitationTemplate
               data={previewData}
               templateId={templateId}
@@ -360,7 +384,7 @@ export function TemplateSettings() {
         </div>
         <Button
           size="lg"
-          className="w-full"
+          className="w-full shrink-0"
           onClick={handleSave}
           disabled={setTemplate.pending}
         >

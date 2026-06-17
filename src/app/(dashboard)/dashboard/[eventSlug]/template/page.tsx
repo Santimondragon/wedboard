@@ -2,8 +2,8 @@ import { TemplateSettings } from "@/components/template-selection/template-setti
 
 export default function TemplatePage() {
   return (
-    <div className="p-6 space-y-6">
-      <div className="space-y-1">
+    <div className="flex h-full flex-col gap-6 p-6">
+      <div className="shrink-0 space-y-1">
         <h1 className="text-2xl font-semibold text-zinc-900">
           Invitation Template
         </h1>
