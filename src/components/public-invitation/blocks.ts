@@ -2,6 +2,8 @@
 // list of blocks; the same block type may appear multiple times (e.g. three
 // "text" blocks back to back). Persisted on `events.layoutBlocks`.
 
+import { ITINERARY_ILLUSTRATIONS } from "./templates/elegant/illustrations"
+
 export type BlockType =
   | "hero"
   | "text"
@@ -49,7 +51,17 @@ export interface ConfigField {
    * (e.g. food options); set for structured rows (e.g. itinerary
    * {time,label} entries).
    */
-  itemFields?: { key: string; label: string }[]
+  itemFields?: {
+    key: string
+    label: string
+    /**
+     * Defaults to a plain text input. "illustration" renders a modal picker
+     * of preset images (see `options`) instead of a text field.
+     */
+    input?: "text" | "illustration"
+    /** For "illustration" item fields: the selectable presets. */
+    options?: { value: string; label: string; src: string }[]
+  }[]
 }
 
 interface BlockDef {
@@ -104,6 +116,12 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
         itemFields: [
           { key: "time", label: "Time" },
           { key: "label", label: "Activity" },
+          {
+            key: "illustration",
+            label: "Illustration",
+            input: "illustration",
+            options: ITINERARY_ILLUSTRATIONS,
+          },
         ],
       },
     ],

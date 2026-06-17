@@ -332,10 +332,3 @@ export function useRemaining(date?: number) {
 }
 
 export const ASSET_BASE = "/templates/elegant"
-
-export const ITINERARY_ICONS = [
-  `${ASSET_BASE}/itinerary-1.svg`,
-  `${ASSET_BASE}/itinerary-2.svg`,
-  `${ASSET_BASE}/itinerary-3.svg`,
-  `${ASSET_BASE}/itinerary-4.svg`,
-]

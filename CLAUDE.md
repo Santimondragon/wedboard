@@ -501,7 +501,10 @@ src/hooks/
 > specialInvitation, rsvp, allergies, menuSelection, drinkSelection, stayInvite, guestMessage, footer)
 > may repeat (e.g. several `text` blocks). **All non-derived text is authorable**:
 > every block with copy carries it in `config` (incl. `rsvp` title/deadline/attendLabel/declineLabel/note/submitLabel, `footer.body`, `allergies`
-> headline/note/options string-list, `itinerary.items` `{time,label}` list); only derived data (event
+> headline/note/options string-list, `itinerary.items` `{time,label,illustration}` list — each
+> itinerary item's `illustration` is picked from a preset set of SVGs via a modal picker; the presets
+> live in `templates/elegant/illustrations.ts` (`ITINERARY_ILLUSTRATIONS`, documented for adding more));
+> only derived data (event
 > name/bride/groom names/date/venue/map link, guest names — managed in event settings) is not. The
 > hero shows the couple via `event.brideName`/`groomName` (falling back to splitting the event name),
 > and the location "Ver mapa" button links to `event.venueMapUrl` (falling back to a Google Maps search
