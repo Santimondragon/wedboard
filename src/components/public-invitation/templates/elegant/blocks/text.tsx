@@ -1,7 +1,7 @@
 "use client"
 
 import { getConfigString } from "../../../blocks"
-import type { BlockComponentProps } from "../../default-blocks"
+import type { BlockComponentProps } from "../../types"
 import { ASSET_BASE, ElegantSection } from "./primitives"
 
 export function ElegantText({ block }: BlockComponentProps) {

@@ -446,11 +446,11 @@ src/components/
     public-invitation-page.tsx  Loads {eventSlug, invitationSlug} via getPublicInvitation; handles loading/not-found, then renders InvitationTemplate with event.templateId + event.layoutBlocks
     types.ts                    Local PublicEvent/PublicInvitation/PublicGuest/PublicInvitationData (incl. mediaUrls) types for the template
     blocks.ts                   Page-builder model: BlockType union, LayoutBlock, ConfigField (input: text | textarea | list | image; list supports itemFields for structured rows), BLOCK_DEFS, BLOCK_PALETTE, createBlock(), defaultLayout(), resolveLayout(), getConfigString(), getConfigList()
-    template-theme.tsx          "use client" — TemplateTheme tokens for elegant; TemplateThemeProvider + useTemplateTheme (consumed by the default frame/blocks)
+    template-theme.tsx          "use client" — TemplateTheme tokens for elegant; TemplateThemeProvider + useTemplateTheme (consumed by the template frame/blocks)
     templates/
-      template-registry.ts      Source of truth for templates: TemplateDef ({id,label,description,theme, optional Frame, per-block overrides, optional defaultLayout, optional defaultBlockConfig used to seed configs of newly added blocks}), TEMPLATES, TEMPLATE_LIST, DEFAULT_TEMPLATE_ID (="elegant"), resolveTemplate()
-      default-blocks.tsx        "use client" — DefaultFrame (themed divided card) + DEFAULT_BLOCKS (BlockType→component); the shared fallback markup. Defines BlockComponentProps/FrameProps
-      invitation-template.tsx   "use client" — resolves the template, renders its Frame (or DefaultFrame), and for each LayoutBlock its override component (or DEFAULT_BLOCKS); layout = saved blocks ?? template.defaultLayout() ?? defaultLayout()
+      template-registry.ts      Source of truth for templates: TemplateDef ({id,label,description,theme, Frame, blocks (per-BlockType markup), optional defaultLayout, optional defaultBlockConfig used to seed configs of newly added blocks}), TEMPLATES, TEMPLATE_LIST, DEFAULT_TEMPLATE_ID (="elegant"), resolveTemplate()
+      types.ts                  Shared template contracts: BlockComponentProps/BlockComponent + FrameProps/FrameComponent (imported by every template's frame + blocks)
+      invitation-template.tsx   "use client" — resolves the template, renders its Frame, and for each LayoutBlock its block component (block types the template omits render nothing); layout = saved blocks ?? template.defaultLayout() ?? defaultLayout()
       dummy-data.ts             DUMMY_INVITATION_DATA sample used by the live preview
       elegant/                  The official template (Figma design, node 452:172) — its own markup, not the default sections
         frame.tsx               ElegantFrame — phone-width card, NO global gap (each block owns padding)
@@ -458,20 +458,6 @@ src/components/
         default-copy.ts         ELEGANT_COPY (the design's Spanish copy) + ELEGANT_BLOCK_CONFIG (per-block default configs)
         default-layout.ts       elegantDefaultLayout() — preset blocks in the design's order, configs seeded from ELEGANT_BLOCK_CONFIG
         index.ts                Re-exports ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout
-    sections/
-      section.tsx               Shared eyebrow/heading/spacing wrapper; pulls colors/fonts from useTemplateTheme
-      hero-section.tsx          Event name, date, "Dear {invitation.title}" (themed)
-      location-section.tsx      Venue name + address (placeholder if absent)
-      message-section.tsx       Optional headline + body — backs the "text" block
-      countdown-section.tsx     "use client" — live ticking countdown to event date (themed)
-      itinerary-section.tsx     Time/title schedule (placeholder items — no backend model yet)
-      dress-code-section.tsx    Dress code + note (from block config)
-      special-invitation-section.tsx  Eyebrow/title/description/date/location from block config (placeholder defaults)
-      rsvp-section.tsx          Per-guest attending/declines radios (draft — not wired)
-      allergies-section.tsx     Per-guest allergies text input (draft — not wired)
-      menu-selection-section.tsx   Per-guest menu select (placeholder options — not wired)
-      drink-selection-section.tsx  Per-guest drink select (placeholder options — not wired)
-      footer-section.tsx        Event name + closing line (themed)
 
   template-selection/
     template-settings.tsx       "use client" — template picker + block page-builder (add via Select with template-seeded config, reorder up/down, duplicate, remove, edit fields) + live InvitationTemplate preview (dummy data + the event's real media URLs); saves via events.setInvitationTemplate. Rendered by /dashboard/[eventSlug]/template
@@ -497,10 +483,10 @@ src/hooks/
 > add/reorder/duplicate/remove/edit + live preview). Layout is stored on `events.layoutBlocks`
 > (undefined = the selected template's `defaultLayout()`, then the global `defaultLayout()`).
 >
-> **Templates own their markup.** A `TemplateDef` (template-registry) can supply its own page `Frame`,
-> a per-`BlockType` component map, and a preset `defaultLayout`; the renderer falls back to
-> `DefaultFrame` / `DEFAULT_BLOCKS` for anything a template doesn't override. So templates differ in
-> **markup and structure**, not just theme.
+> **Templates own their markup.** A `TemplateDef` (template-registry) supplies its own page `Frame`,
+> a per-`BlockType` component map, and an optional preset `defaultLayout`; block types a template
+> omits render nothing. There is no shared default markup — the shared `BlockComponentProps`/`FrameProps`
+> contracts live in `templates/types.ts`. So templates differ in **markup and structure**, not just theme.
 >
 > - **`elegant`** is the **only official template** (default), implementing the Figma
 >   design (file `heSJxDYKECFLtzVd9F1LyJ`, frame `525:3`) under `templates/elegant/`: its own `Frame`
@@ -516,7 +502,7 @@ src/hooks/
 >   controls are not yet wired to `submitPublicRsvp`. Image slots render the configured media image or
 >   a placeholder.
 > - Add more templates by giving each its own `Frame`/`blocks` (and optional `defaultLayout`) in its
->   `TemplateDef`; anything left unset falls back to `DefaultFrame` / `DEFAULT_BLOCKS`.
+>   `TemplateDef`; a template implements the markup for every block type it intends to render.
 
 ---
 

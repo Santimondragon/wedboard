@@ -1,7 +1,7 @@
 "use client"
 
 import { getConfigList } from "../../../blocks"
-import type { BlockComponentProps } from "../../default-blocks"
+import type { BlockComponentProps } from "../../types"
 import { ELEGANT_COPY } from "../default-copy"
 import { ElegantSection, ITINERARY_ICONS, formatDate } from "./primitives"
 

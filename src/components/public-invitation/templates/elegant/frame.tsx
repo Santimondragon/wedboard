@@ -1,4 +1,4 @@
-import type { FrameProps } from "../default-blocks"
+import type { FrameProps } from "../types"
 
 /**
  * Page frame for the "elegant" template: a phone-width invitation

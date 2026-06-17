@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { getConfigString } from "../../../blocks"
-import type { BlockComponentProps } from "../../default-blocks"
+import type { BlockComponentProps } from "../../types"
 
 /**
  * 24px horizontal padding matches the design (342px content in a 390px frame).

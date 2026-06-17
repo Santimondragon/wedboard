@@ -1,11 +1,10 @@
-// Source of truth for the available templates. Each template can override the
-// page frame and/or any block's markup; anything left unset falls back to the
-// shared defaults in default-blocks. This is what lets templates have
-// completely different markup from each other — not just different theming.
+// Source of truth for the available templates. Each template owns its page
+// frame and the markup for every block it renders. This is what lets templates
+// have completely different markup from each other — not just different theming.
 
 import { TEMPLATE_THEMES, type TemplateTheme } from "../template-theme"
 import type { BlockType, LayoutBlock } from "../blocks"
-import type { BlockComponent, FrameComponent } from "./default-blocks"
+import type { BlockComponent, FrameComponent } from "./types"
 import { ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout } from "./elegant"
 import { ELEGANT_BLOCK_CONFIG } from "./elegant/default-copy"
 
@@ -13,12 +12,12 @@ export interface TemplateDef {
   id: string
   label: string
   description: string
-  /** Theme tokens consumed by the default frame/blocks. */
+  /** Theme tokens consumed by the template's frame/blocks. */
   theme: TemplateTheme
-  /** Optional page wrapper. Falls back to DefaultFrame when unset. */
-  Frame?: FrameComponent
-  /** Per-block markup overrides. Missing types fall back to DEFAULT_BLOCKS. */
-  blocks?: Partial<Record<BlockType, BlockComponent>>
+  /** Page wrapper that lays out the rendered blocks. */
+  Frame: FrameComponent
+  /** Markup for each block type. Block types the template omits render nothing. */
+  blocks: Partial<Record<BlockType, BlockComponent>>
   /** Preset layout used when an event has no saved layout. */
   defaultLayout?: () => LayoutBlock[]
   /**
@@ -31,7 +30,7 @@ export interface TemplateDef {
 /**
  * `elegant` is the only official template: it ships its own page frame, a block
  * component per section, and a preset layout. Add more templates here by giving
- * each its own `Frame`/`blocks` to define their markup.
+ * each its own `Frame`/`blocks` that define their markup.
  */
 export const TEMPLATES: Record<string, TemplateDef> = {
   elegant: {

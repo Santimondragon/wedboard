@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { getConfigString } from "../../../blocks"
-import type { BlockComponentProps } from "../../default-blocks"
+import type { BlockComponentProps } from "../../types"
 import { ELEGANT_COPY } from "../default-copy"
 import { CheckRow, ImagePlaceholder, WeddingButton, getConfigImage } from "./primitives"
 
@@ -13,9 +13,7 @@ export function ElegantStayInvite({ data, block }: BlockComponentProps) {
   return (
     <section className="py-6">
       <ImagePlaceholder
-        className="h-[200px] w-full"
-        src={getConfigImage(data, block, "image")}
-        alt={headline}
+        className="h-50 w-full"
       />
       <div className="space-y-4 px-6 pt-5">
         <h2 className="font-script text-[48px] leading-tight text-wedding-gold">

@@ -1,6 +1,6 @@
 "use client"
 
-import type { BlockComponentProps } from "../../default-blocks"
+import type { BlockComponentProps } from "../../types"
 import { ElegantSection, pad, useRemaining } from "./primitives"
 
 export function ElegantCountdown({ data }: BlockComponentProps) {

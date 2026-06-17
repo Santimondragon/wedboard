@@ -1,5 +1,5 @@
 import type { BlockType } from "../../../blocks"
-import type { BlockComponent } from "../../default-blocks"
+import type { BlockComponent } from "../../types"
 import { ElegantAllergies } from "./allergies"
 import { ElegantCountdown } from "./countdown"
 import { ElegantDressCode } from "./dress-code"

@@ -3,7 +3,6 @@
 import { defaultLayout, type LayoutBlock } from "../blocks"
 import { TemplateThemeProvider } from "../template-theme"
 import type { PublicInvitationData } from "../types"
-import { DEFAULT_BLOCKS, DefaultFrame } from "./default-blocks"
 import { resolveTemplate } from "./template-registry"
 
 interface InvitationTemplateProps {
@@ -15,10 +14,9 @@ interface InvitationTemplateProps {
 }
 
 /**
- * Renders a public invitation. The chosen template supplies the page frame and
- * the component for each block type (falling back to the shared defaults), so
- * templates can differ in markup as well as styling. Sections are still
- * plain-text drafts.
+ * Renders a public invitation. The chosen template owns the page frame and the
+ * component for each block type, so templates differ in markup as well as
+ * styling. Block types a template doesn't implement render nothing.
  */
 export function InvitationTemplate({
   data,
@@ -26,7 +24,7 @@ export function InvitationTemplate({
   blocks,
 }: InvitationTemplateProps) {
   const template = resolveTemplate(templateId)
-  const Frame = template.Frame ?? DefaultFrame
+  const Frame = template.Frame
   // Saved blocks win; otherwise use the template's preset layout, then the
   // global default.
   const layout =
@@ -38,7 +36,7 @@ export function InvitationTemplate({
     <TemplateThemeProvider templateId={templateId}>
       <Frame>
         {layout.map((block) => {
-          const Block = template.blocks?.[block.type] ?? DEFAULT_BLOCKS[block.type]
+          const Block = template.blocks[block.type]
           return Block ? <Block key={block.id} block={block} data={data} /> : null
         })}
       </Frame>

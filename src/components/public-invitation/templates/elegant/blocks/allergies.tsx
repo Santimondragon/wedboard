@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { getConfigList, getConfigString } from "../../../blocks"
-import type { BlockComponentProps } from "../../default-blocks"
+import type { BlockComponentProps } from "../../types"
 import { ELEGANT_COPY } from "../default-copy"
 import { CheckRow, ElegantSection, WeddingButton } from "./primitives"
 

@@ -446,32 +446,18 @@ src/components/
     public-invitation-page.tsx  Loads {eventSlug, invitationSlug} via getPublicInvitation; handles loading/not-found, then renders InvitationTemplate with event.templateId + event.layoutBlocks
     types.ts                    Local PublicEvent/PublicInvitation/PublicGuest/PublicInvitationData (incl. mediaUrls) types for the template
     blocks.ts                   Page-builder model: BlockType union, LayoutBlock, ConfigField (input: text | textarea | list | image; list supports itemFields for structured rows), BLOCK_DEFS, BLOCK_PALETTE, createBlock(), defaultLayout(), resolveLayout(), getConfigString(), getConfigList()
-    template-theme.tsx          "use client" — TemplateTheme tokens for elegant; TemplateThemeProvider + useTemplateTheme (consumed by the default frame/blocks)
+    template-theme.tsx          "use client" — TemplateTheme tokens for elegant; TemplateThemeProvider + useTemplateTheme (consumed by the template frame/blocks)
     templates/
-      template-registry.ts      Source of truth for templates: TemplateDef ({id,label,description,theme, optional Frame, per-block overrides, optional defaultLayout, optional defaultBlockConfig used to seed configs of newly added blocks}), TEMPLATES, TEMPLATE_LIST, DEFAULT_TEMPLATE_ID (="elegant"), resolveTemplate()
-      default-blocks.tsx        "use client" — DefaultFrame (themed divided card) + DEFAULT_BLOCKS (BlockType→component); the shared fallback markup. Defines BlockComponentProps/FrameProps
-      invitation-template.tsx   "use client" — resolves the template, renders its Frame (or DefaultFrame), and for each LayoutBlock its override component (or DEFAULT_BLOCKS); layout = saved blocks ?? template.defaultLayout() ?? defaultLayout()
+      template-registry.ts      Source of truth for templates: TemplateDef ({id,label,description,theme, Frame, blocks (per-BlockType markup), optional defaultLayout, optional defaultBlockConfig used to seed configs of newly added blocks}), TEMPLATES, TEMPLATE_LIST, DEFAULT_TEMPLATE_ID (="elegant"), resolveTemplate()
+      types.ts                  Shared template contracts: BlockComponentProps/BlockComponent + FrameProps/FrameComponent (imported by every template's frame + blocks)
+      invitation-template.tsx   "use client" — resolves the template, renders its Frame, and for each LayoutBlock its block component (block types the template omits render nothing); layout = saved blocks ?? template.defaultLayout() ?? defaultLayout()
       dummy-data.ts             DUMMY_INVITATION_DATA sample used by the live preview
       elegant/                  The official template (Figma design, node 452:172) — its own markup, not the default sections
         frame.tsx               ElegantFrame — phone-width card, NO global gap (each block owns padding)
-        blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/stayInvite/footer) + primitives (ElegantSection, WeddingButton, CheckRow, CircularPhoto/ImagePlaceholder render real images from mediaUrls when an "image" config field is set). All copy reads block.config first, falling back to ELEGANT_COPY
+        blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/stayInvite/footer) + primitives (ElegantSection [24px horizontal padding; each block sets its own vertical padding/gap], WeddingButton [renders an `<a>` when given `href` — location "Ver mapa" links to `event.venueMapUrl`], CheckRow [real interactive checkbox/radio], CircularPhoto/ImagePlaceholder render real images from mediaUrls when an "image" config field is set). Hero uses `event.brideName`/`groomName` (stacked on two lines). All copy reads block.config first, falling back to ELEGANT_COPY
         default-copy.ts         ELEGANT_COPY (the design's Spanish copy) + ELEGANT_BLOCK_CONFIG (per-block default configs)
         default-layout.ts       elegantDefaultLayout() — preset blocks in the design's order, configs seeded from ELEGANT_BLOCK_CONFIG
         index.ts                Re-exports ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout
-    sections/
-      section.tsx               Shared eyebrow/heading/spacing wrapper; pulls colors/fonts from useTemplateTheme
-      hero-section.tsx          Event name, date, "Dear {invitation.title}" (themed)
-      location-section.tsx      Venue name + address (placeholder if absent)
-      message-section.tsx       Optional headline + body — backs the "text" block
-      countdown-section.tsx     "use client" — live ticking countdown to event date (themed)
-      itinerary-section.tsx     Time/title schedule (placeholder items — no backend model yet)
-      dress-code-section.tsx    Dress code + note (from block config)
-      special-invitation-section.tsx  Eyebrow/title/description/date/location from block config (placeholder defaults)
-      rsvp-section.tsx          Per-guest attending/declines radios (draft — not wired)
-      allergies-section.tsx     Per-guest allergies text input (draft — not wired)
-      menu-selection-section.tsx   Per-guest menu select (placeholder options — not wired)
-      drink-selection-section.tsx  Per-guest drink select (placeholder options — not wired)
-      footer-section.tsx        Event name + closing line (themed)
 
   template-selection/
     template-settings.tsx       "use client" — template picker + block page-builder (add via Select with template-seeded config, reorder up/down, duplicate, remove, edit fields) + live InvitationTemplate preview (dummy data + the event's real media URLs); saves via events.setInvitationTemplate. Rendered by /dashboard/[eventSlug]/template
@@ -497,20 +483,26 @@ src/hooks/
 > add/reorder/duplicate/remove/edit + live preview). Layout is stored on `events.layoutBlocks`
 > (undefined = the selected template's `defaultLayout()`, then the global `defaultLayout()`).
 >
-> **Templates own their markup.** A `TemplateDef` (template-registry) can supply its own page `Frame`,
-> a per-`BlockType` component map, and a preset `defaultLayout`; the renderer falls back to
-> `DefaultFrame` / `DEFAULT_BLOCKS` for anything a template doesn't override. So templates differ in
-> **markup and structure**, not just theme.
+> **Templates own their markup.** A `TemplateDef` (template-registry) supplies its own page `Frame`,
+> a per-`BlockType` component map, and an optional preset `defaultLayout`; block types a template
+> omits render nothing. There is no shared default markup — the shared `BlockComponentProps`/`FrameProps`
+> contracts live in `templates/types.ts`. So templates differ in **markup and structure**, not just theme.
 >
 > - **`elegant`** is the **only official template** (default), implementing the Figma
->   design under `templates/elegant/`: its own `Frame` + a component per section, gold/serif styling
->   via the `wedding-*` palette and `font-script`/`font-elegant` (see globals.css + layout.tsx), and a
->   preset Spanish layout (configs seeded from `default-copy.ts`). Per the design, **each block owns
->   its vertical padding** (`ElegantSection`) — the frame has no global gap. Image slots render the
->   configured media image or a placeholder; the form controls (RSVP/food/stay) are not yet wired to
->   `submitPublicRsvp`.
+>   design (file `heSJxDYKECFLtzVd9F1LyJ`, frame `525:3`) under `templates/elegant/`: its own `Frame`
+>   + a component per section, gold/serif styling via the `wedding-*` palette and
+>   `font-script`/`font-elegant` (see globals.css + layout.tsx), and a preset Spanish layout (configs
+>   seeded from `default-copy.ts`). **Spacing mirrors the Figma frame exactly**: 390px-wide white card
+>   on `wedding-soft` (`ElegantFrame`); 24px horizontal padding on every block (`ElegantSection` base
+>   `px-6`); and **each block owns its vertical padding + gap** (the frame has no global gap) per the
+>   design's per-section values (e.g. hero `py-10`, location `pt-24 pb-6`, rsvp `px-10 py-12`, special
+>   invite `px-16 py-40`, footer `py-10`). Palette/fonts already matched the design (gold `#c5a46d`,
+>   ink `#3c3c3c`, soft `#ececec`, muted `#d9d9d9`; Fleur De Leah / Gowun Batang). Checkboxes are real
+>   interactive controls (`CheckRow` — `checkbox` for food multi-select, `radio` for stay); the form
+>   controls are not yet wired to `submitPublicRsvp`. Image slots render the configured media image or
+>   a placeholder.
 > - Add more templates by giving each its own `Frame`/`blocks` (and optional `defaultLayout`) in its
->   `TemplateDef`; anything left unset falls back to `DefaultFrame` / `DEFAULT_BLOCKS`.
+>   `TemplateDef`; a template implements the markup for every block type it intends to render.
 
 ---
 
