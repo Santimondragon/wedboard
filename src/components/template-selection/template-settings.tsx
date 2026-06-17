@@ -65,12 +65,11 @@ export function TemplateSettings() {
     return (preset.defaultLayout?.() ?? defaultLayout()).map(applyDefaults)
   })
   function addBlock(type: BlockType) {
-    // Pre-fill the new block with the template's default copy so its text is
-    // editable from the start.
     const seed = resolveTemplate(templateId).defaultBlockConfig?.[type]
+    const eventDerived = deriveEventConfig(event, type)
     setBlocks((prev) => {
       const block = createBlock(type)
-      if (seed) block.config = { ...seed }
+      block.config = { ...(seed ?? {}), ...eventDerived }
       return [...prev, block]
     })
   }
