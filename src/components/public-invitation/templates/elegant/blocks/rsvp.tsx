@@ -4,47 +4,13 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "convex/_generated/api"
 import type { Id } from "convex/_generated/dataModel"
-import { cn } from "@/lib/utils"
 import { useToastMutation } from "@/hooks/use-toast-mutation"
 import { getConfigString } from "../../../blocks"
 import type { BlockComponentProps } from "../../types"
 import { ELEGANT_COPY } from "../default-copy"
-import { ElegantSection, WeddingButton } from "./primitives"
+import { CheckRow, ElegantSection, WeddingButton } from "./primitives"
 
 type Choice = "attending" | "declined"
-
-function RsvpRadio({
-  label,
-  name,
-  checked,
-  onChange,
-}: {
-  label: string
-  name: string
-  checked: boolean
-  onChange: () => void
-}) {
-  return (
-    <label className="flex cursor-pointer items-center gap-3 font-elegant text-[16px] text-wedding-ink">
-      <span
-        className={cn(
-          "flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-wedding-ink/70 bg-white transition-colors",
-          checked && "border-wedding-gold"
-        )}
-      >
-        <input
-          type="radio"
-          name={name}
-          checked={checked}
-          onChange={onChange}
-          className="sr-only"
-        />
-        {checked && <span className="size-3 rounded-full bg-wedding-gold" />}
-      </span>
-      <span>{label}</span>
-    </label>
-  )
-}
 
 function GuestRsvp({
   name,
@@ -64,13 +30,15 @@ function GuestRsvp({
   return (
     <div className="space-y-3">
       <p className="font-elegant text-[24px] font-bold text-wedding-ink">{name}</p>
-      <RsvpRadio
+      <CheckRow
+        type="radio"
         name={group}
         label={attendLabel}
         checked={value === "attending"}
         onChange={() => onChange("attending")}
       />
-      <RsvpRadio
+      <CheckRow
+        type="radio"
         name={group}
         label={declineLabel}
         checked={value === "declined"}
