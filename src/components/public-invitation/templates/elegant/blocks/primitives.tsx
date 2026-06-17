@@ -118,15 +118,17 @@ export function SealedPhoto({
   className,
   src,
   alt,
+  isTilted
 }: {
   className?: string
   src?: string
   alt?: string
+  isTilted?: boolean
 }) {
   const imageClassName = "object-cover w-full h-full";
 
   return (
-    <div className="relative flex flex-col items-center w-full my-10">
+    <div className={cn("relative flex flex-col items-center w-full my-10", isTilted && "origin-center -rotate-12 scale-85")}>
       <img
         src={`${ASSET_BASE}/golden-seal.png`}
         alt={'golden-seal-decoration'}
@@ -160,14 +162,14 @@ export function FullWidthPhoto({
 
   return (
     <div className="relative flex flex-col items-center w-full">
-        {src ?
-          <img
-            src={src}
-            alt={alt ?? ""}
-            className={imageClassName}
-          /> :
-          <ImagePlaceholder className={imageClassName} />
-        }
+      {src ?
+        <img
+          src={src}
+          alt={alt ?? ""}
+          className={imageClassName}
+        /> :
+        <ImagePlaceholder className={imageClassName} />
+      }
     </div>
   )
 }
@@ -180,6 +182,43 @@ export function ImagePlaceholder({
   return (
     <img src='/templates/image-placeholder.jpg' alt='image-placeholder' className={cn("object-cover", className)} />
   )
+}
+
+/**
+ * Renders text with lightweight inline markup:
+ *   *text* → bold, _text_ → italic.
+ * Markers can nest (e.g. *_text_*). Unmatched markers render literally.
+ */
+export function RichText({
+  text,
+  className,
+}: {
+  text: string
+  className?: string
+}) {
+  return <span className={className}>{renderRichText(text)}</span>
+}
+
+function renderRichText(text: string): React.ReactNode[] {
+  // Split on *...* and _..._ , keeping the delimiters via capture groups.
+  const tokens = text.split(/(\*[^*]+\*|_[^_]+_)/g)
+  return tokens.map((token, i) => {
+    if (token.length >= 2 && token.startsWith("*") && token.endsWith("*")) {
+      return (
+        <strong key={i} className="font-bold">
+          {renderRichText(token.slice(1, -1))}
+        </strong>
+      )
+    }
+    if (token.length >= 2 && token.startsWith("_") && token.endsWith("_")) {
+      return (
+        <em key={i} className="italic">
+          {renderRichText(token.slice(1, -1))}
+        </em>
+      )
+    }
+    return token
+  })
 }
 
 export function getConfigImage(

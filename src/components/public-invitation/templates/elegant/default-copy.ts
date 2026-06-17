@@ -31,7 +31,7 @@ export const ELEGANT_COPY = {
   foodOtherPlaceholder: "Cuéntanos…",
   foodSubmitLabel: "Enviar",
   dressCode:
-    "Hombres: Smoking (traje y corbatín)\nMujeres: Vestido formal de un solo tono\n\nAgradecemos evitar el color vinotinto, el blanco y sus tonalidades afines, tanto en vestuario femenino como masculino.",
+    "*Hombres*: Smoking (traje y corbatín)\n*Mujeres*: Vestido formal de un solo tono\n\nAgradecemos evitar el color vinotinto, el blanco y sus tonalidades afines, tanto en vestuario femenino como masculino.",
   dinnerDescription:
     "Porque los mejores momentos comienzan alrededor de una mesa, los esperamos para compartir una cena especial y comenzar juntos este fin de semana inolvidable.",
   dinnerName: "Una Noche para Compartir",
