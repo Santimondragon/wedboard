@@ -9,7 +9,7 @@ export function ElegantText({ block }: BlockComponentProps) {
   const body = getConfigString(block, "body")
   const showFlourishes = block.config?.showFlourishes !== false
   return (
-    <ElegantSection className="relative space-y-3 text-center">
+    <ElegantSection className="relative space-y-3 text-center px-16">
       {showFlourishes && (
         <img
           aria-hidden
@@ -27,12 +27,12 @@ export function ElegantText({ block }: BlockComponentProps) {
         />
       )}
       {headline && (
-        <h2 className="font-script text-[48px] leading-tight text-wedding-gold">
+        <h2 className="font-script text-5xl leading-tight text-wedding-gold">
           {headline}
         </h2>
       )}
       {body && (
-        <p className="whitespace-pre-line font-elegant text-[16px] leading-relaxed text-wedding-ink">
+        <p className="whitespace-pre-line font-elegant text-lg leading-relaxed text-wedding-ink">
           {body}
         </p>
       )}

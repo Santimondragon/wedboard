@@ -24,6 +24,12 @@ export const ELEGANT_COPY = {
     "Huevo",
     "Vegetariano / Vegano",
   ],
+  foodQuestion: "¿Tienes alguna alergia o restricción alimentaria?",
+  foodNoneLabel: "No, como de todo",
+  foodHasLabel: "Sí, tengo algunas",
+  foodOtherLabel: "Otra:",
+  foodOtherPlaceholder: "Cuéntanos…",
+  foodSubmitLabel: "Enviar",
   dressCode:
     "Hombres: Smoking (traje y corbatín)\nMujeres: Vestido formal de un solo tono\n\nAgradecemos evitar el color vinotinto, el blanco y sus tonalidades afines, tanto en vestuario femenino como masculino.",
   dinnerDescription:

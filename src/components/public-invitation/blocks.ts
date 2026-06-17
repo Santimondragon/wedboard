@@ -146,6 +146,10 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
     fields: [
       { key: "headline", label: "Headline", input: "text", placeholder: "Food" },
       { key: "note", label: "Note", input: "textarea", placeholder: "Tell us about any allergies…" },
+      { key: "noneLabel", label: "No-allergies label", input: "text", placeholder: "No, como de todo" },
+      { key: "hasLabel", label: "Has-allergies label", input: "text", placeholder: "Sí, tengo algunas" },
+      { key: "otherLabel", label: "Other label", input: "text", placeholder: "Otra:" },
+      { key: "submitLabel", label: "Submit button", input: "text", placeholder: "Enviar" },
       { key: "options", label: "Options", input: "list" },
     ],
   },
