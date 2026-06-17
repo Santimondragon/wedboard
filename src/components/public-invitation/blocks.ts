@@ -66,7 +66,13 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
   location: {
     label: "Location & Address",
     description: "Venue name and address.",
-    fields: [{ key: "mapImage", label: "Map image", input: "image" }],
+    fields: [
+      { key: "title", label: "Title", input: "text", placeholder: "Ubicación" },
+      { key: "address", label: "Address", input: "text", placeholder: "Venue name, address…" },
+      { key: "mapImage", label: "Location image", input: "image" },
+      { key: "buttonLabel", label: "Button label", input: "text", placeholder: "Ver mapa" },
+      { key: "buttonUrl", label: "Button URL", input: "text", placeholder: "https://maps.google.com/…" },
+    ],
   },
   countdown: {
     label: "Countdown",

@@ -21,28 +21,37 @@ export function ElegantSection({
 }
 
 export function WeddingButton({
+  className,
   children,
   href,
 }: {
+  className?: string
   children: React.ReactNode
   href?: string
 }) {
-  const className =
-    "inline-flex items-center justify-center rounded bg-wedding-soft px-4 py-1.5 font-elegant text-[16px] text-wedding-ink"
+  const buttonClassName = cn(
+    "relative inline-flex items-center justify-center bg-wedding-soft px-6 py-2 font-elegant text-xl text-wedding-ink shadow-none hover:shadow-md transition-shadow",
+    className
+  )
+
+  const Frame = () => <div className="absolute top-1 left-1 pointer-events-none w-[calc(100%-8px)] h-[calc(100%-8px)] border border-wedding-gold"></div>
+
   if (href) {
     return (
       <a
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className={className}
+        className={buttonClassName}
       >
+        <Frame />
         {children}
       </a>
     )
   }
   return (
-    <button type="button" className={className}>
+    <button type="button" className={buttonClassName}>
+      <Frame />
       {children}
     </button>
   )
@@ -126,7 +135,31 @@ export function SealedPhoto({
       </div>
     </div>
   )
+}
 
+export function FullWidthPhoto({
+  className,
+  src,
+  alt,
+}: {
+  className?: string
+  src?: string
+  alt?: string
+}) {
+  const imageClassName = cn("object-cover w-full h-full aspect-[16/10]", className);
+
+  return (
+    <div className="relative flex flex-col items-center w-full">
+        {src ?
+          <img
+            src={src}
+            alt={alt ?? ""}
+            className={imageClassName}
+          /> :
+          <ImagePlaceholder className={imageClassName} />
+        }
+    </div>
+  )
 }
 
 export function ImagePlaceholder({

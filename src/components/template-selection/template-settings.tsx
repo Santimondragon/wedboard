@@ -50,10 +50,19 @@ export function TemplateSettings() {
     event.templateId ?? DEFAULT_TEMPLATE_ID
   )
   const [blocks, setBlocks] = useState<LayoutBlock[]>(() => {
-    const saved = event.layoutBlocks as LayoutBlock[] | undefined
-    if (saved && saved.length > 0) return saved
     const preset = resolveTemplate(event.templateId ?? DEFAULT_TEMPLATE_ID)
-    return preset.defaultLayout?.() ?? defaultLayout()
+    const defaults = preset.defaultBlockConfig ?? {}
+
+    const applyDefaults = (block: LayoutBlock): LayoutBlock => {
+      const seed = defaults[block.type] ?? {}
+      const eventDerived = deriveEventConfig(event, block.type)
+      // Priority: user's saved values > event-derived > template text defaults
+      return { ...block, config: { ...seed, ...eventDerived, ...block.config } }
+    }
+
+    const saved = event.layoutBlocks as LayoutBlock[] | undefined
+    if (saved && saved.length > 0) return saved.map(applyDefaults)
+    return (preset.defaultLayout?.() ?? defaultLayout()).map(applyDefaults)
   })
   function addBlock(type: BlockType) {
     // Pre-fill the new block with the template's default copy so its text is
@@ -296,6 +305,19 @@ export function TemplateSettings() {
       </div>
     </div>
   )
+}
+
+function deriveEventConfig(
+  event: ReturnType<typeof useEvent>,
+  blockType: BlockType
+): Record<string, unknown> {
+  if (blockType === "location") {
+    const address = [event.venueName, event.venueAddress].filter(Boolean).join(", ")
+    const buttonUrl = event.venueMapUrl?.trim() ||
+      (address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "")
+    return { ...(address && { address }), ...(buttonUrl && { buttonUrl }) }
+  }
+  return {}
 }
 
 function IconButton({

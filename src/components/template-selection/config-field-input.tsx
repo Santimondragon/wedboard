@@ -50,22 +50,28 @@ export function ConfigFieldInput({
   const text = typeof value === "string" ? value : ""
   if (field.input === "textarea") {
     return (
-      <Textarea
-        value={text}
-        placeholder={field.placeholder}
-        aria-label={field.label}
-        rows={3}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <div className="space-y-1">
+        <p className="text-xs font-medium text-zinc-500">{field.label}</p>
+        <Textarea
+          value={text}
+          placeholder={field.placeholder}
+          aria-label={field.label}
+          rows={3}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
     )
   }
   return (
-    <Input
-      value={text}
-      placeholder={field.placeholder}
-      aria-label={field.label}
-      onChange={(e) => onChange(e.target.value)}
-    />
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-zinc-500">{field.label}</p>
+      <Input
+        value={text}
+        placeholder={field.placeholder}
+        aria-label={field.label}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
   )
 }
 

@@ -42,6 +42,7 @@ export const ELEGANT_COPY = {
  */
 export const ELEGANT_BLOCK_CONFIG: Record<string, Record<string, unknown>> = {
   hero: { body: ELEGANT_COPY.heroIntro },
+  location: { title: "Ubicación", buttonLabel: "Ver mapa" },
   rsvp: { body: ELEGANT_COPY.rsvpNote },
   itinerary: { items: [...ELEGANT_COPY.itineraryItems] },
   text: { headline: "Lluvia de sobres" },
