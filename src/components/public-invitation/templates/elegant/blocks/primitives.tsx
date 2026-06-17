@@ -24,13 +24,18 @@ export function WeddingButton({
   className,
   children,
   href,
+  onClick,
+  disabled,
 }: {
   className?: string
   children: React.ReactNode
   href?: string
+  onClick?: () => void
+  disabled?: boolean
 }) {
   const buttonClassName = cn(
-    "relative inline-flex items-center justify-center bg-wedding-soft px-6 py-2 font-elegant text-xl text-wedding-ink shadow-none hover:shadow-md transition-shadow",
+    "cursor-pointer relative inline-flex items-center justify-center bg-wedding-soft px-6 py-2 font-elegant text-xl text-wedding-ink shadow-none hover:shadow-md transition-shadow",
+    disabled && "opacity-50 pointer-events-none",
     className
   )
 
@@ -50,7 +55,12 @@ export function WeddingButton({
     )
   }
   return (
-    <button type="button" className={buttonClassName}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={buttonClassName}
+    >
       <Frame />
       {children}
     </button>

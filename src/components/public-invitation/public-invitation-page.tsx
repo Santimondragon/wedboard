@@ -42,7 +42,7 @@ export function PublicInvitationPage({
 
   return (
     <InvitationTemplate
-      data={data}
+      data={{ ...data, eventSlug, invitationSlug }}
       templateId={data.event.templateId}
       blocks={data.event.layoutBlocks as LayoutBlock[] | undefined}
     />

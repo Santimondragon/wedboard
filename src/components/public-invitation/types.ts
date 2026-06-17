@@ -33,4 +33,10 @@ export interface PublicInvitationData {
   guests: PublicGuest[]
   /** Media id → signed URL for images referenced by the layout config. */
   mediaUrls?: Record<string, string>
+  /**
+   * Slugs needed by interactive blocks (e.g. RSVP) to call public mutations.
+   * Absent in the template-editor preview, where submission is a no-op.
+   */
+  eventSlug?: string
+  invitationSlug?: string
 }

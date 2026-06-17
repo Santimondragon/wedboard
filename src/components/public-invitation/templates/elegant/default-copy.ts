@@ -5,8 +5,14 @@
 export const ELEGANT_COPY = {
   heroIntro:
     "Con mucha alegría en el corazón, queremos invitarte a acompañarnos en uno de los momentos más importantes de nuestras vidas. Será un día para celebrar el amor, la unión y el comienzo de una nueva historia que soñamos compartir con quienes más queremos.",
+  rsvpTitle: "Confirma tu asistencia",
+  rsvpDeadline: "Antes del 00 del Mes",
+  rsvpAttendLabel: "Si asistiré",
+  rsvpDeclineLabel: "Lamentablemente no podré asistir",
+  rsvpPlusOneSuffix: "(+1)",
+  rsvpSubmitLabel: "Enviar",
   rsvpNote:
-    "Gracias por confirmar tu asistencia y por acompañarnos en este día tan especial para nosotros.",
+    "Aunque adoramos a los más pequeños, hemos decidido que esta celebración sea exclusivamente para adultos.",
   foodHeadline: "Comida",
   foodNote:
     "Por favor, indícanos si tienes alguna alergia o restricción alimentaria para tenerlo en cuenta:",
@@ -43,7 +49,14 @@ export const ELEGANT_COPY = {
 export const ELEGANT_BLOCK_CONFIG: Record<string, Record<string, unknown>> = {
   hero: { body: ELEGANT_COPY.heroIntro },
   location: { title: "Ubicación", buttonLabel: "Ver mapa" },
-  rsvp: { body: ELEGANT_COPY.rsvpNote },
+  rsvp: {
+    title: ELEGANT_COPY.rsvpTitle,
+    deadline: ELEGANT_COPY.rsvpDeadline,
+    attendLabel: ELEGANT_COPY.rsvpAttendLabel,
+    declineLabel: ELEGANT_COPY.rsvpDeclineLabel,
+    note: ELEGANT_COPY.rsvpNote,
+    submitLabel: ELEGANT_COPY.rsvpSubmitLabel,
+  },
   itinerary: { items: [...ELEGANT_COPY.itineraryItems] },
   text: { showFlourishes: true },
   allergies: {

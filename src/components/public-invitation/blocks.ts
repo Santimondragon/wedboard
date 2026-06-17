@@ -118,9 +118,14 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
   },
   rsvp: {
     label: "RSVP (per guest)",
-    description: "Attending / declines toggle per guest.",
+    description: "Attending / declines choice per guest (plus-one aware).",
     fields: [
-      { key: "body", label: "Note", input: "textarea", placeholder: "Thank-you note shown above the RSVP controls…" },
+      { key: "title", label: "Title", input: "text", placeholder: "Confirma tu asistencia" },
+      { key: "deadline", label: "Deadline", input: "text", placeholder: "Antes del 00 del Mes" },
+      { key: "attendLabel", label: "Attending label", input: "text", placeholder: "Sí asistiré" },
+      { key: "declineLabel", label: "Declining label", input: "text", placeholder: "Lamentablemente no podré asistir" },
+      { key: "note", label: "Note", input: "textarea", placeholder: "Optional note shown below the RSVP controls…" },
+      { key: "submitLabel", label: "Submit button", input: "text", placeholder: "Enviar" },
     ],
   },
   allergies: {

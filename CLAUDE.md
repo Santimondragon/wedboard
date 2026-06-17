@@ -319,7 +319,7 @@ Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPub
 | `updateGuest` | mutation | |
 | `deleteGuest` | mutation | Cascades to guestSpecialEventRsvps |
 | `bulkCreateGuestsForInvitation` | mutation | ≤20 guests per call |
-| `submitPublicRsvp` | mutation | **Public** — resolves via `{eventSlug, invitationSlug}`; only patches whitelisted RSVP fields, validates menu/drink option ownership + `invitationSpecialEventAccess`, bounds arrays (≤20 guest updates) and strings (≤1000 chars). RSVP UI currently deferred |
+| `submitPublicRsvp` | mutation | **Public** — resolves via `{eventSlug, invitationSlug}`; only patches whitelisted RSVP fields, validates menu/drink option ownership + `invitationSpecialEventAccess`, bounds arrays (≤20 guest updates) and strings (≤1000 chars). Wired to the elegant `rsvp` block's submit button |
 
 ### `convex/specialEvents.ts`
 `listByEvent` (auth), `listForInvitation` (**public**), `createSpecialEvent`, `updateSpecialEvent`, `deleteSpecialEvent` (cascades access + RSVPs)
@@ -471,7 +471,7 @@ src/hooks/
 > of `LayoutBlock`s (`{id, type, config?}`) defined in `blocks.ts`. Block types (hero, text, location,
 > countdown, itinerary, dressCode, specialInvitation, rsvp, allergies, menuSelection, drinkSelection,
 > stayInvite, footer) may repeat (e.g. several `text` blocks). **All non-derived text is authorable**:
-> every block with copy carries it in `config` (incl. `rsvp.body`, `footer.body`, `allergies`
+> every block with copy carries it in `config` (incl. `rsvp` title/deadline/attendLabel/declineLabel/note/submitLabel, `footer.body`, `allergies`
 > headline/note/options string-list, `itinerary.items` `{time,label}` list); only derived data (event
 > name/bride/groom names/date/venue/map link, guest names — managed in event settings) is not. The
 > hero shows the couple via `event.brideName`/`groomName` (falling back to splitting the event name),
@@ -498,9 +498,13 @@ src/hooks/
 >   design's per-section values (e.g. hero `py-10`, location `pt-24 pb-6`, rsvp `px-10 py-12`, special
 >   invite `px-16 py-40`, footer `py-10`). Palette/fonts already matched the design (gold `#c5a46d`,
 >   ink `#3c3c3c`, soft `#ececec`, muted `#d9d9d9`; Fleur De Leah / Gowun Batang). Checkboxes are real
->   interactive controls (`CheckRow` — `checkbox` for food multi-select, `radio` for stay); the form
->   controls are not yet wired to `submitPublicRsvp`. Image slots render the configured media image or
->   a placeholder.
+>   interactive controls (`CheckRow` — `checkbox` for food multi-select, `radio` for stay); the food
+>   controls are not yet wired to `submitPublicRsvp`. The `rsvp` block **is** wired: it renders one
+>   attending/declining radio group per guest (plus an extra row labelled `<primary guest> (+1)` when
+>   `invitation.allowPlusOne`) and a submit button that calls `submitPublicRsvp` with the named guests'
+>   choices (the +1 row has no guest record so it isn't persisted). Submission needs `data.eventSlug` +
+>   `data.invitationSlug` (injected by `public-invitation-page`); they're absent in the editor preview,
+>   so the button is disabled there. Image slots render the configured media image or a placeholder.
 > - Add more templates by giving each its own `Frame`/`blocks` (and optional `defaultLayout`) in its
 >   `TemplateDef`; a template implements the markup for every block type it intends to render.
 
