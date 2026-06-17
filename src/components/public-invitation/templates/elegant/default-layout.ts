@@ -16,7 +16,6 @@ export function elegantDefaultLayout(): LayoutBlock[] {
     { id: "elegant-allergies", type: "allergies", config: { ...ELEGANT_BLOCK_CONFIG.allergies } },
     { id: "elegant-dressCode", type: "dressCode", config: { ...ELEGANT_BLOCK_CONFIG.dressCode } },
     { id: "elegant-specialInvitation", type: "specialInvitation", config: { ...ELEGANT_BLOCK_CONFIG.specialInvitation } },
-    { id: "elegant-stayInvite", type: "stayInvite", config: { ...ELEGANT_BLOCK_CONFIG.stayInvite } },
     { id: "elegant-footer", type: "footer", config: { ...ELEGANT_BLOCK_CONFIG.footer } },
   ]
 }

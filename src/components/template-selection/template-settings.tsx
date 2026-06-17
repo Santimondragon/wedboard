@@ -75,7 +75,10 @@ export function TemplateSettings() {
           (variant === "accepted" ? event.layoutBlocks : undefined)) as
           | LayoutBlock[]
           | undefined
-        if (saved && saved.length > 0) return saved.map(applyDefaults)
+        // Drop blocks whose type no longer exists (e.g. removed block types in
+        // older saved layouts) so the editor doesn't crash on an unknown def.
+        const known = saved?.filter((b) => BLOCK_DEFS[b.type])
+        if (known && known.length > 0) return known.map(applyDefaults)
         return (preset.defaultLayouts?.[variant]?.() ?? defaultLayout(variant)).map(
           applyDefaults
         )
@@ -290,9 +293,18 @@ export function TemplateSettings() {
                     </div>
                   </div>
 
-                  {def.fields.length > 0 && (
+                  {(() => {
+                    const visibleFields = def.fields.filter(
+                      (field) =>
+                        !field.showWhen ||
+                        field.showWhen.equals.includes(
+                          String(block.config?.[field.showWhen.key] ?? "")
+                        )
+                    )
+                    if (visibleFields.length === 0) return null
+                    return (
                     <div className="space-y-2 pt-1">
-                      {def.fields.map((field) => (
+                      {visibleFields.map((field) => (
                         <ConfigFieldInput
                           key={field.key}
                           field={field}
@@ -306,7 +318,8 @@ export function TemplateSettings() {
                         />
                       ))}
                     </div>
-                  )}
+                    )
+                  })()}
                 </li>
               )
             })}

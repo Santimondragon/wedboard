@@ -16,7 +16,6 @@ export type BlockType =
   | "allergies"
   | "menuSelection"
   | "drinkSelection"
-  | "stayInvite"
   | "guestMessage"
   | "footer"
 
@@ -57,6 +56,12 @@ export interface ConfigField {
    * e.g. the special-invitation display template. Ignored when optionsSource set.
    */
   options?: { value: string; label: string }[]
+  /**
+   * Conditional visibility: the field is only shown in the editor when the
+   * block's `config[key]` matches one of `equals` (e.g. the special-invitation
+   * image only when its display template is "with-image").
+   */
+  showWhen?: { key: string; equals: string[] }
   /**
    * For "list" fields: shape of each item. Omit for a plain string list
    * (e.g. food options); set for structured rows (e.g. itinerary
@@ -164,7 +169,16 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
         label: "Template",
         input: "select",
         // Static set for now; grows as more special-invitation templates are added.
-        options: [{ value: "elegant", label: "Elegant Card" }],
+        options: [
+          { value: "elegant", label: "Elegant Card" },
+          { value: "with-image", label: "With Image" },
+        ],
+      },
+      {
+        key: "image",
+        label: "Image",
+        input: "image",
+        showWhen: { key: "specialTemplateId", equals: ["with-image"] },
       },
       { key: "confirmLabel", label: "Confirm button", input: "text", placeholder: "Confirmar asistencia" },
       { key: "detailsLabel", label: "Details button (after responding)", input: "text", placeholder: "Ver detalles" },
@@ -205,15 +219,6 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
     description: "Drink choice per guest.",
     fields: [],
   },
-  stayInvite: {
-    label: "Stay Invitation",
-    description: "Accommodation invite with image, message and a confirm choice.",
-    fields: [
-      { key: "headline", label: "Headline", input: "text", placeholder: "Continúa la celebración" },
-      { key: "body", label: "Message", input: "textarea", placeholder: "Details about accommodation…" },
-      { key: "image", label: "Image", input: "image" },
-    ],
-  },
   guestMessage: {
     label: "Message to the host",
     description: "Lets a guest leave the host a message (e.g. when they can't attend).",
@@ -248,7 +253,6 @@ export const BLOCK_PALETTE: BlockType[] = [
   "allergies",
   "menuSelection",
   "drinkSelection",
-  "stayInvite",
   "guestMessage",
   "footer",
 ]
@@ -271,7 +275,6 @@ const DEFAULT_ORDER: Record<RsvpVariant, BlockType[]> = {
     "allergies",
     "dressCode",
     "specialInvitation",
-    "stayInvite",
     "footer",
   ],
   pending: ["hero", "location", "rsvp", "footer"],

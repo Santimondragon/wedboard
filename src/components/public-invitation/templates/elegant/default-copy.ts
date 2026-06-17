@@ -42,9 +42,6 @@ export const ELEGANT_COPY = {
   dinnerAttendLabel: "Sí, asistiré",
   dinnerDeclineLabel: "No podré asistir",
   dinnerModalSubmitLabel: "Enviar",
-  stayHeadline: "Continúa la celebración",
-  stayBody:
-    "Después de una noche inolvidable, queremos que puedas descansar y disfrutar con tranquilidad. Si deseas hospedarte en la hacienda, por favor confírmanos tu asistencia.",
   footerNote:
     "Esperamos celebrar juntos este comienzo tan importante en nuestras vidas.",
   messageHeadline: "Déjanos un mensaje",
@@ -89,10 +86,6 @@ export const ELEGANT_BLOCK_CONFIG: Record<string, Record<string, unknown>> = {
     specialTemplateId: "elegant",
     confirmLabel: ELEGANT_COPY.dinnerConfirmLabel,
     detailsLabel: ELEGANT_COPY.dinnerDetailsLabel,
-  },
-  stayInvite: {
-    headline: ELEGANT_COPY.stayHeadline,
-    body: ELEGANT_COPY.stayBody,
   },
   guestMessage: {
     headline: ELEGANT_COPY.messageHeadline,

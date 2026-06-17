@@ -10,7 +10,6 @@ import { ElegantItinerary } from "./itinerary"
 import { ElegantLocation } from "./location"
 import { ElegantRsvp } from "./rsvp"
 import { ElegantSpecialInvitation } from "./special-invitation"
-import { ElegantStayInvite } from "./stay-invite"
 import { ElegantText } from "./text"
 
 export const ELEGANT_BLOCKS: Partial<Record<BlockType, BlockComponent>> = {
@@ -23,7 +22,6 @@ export const ELEGANT_BLOCKS: Partial<Record<BlockType, BlockComponent>> = {
   allergies: ElegantAllergies,
   dressCode: ElegantDressCode,
   specialInvitation: ElegantSpecialInvitation,
-  stayInvite: ElegantStayInvite,
   guestMessage: ElegantGuestMessage,
   footer: ElegantFooter,
 }
