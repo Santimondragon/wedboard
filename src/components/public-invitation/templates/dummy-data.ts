@@ -25,4 +25,16 @@ export const DUMMY_INVITATION_DATA: PublicInvitationData = {
     { _id: "preview-guest-2", firstName: "Noah", lastName: "Carter" },
     { _id: "preview-guest-3", firstName: "Olivia", lastName: "Carter" },
   ],
+  // Sample sub-event so the special-invitation block renders in the live preview.
+  specialEvents: [
+    {
+      _id: "preview-special-1",
+      name: "Welcome Dinner",
+      description:
+        "Join us the evening before for an intimate welcome dinner as the celebration begins.",
+      date: Date.now() + 1000 * 60 * 60 * 24 * 119,
+      location: "The Garden Room",
+      guestStatuses: {},
+    },
+  ],
 }

@@ -12,6 +12,7 @@ import {
   Palette,
   Image as ImageIcon,
   MessageSquare,
+  Sparkles,
   Settings,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -21,6 +22,7 @@ import { EventSwitcher } from "@/components/dashboard/event-switcher"
 const NAV_ITEMS = [
   { label: "Overview", icon: LayoutDashboard, segment: "" },
   { label: "Invitations", icon: Mail, segment: "invitations" },
+  { label: "Special Events", icon: Sparkles, segment: "special-events" },
   { label: "Guests", icon: Users, segment: "guests" },
   { label: "Menu & Drinks", icon: UtensilsCrossed, segment: "menu" },
   { label: "Tables", icon: LayoutGrid, segment: "tables" },

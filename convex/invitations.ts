@@ -61,6 +61,47 @@ export const getPublicInvitation = query({
         ? "pending"
         : "declined";
 
+    // Special events this invitation may RSVP to (via invitationSpecialEventAccess),
+    // each enriched with every guest's current per-event RSVP status. Powers the
+    // elegant `specialInvitation` block's confirm modal.
+    const accesses = await ctx.db
+      .query("invitationSpecialEventAccess")
+      .withIndex("by_invitationId", (q) => q.eq("invitationId", invitation._id))
+      .take(100);
+    const specialEventDocs = (
+      await Promise.all(accesses.map((a) => ctx.db.get(a.specialEventId)))
+    ).filter(
+      (se): se is NonNullable<typeof se> => se !== null && se.isActive
+    );
+
+    // Each guest's special-event RSVP rows, fetched once and indexed by guest.
+    const rsvpRowsByGuest = await Promise.all(
+      guests.map((g) =>
+        ctx.db
+          .query("guestSpecialEventRsvps")
+          .withIndex("by_guestId", (q) => q.eq("guestId", g._id))
+          .take(100)
+      )
+    );
+    const specialEvents = specialEventDocs.map((se) => {
+      const guestStatuses: Record<
+        string,
+        "pending" | "attending" | "declined"
+      > = {};
+      rsvpRowsByGuest.forEach((rows, i) => {
+        const row = rows.find((r) => r.specialEventId === se._id);
+        if (row) guestStatuses[guests[i]._id] = row.status;
+      });
+      return {
+        _id: se._id,
+        name: se.name,
+        description: se.description,
+        date: se.date,
+        location: se.location,
+        guestStatuses,
+      };
+    });
+
     // Saved blocks for the resolved state. `layoutBlocks` is the legacy single
     // layout, used as the accepted fallback. Undefined → the public page falls
     // back to the selected template's default layout for this state.
@@ -111,6 +152,7 @@ export const getPublicInvitation = query({
         firstName: g.firstName,
         lastName: g.lastName,
       })),
+      specialEvents,
       mediaUrls,
     };
   },

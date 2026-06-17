@@ -14,6 +14,41 @@ export const listByEvent = query({
   },
 });
 
+// Everything the special-events dashboard page needs in one round trip:
+// the event's special invitations, its invitations (for assignment), and the
+// current access map (which invitations each special event is visible to).
+export const getSpecialEventsPageData = query({
+  args: { eventId: v.id("events") },
+  handler: async (ctx, args) => {
+    await requireEventEditor(ctx, args.eventId);
+
+    const [specialEvents, invitations] = await Promise.all([
+      ctx.db
+        .query("specialEvents")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(100),
+      ctx.db
+        .query("invitations")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(500),
+    ]);
+
+    // specialEventId → invitation ids that currently have access.
+    const accessByEvent: Record<string, string[]> = {};
+    for (const se of specialEvents) {
+      const accesses = await ctx.db
+        .query("invitationSpecialEventAccess")
+        .withIndex("by_specialEventId", (q) =>
+          q.eq("specialEventId", se._id)
+        )
+        .take(500);
+      accessByEvent[se._id] = accesses.map((a) => a.invitationId);
+    }
+
+    return { specialEvents, invitations, accessByEvent };
+  },
+});
+
 export const listForInvitation = query({
   args: { invitationId: v.id("invitations") },
   handler: async (ctx, args) => {
@@ -36,6 +71,9 @@ export const listForInvitation = query({
   },
 });
 
+/** Max special invitations (mini sub-events) an event may have. */
+export const MAX_SPECIAL_EVENTS = 2;
+
 export const createSpecialEvent = mutation({
   args: {
     eventId: v.id("events"),
@@ -46,6 +84,17 @@ export const createSpecialEvent = mutation({
   },
   handler: async (ctx, args) => {
     await requireEventEditor(ctx, args.eventId);
+
+    // An event may have at most MAX_SPECIAL_EVENTS special invitations.
+    const existing = await ctx.db
+      .query("specialEvents")
+      .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+      .take(MAX_SPECIAL_EVENTS + 1);
+    if (existing.length >= MAX_SPECIAL_EVENTS) {
+      throw new ConvexError(
+        `An event can have at most ${MAX_SPECIAL_EVENTS} special invitations`
+      );
+    }
 
     return await ctx.db.insert("specialEvents", {
       eventId: args.eventId,

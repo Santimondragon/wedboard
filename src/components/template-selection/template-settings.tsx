@@ -44,6 +44,9 @@ import { DUMMY_INVITATION_DATA } from "@/components/public-invitation/templates/
 export function TemplateSettings() {
   const event = useEvent()
   const media = useQuery(api.media.listByEvent, { eventId: event._id })
+  const specialEvents = useQuery(api.specialEvents.listByEvent, {
+    eventId: event._id,
+  })
   const setTemplate = useToastMutation(api.events.setInvitationTemplate, {
     success: "Invitation layout saved",
     error: "Failed to save layout",
@@ -296,6 +299,7 @@ export function TemplateSettings() {
                           value={block.config?.[field.key]}
                           eventId={event._id}
                           media={media}
+                          specialEvents={specialEvents ?? undefined}
                           onChange={(value) =>
                             updateConfig(block.id, field.key, value)
                           }

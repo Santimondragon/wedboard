@@ -35,6 +35,13 @@ export const ELEGANT_COPY = {
   dinnerDescription:
     "Porque los mejores momentos comienzan alrededor de una mesa, los esperamos para compartir una cena especial y comenzar juntos este fin de semana inolvidable.",
   dinnerName: "Una Noche para Compartir",
+  dinnerConfirmLabel: "Confirmar asistencia",
+  dinnerDetailsLabel: "Ver detalles",
+  dinnerModalTitle: "Confirma tu asistencia",
+  dinnerModalNote: "Indícanos quién podrá acompañarnos.",
+  dinnerAttendLabel: "Sí, asistiré",
+  dinnerDeclineLabel: "No podré asistir",
+  dinnerModalSubmitLabel: "Enviar",
   stayHeadline: "Continúa la celebración",
   stayBody:
     "Después de una noche inolvidable, queremos que puedas descansar y disfrutar con tranquilidad. Si deseas hospedarte en la hacienda, por favor confírmanos tu asistencia.",
@@ -79,8 +86,9 @@ export const ELEGANT_BLOCK_CONFIG: Record<string, Record<string, unknown>> = {
   },
   dressCode: { dressCode: ELEGANT_COPY.dressCode },
   specialInvitation: {
-    name: ELEGANT_COPY.dinnerName,
-    description: ELEGANT_COPY.dinnerDescription,
+    specialTemplateId: "elegant",
+    confirmLabel: ELEGANT_COPY.dinnerConfirmLabel,
+    detailsLabel: ELEGANT_COPY.dinnerDetailsLabel,
   },
   stayInvite: {
     headline: ELEGANT_COPY.stayHeadline,

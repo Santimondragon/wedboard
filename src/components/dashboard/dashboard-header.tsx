@@ -7,6 +7,7 @@ import { useEvent } from "@/components/dashboard/event-provider"
 
 const PAGE_TITLES: Record<string, string> = {
   invitations: "Invitations",
+  "special-events": "Special Events",
   guests: "Guests",
   menu: "Menu & Drinks",
   tables: "Tables",

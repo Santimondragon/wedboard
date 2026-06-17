@@ -44,8 +44,19 @@ export interface ConfigField {
   label: string
   /** "image" stores a media id (string) referencing the event's media table. */
   /** "toggle" stores a boolean. */
-  input: "text" | "textarea" | "list" | "image" | "toggle"
+  /** "select" stores a single id chosen from a dynamic, event-derived source. */
+  input: "text" | "textarea" | "list" | "image" | "toggle" | "select"
   placeholder?: string
+  /**
+   * For "select" fields: where the options come from. The editor resolves this
+   * source to a list of {value,label} options (e.g. the event's special events).
+   */
+  optionsSource?: "specialEvents"
+  /**
+   * For "select" fields with a fixed, known set of options (no dynamic source),
+   * e.g. the special-invitation display template. Ignored when optionsSource set.
+   */
+  options?: { value: string; label: string }[]
   /**
    * For "list" fields: shape of each item. Omit for a plain string list
    * (e.g. food options); set for structured rows (e.g. itinerary
@@ -137,13 +148,26 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
   },
   specialInvitation: {
     label: "Special Invitation",
-    description: "Invite to a sub-event (welcome dinner, after-party…).",
+    description:
+      "Shows a special event (managed in Special Events) and lets guests RSVP to it.",
     fields: [
-      { key: "eyebrow", label: "Eyebrow", input: "text", placeholder: "Special Invitation" },
-      { key: "name", label: "Title", input: "text", placeholder: "Welcome Dinner" },
-      { key: "description", label: "Description", input: "textarea", placeholder: "Details…" },
-      { key: "date", label: "Date", input: "text", placeholder: "Friday, June 12" },
-      { key: "location", label: "Location", input: "text", placeholder: "The Garden Room" },
+      // Content (name/description/date/location) comes from the linked special
+      // event, managed under the dashboard's Special Events page.
+      {
+        key: "specialEventId",
+        label: "Linked special event",
+        input: "select",
+        optionsSource: "specialEvents",
+      },
+      {
+        key: "specialTemplateId",
+        label: "Template",
+        input: "select",
+        // Static set for now; grows as more special-invitation templates are added.
+        options: [{ value: "elegant", label: "Elegant Card" }],
+      },
+      { key: "confirmLabel", label: "Confirm button", input: "text", placeholder: "Confirmar asistencia" },
+      { key: "detailsLabel", label: "Details button (after responding)", input: "text", placeholder: "Ver detalles" },
     ],
   },
   rsvp: {

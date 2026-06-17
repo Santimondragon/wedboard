@@ -29,10 +29,22 @@ export interface PublicGuest {
   lastName: string
 }
 
+export interface PublicSpecialEvent {
+  _id: string
+  name: string
+  description?: string
+  date?: number
+  location?: string
+  /** guestId → that guest's current RSVP status for this special event. */
+  guestStatuses: Record<string, "pending" | "attending" | "declined">
+}
+
 export interface PublicInvitationData {
   event: PublicEvent
   invitation: PublicInvitation
   guests: PublicGuest[]
+  /** Special events this invitation can RSVP to (with per-guest statuses). */
+  specialEvents?: PublicSpecialEvent[]
   /** Media id → signed URL for images referenced by the layout config. */
   mediaUrls?: Record<string, string>
   /**

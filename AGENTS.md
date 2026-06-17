@@ -316,7 +316,7 @@ Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPub
 |---|---|---|
 | `listByEvent` | query | Auth required |
 | `getById` | query | Auth required |
-| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; resolves via `lib/public.ts` (null for archived events / inactive invitations). Derives `rsvpState` (`pending`/`accepted`/`declined`) from the invitation's guests (any attending → accepted; else any pending or no guests → pending; else declined) and returns the **state-resolved** layout: `event.layoutBlocks` is set to `layoutVariants[state]` (accepted falls back to legacy `layoutBlocks`), or undefined to let the client use the template default for that state. Returns `{event (incl. brideName, groomName, venueMapUrl, templateId, layoutBlocks), rsvpState, invitation, guests:[{firstName,lastName}], mediaUrls}` (media resolved over the chosen layout only) |
+| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; resolves via `lib/public.ts` (null for archived events / inactive invitations). Derives `rsvpState` (`pending`/`accepted`/`declined`) from the invitation's guests (any attending → accepted; else any pending or no guests → pending; else declined) and returns the **state-resolved** layout: `event.layoutBlocks` is set to `layoutVariants[state]` (accepted falls back to legacy `layoutBlocks`), or undefined to let the client use the template default for that state. Returns `{event (incl. brideName, groomName, venueMapUrl, templateId, layoutBlocks), rsvpState, invitation, guests:[{_id,firstName,lastName}], specialEvents:[{_id,name,description,date,location,guestStatuses:{guestId→status}}] (the invitation's accessible special events — via `invitationSpecialEventAccess` — each enriched with every guest's current per-event RSVP status; powers the elegant `specialInvitation` confirm modal), mediaUrls}` (media resolved over the chosen layout only) |
 | `createInvitation` | mutation | Per-event-unique slug; optional `guestIds` (≤20) links selected un-invited guests |
 | `updateInvitation` | mutation | |
 | `deleteInvitation` | mutation | **Unassigns** its guests (sets invitationId undefined), does not delete them |
@@ -338,7 +338,7 @@ Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPub
 | `submitPublicRsvp` | mutation | **Public** — resolves via `{eventSlug, invitationSlug}`; only patches whitelisted RSVP fields, validates menu/drink option ownership + `invitationSpecialEventAccess`, bounds arrays (≤20 guest updates) and strings (≤1000 chars). Wired to the elegant `rsvp` block's submit button |
 
 ### `convex/specialEvents.ts`
-`listByEvent` (auth), `listForInvitation` (**public**), `createSpecialEvent`, `updateSpecialEvent`, `deleteSpecialEvent` (cascades access + RSVPs)
+`listByEvent` (auth), `getSpecialEventsPageData` (auth — `{specialEvents, invitations, accessByEvent}` in one round trip; powers the special-events dashboard page, incl. the per-invitation assignment checkboxes), `listForInvitation` (**public**), `createSpecialEvent` (enforces **`MAX_SPECIAL_EVENTS` = 2** per event), `updateSpecialEvent`, `deleteSpecialEvent` (cascades access + RSVPs). Per-invitation visibility is set via `invitations.setSpecialEventAccess`.
 
 ### `convex/menu.ts`
 `listMenuOptionsByEvent` (**public**), `listMenuOptionsByEventAdmin` (auth), `getSelectionCounts` (auth — `{menuCounts, drinkCounts, menuUnassigned, drinkUnassigned, totalGuests}` so the menu page never ships the full guest list), `createMenuOption`, `updateMenuOption`, `deleteMenuOption`. Shared logic lives in `lib/options.ts`.
@@ -391,6 +391,7 @@ Same shape as `menu.ts` (thin wrappers over `lib/options.ts`).
 /dashboard                            Lists all events — minimal chrome (logo + user menu), NO event sidebar. No auto-redirect.
 /dashboard/[eventSlug]                Overview — 8 metric cards
 /dashboard/[eventSlug]/invitations    Invitation CRUD + copy public link
+/dashboard/[eventSlug]/special-events Special invitations (mini sub-events) CRUD, ≤2 per event, + per-invitation visibility assignment
 /dashboard/[eventSlug]/guests         Guest table with search/filter + detail sheet + Add Guest
 /dashboard/[eventSlug]/menu           Food & drink option management
 /dashboard/[eventSlug]/tables         Drag-free seat assignment grid
@@ -462,6 +463,10 @@ src/components/
   messages/
     message-list.tsx            List of host messages (name, invitation title, relative date, body) — exports GuestMessageItem type
 
+  special-events/
+    special-event-list.tsx      Rows: name, date/time, location, description, active toggle, edit/delete (+ "visible to N invitations" count)
+    special-event-form.tsx      Create/edit dialog (name, description, datetime-local date, location, active) + per-invitation visibility checkboxes (edit mode; toggles invitations.setSpecialEventAccess). Powered by getSpecialEventsPageData.
+
   tables/
     table-grid.tsx              Responsive grid of TableCards
     table-card.tsx              Single table: seats, assign/unassign, edit/delete
@@ -471,7 +476,7 @@ src/components/
   public-invitation/
     public-invitation-page.tsx  Loads {eventSlug, invitationSlug} via getPublicInvitation; handles loading/not-found, then renders InvitationTemplate with event.templateId + event.layoutBlocks
     types.ts                    Local PublicEvent/PublicInvitation/PublicGuest/PublicInvitationData (incl. mediaUrls) types for the template
-    blocks.ts                   Page-builder model: BlockType union (incl. `guestMessage`), RsvpVariant (`pending`/`accepted`/`declined`) + RSVP_VARIANTS, LayoutBlock, ConfigField (input: text | textarea | list | image | toggle; list supports itemFields for structured rows), BLOCK_DEFS, BLOCK_PALETTE, createBlock(), defaultLayout(variant) (per-variant fallback order), resolveLayout(), getConfigString(), getConfigList()
+    blocks.ts                   Page-builder model: BlockType union (incl. `guestMessage`), RsvpVariant (`pending`/`accepted`/`declined`) + RSVP_VARIANTS, LayoutBlock, ConfigField (input: text | textarea | list | image | toggle | select; list supports itemFields for structured rows; select resolves options via `optionsSource` for a dynamic source — currently `"specialEvents"` — or a static `options` list, e.g. the special-invitation `specialTemplateId` template picker), BLOCK_DEFS, BLOCK_PALETTE, createBlock(), defaultLayout(variant) (per-variant fallback order), resolveLayout(), getConfigString(), getConfigList()
     template-theme.tsx          "use client" — TemplateTheme tokens for elegant; TemplateThemeProvider + useTemplateTheme (consumed by the template frame/blocks)
     templates/
       template-registry.ts      Source of truth for templates: TemplateDef ({id,label,description,theme, Frame, blocks (per-BlockType markup), optional defaultLayouts (per RsvpVariant), optional defaultBlockConfig used to seed configs of newly added blocks}), TEMPLATES, TEMPLATE_LIST, DEFAULT_TEMPLATE_ID (="elegant"), resolveTemplate()
@@ -480,14 +485,14 @@ src/components/
       dummy-data.ts             DUMMY_INVITATION_DATA sample used by the live preview
       elegant/                  The official template (Figma design, node 452:172) — its own markup, not the default sections
         frame.tsx               ElegantFrame — phone-width card, NO global gap (each block owns padding)
-        blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/stayInvite/guestMessage/footer) + primitives (ElegantSection [24px horizontal padding; each block sets its own vertical padding/gap], WeddingButton [renders an `<a>` when given `href` — location "Ver mapa" links to `event.venueMapUrl`], CheckRow [real interactive checkbox/radio], CircularPhoto/ImagePlaceholder render real images from mediaUrls when an "image" config field is set). The `guestMessage` block (`blocks/guest-message.tsx`) is a working name + message form wired to `messages.submitGuestMessage`. Hero uses `event.brideName`/`groomName` (stacked on two lines). All copy reads block.config first, falling back to ELEGANT_COPY
+        blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/stayInvite/guestMessage/footer) + primitives (ElegantSection [24px horizontal padding; each block sets its own vertical padding/gap], WeddingButton [renders an `<a>` when given `href` — location "Ver mapa" links to `event.venueMapUrl`], CheckRow [real interactive checkbox/radio], CircularPhoto/ImagePlaceholder render real images from mediaUrls when an "image" config field is set). The `guestMessage` block (`blocks/guest-message.tsx`) is a working name + message form wired to `messages.submitGuestMessage`. The `specialInvitation` block (`blocks/special-invitation.tsx`) renders a decorated sub-event card (its name/description/date/location **sourced from the linked special event**, managed under the dashboard's Special Events page — not authored in the block) plus a "Confirmar asistencia" button that opens a themed modal (shadcn `Dialog`) showing the event's date/time/location/description and a per-guest attending/declining radio group, submitting via `submitPublicRsvp.specialEventRsvps`. It binds to a special event via its `specialEventId` config (falls back to the sole accessible one) and picks a display template via `specialTemplateId` (a small `SPECIAL_TEMPLATES` registry — `elegant` only for now). Because `getPublicInvitation` only returns special events the invitation has access to, the block **renders nothing on the live page when unbound** (i.e. the invitation isn't assigned it); in the editor preview it shows the sample sub-event with the button disabled. Each guest is prefilled from `specialEvents[].guestStatuses`. Hero uses `event.brideName`/`groomName` (stacked on two lines). All copy reads block.config first, falling back to ELEGANT_COPY
         default-copy.ts         ELEGANT_COPY (the design's Spanish copy) + ELEGANT_BLOCK_CONFIG (per-block default configs)
         default-layout.ts       elegantDefaultLayouts: Record<RsvpVariant,()=>LayoutBlock[]> — accepted (full design order), pending (hero/location/rsvp/footer), declined (hero/location/guestMessage/footer); configs seeded from ELEGANT_BLOCK_CONFIG. elegantDefaultLayout() = the accepted layout
         index.ts                Re-exports ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout(s)
 
   template-selection/
     template-settings.tsx       "use client" — template picker + per-RSVP-variant block page-builder (Pending/Accepted/Declined Tabs; add via Select with template-seeded config, reorder up/down, duplicate, remove, edit fields) + live InvitationTemplate preview (dummy data + the event's real media URLs, `rsvpState` = active tab); saves all three variants via events.setInvitationTemplate `layoutVariants`. Rendered by /dashboard/[eventSlug]/template
-    config-field-input.tsx      "use client" — ConfigFieldInput: renders one block-config field switching on field.input (text / textarea / list with add-remove rows / image via MediaPickerDialog)
+    config-field-input.tsx      "use client" — ConfigFieldInput: renders one block-config field switching on field.input (text / textarea / list with add-remove rows / image via MediaPickerDialog / select populated from a dynamic source, e.g. the event's special events). Takes an optional `specialEvents` prop for select fields.
 
 src/hooks/
   use-toast-mutation.ts         useToastMutation(ref, {success?, error}) — wraps useMutation with the try/catch + sonner toast convention; returns {run, pending}; run never throws, returns {ok, value} | {ok:false}
@@ -543,6 +548,21 @@ src/hooks/
 >   so the button is disabled there. Image slots render the configured media image or a placeholder.
 >   The `guestMessage` block (shown on the `declined` layout) is likewise wired — a name + message form
 >   that calls `messages.submitGuestMessage`; messages surface at `/dashboard/[eventSlug]/messages`.
+>   The `specialInvitation` block **is** wired too: special invitations are first-class mini sub-events
+>   (table `specialEvents`, ≤2 per event) managed at `/dashboard/[eventSlug]/special-events`, where the
+>   owner sets name/description/date/location and assigns **which invitations** can see each (per-invitation
+>   `invitationSpecialEventAccess`). In the Template Editor the block selects which special event to show
+>   (`specialEventId`) and a display template (`specialTemplateId`); its card content is sourced from the
+>   linked special event (not authored in the block). On the public page the card button opens a themed modal
+>   showing the event details (date/time and location prefixed with calendar / map-pin icons) + a per-guest
+>   attending/declining radio group, submitting via `submitPublicRsvp.specialEventRsvps` (`guestUpdates: []`);
+>   responses persist **only** to `guestSpecialEventRsvps` (no aggregate invitation/guest status yet). The
+>   card button label is authorable two ways: `confirmLabel` (default "Confirmar asistencia") before
+>   responding, and `detailsLabel` (default "Ver detalles") once **every** named guest already has a stored
+>   status for that special event — then the button is a read-only "view details" affordance opening the same
+>   modal with their saved choices. Because the block only renders for invitations granted access, it
+>   **renders nothing on the live page when unassigned**; the editor preview shows the sample sub-event with
+>   the button disabled.
 > - Add more templates by giving each its own `Frame`/`blocks` (and optional `defaultLayouts`) in its
 >   `TemplateDef`; a template implements the markup for every block type it intends to render.
 
@@ -604,6 +624,7 @@ Since AGENTS.md is a copy of CLAUDE.md, both must be kept in sync. Update one, t
 | `guest.ts` | `guestSchema` | firstName/lastName required, email optional |
 | `menu.ts` | `menuOptionSchema` | name required, isActive boolean |
 | `table.ts` | `tableSchema` | name required, seatsCount 1–20 |
+| `special-event.ts` | `specialEventSchema` | name required, optional description/location, optional `date` (datetime-local string → `new Date(str).getTime()`), isActive boolean |
 | `public-rsvp.ts` | `publicRsvpSchema` | array of guest updates + optional special event RSVPs |
 | `guest-message.ts` | `guestMessageSchema` | optional name ≤200, message required 1–1000 chars |
 

@@ -11,6 +11,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -28,7 +35,12 @@ interface ConfigFieldInputProps {
   eventId?: Id<"events">
   /** Event media (for image thumbnails) — pass the media.listByEvent result. */
   media?: MediaItem[]
+  /** Options for "select" fields with optionsSource "specialEvents". */
+  specialEvents?: { _id: string; name: string }[]
 }
+
+/** Sentinel value for the "none" option (shadcn Select disallows empty values). */
+const SELECT_NONE = "__none__"
 
 /**
  * Renders one editable block-config field, switching on the field's input
@@ -40,7 +52,42 @@ export function ConfigFieldInput({
   onChange,
   eventId,
   media,
+  specialEvents,
 }: ConfigFieldInputProps) {
+  if (field.input === "select") {
+    // Dynamic source (e.g. the event's special events) or a static option set.
+    const dynamic = field.optionsSource === "specialEvents"
+    const options: { value: string; label: string }[] = dynamic
+      ? (specialEvents ?? []).map((se) => ({ value: se._id, label: se.name }))
+      : (field.options ?? [])
+    const current = typeof value === "string" && value ? value : SELECT_NONE
+    return (
+      <div className="space-y-1">
+        <p className="text-xs font-medium text-zinc-500">{field.label}</p>
+        <Select
+          value={current}
+          onValueChange={(v) => onChange(v === SELECT_NONE ? undefined : v)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={SELECT_NONE}>None</SelectItem>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {dynamic && options.length === 0 && (
+          <p className="text-xs text-zinc-400">
+            No special events yet — create one in the event&apos;s Special Events.
+          </p>
+        )}
+      </div>
+    )
+  }
   if (field.input === "toggle") {
     return (
       <div className="flex items-center justify-between">
