@@ -95,7 +95,7 @@ export function CircularPhoto({
   )
 }
 
-export function ImagePlaceholder({
+export function SealedPhoto({
   className,
   src,
   alt,
@@ -104,13 +104,39 @@ export function ImagePlaceholder({
   src?: string
   alt?: string
 }) {
-  if (src) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={src} alt={alt ?? ""} className={cn("object-cover", className)} />
-    )
-  }
-  return <div aria-hidden className={cn("bg-wedding-muted", className)} />
+  const imageClassName = "object-cover w-full h-full";
+
+  return (
+    <div className="relative flex flex-col items-center w-full my-10">
+      <img
+        src={`${ASSET_BASE}/golden-seal.png`}
+        alt={'golden-seal-decoration'}
+        className="absolute object-cover w-24 h-24 left-1/2 top-0 -translate-1/2"
+      />
+
+      <div className="p-4 w-[80%] aspect-square shadow-md shadow-gray-300">
+        {src ?
+          <img
+            src={src}
+            alt={alt ?? ""}
+            className={imageClassName}
+          /> :
+          <ImagePlaceholder className={imageClassName} />
+        }
+      </div>
+    </div>
+  )
+
+}
+
+export function ImagePlaceholder({
+  className
+}: {
+  className?: string
+}) {
+  return (
+    <img src='/templates/image-placeholder.jpg' alt='image-placeholder' className={cn("object-cover", className)} />
+  )
 }
 
 export function getConfigImage(
