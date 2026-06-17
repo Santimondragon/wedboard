@@ -187,7 +187,7 @@ export function TemplateSettings() {
             <h2 className="text-sm font-semibold text-zinc-900">Blocks</h2>
             <button
               type="button"
-              className="text-xs text-zinc-500 hover:text-zinc-900"
+              className="text-xs text-zinc-500 hover:text-zinc-900 cursor-pointer hover:underline"
               onClick={() =>
                 setBlocks(
                   resolveTemplate(templateId).defaultLayout?.() ?? defaultLayout()
@@ -283,7 +283,6 @@ export function TemplateSettings() {
       <div className="sticky top-0 self-start space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-zinc-900">Live preview</h2>
-          <span className="text-xs text-zinc-400">Sample data</span>
         </div>
         <div className="overflow-hidden rounded-xl border bg-white">
           <div className="max-h-[70vh] overflow-y-auto">

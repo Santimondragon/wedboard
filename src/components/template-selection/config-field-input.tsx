@@ -5,6 +5,7 @@ import { Id } from "convex/_generated/dataModel"
 import { Image as ImageIcon, Plus, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { MediaPickerDialog } from "@/components/media/media-picker-dialog"
 import type { MediaItem } from "@/components/media/media-grid"
@@ -31,6 +32,18 @@ export function ConfigFieldInput({
   eventId,
   media,
 }: ConfigFieldInputProps) {
+  if (field.input === "toggle") {
+    return (
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-zinc-500">{field.label}</p>
+        <Switch
+          checked={value === true}
+          onCheckedChange={(checked) => onChange(checked)}
+          aria-label={field.label}
+        />
+      </div>
+    )
+  }
   if (field.input === "list") {
     return <ListFieldInput field={field} value={value} onChange={onChange} />
   }

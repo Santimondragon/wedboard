@@ -45,7 +45,7 @@ export const ELEGANT_BLOCK_CONFIG: Record<string, Record<string, unknown>> = {
   location: { title: "Ubicación", buttonLabel: "Ver mapa" },
   rsvp: { body: ELEGANT_COPY.rsvpNote },
   itinerary: { items: [...ELEGANT_COPY.itineraryItems] },
-  text: { headline: "Lluvia de sobres" },
+  text: { showFlourishes: true },
   allergies: {
     headline: ELEGANT_COPY.foodHeadline,
     note: ELEGANT_COPY.foodNote,

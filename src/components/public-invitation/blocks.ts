@@ -29,7 +29,8 @@ export interface ConfigField {
   key: string
   label: string
   /** "image" stores a media id (string) referencing the event's media table. */
-  input: "text" | "textarea" | "list" | "image"
+  /** "toggle" stores a boolean. */
+  input: "text" | "textarea" | "list" | "image" | "toggle"
   placeholder?: string
   /**
    * For "list" fields: shape of each item. Omit for a plain string list
@@ -61,6 +62,7 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
     fields: [
       { key: "headline", label: "Headline", input: "text", placeholder: "Optional headline" },
       { key: "body", label: "Text", input: "textarea", placeholder: "Write your message…" },
+      { key: "showFlourishes", label: "Show flourishes", input: "toggle" },
     ],
   },
   location: {
