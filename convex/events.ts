@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { Doc } from "./_generated/dataModel";
+import { LAYOUT_BLOCKS_VALIDATOR } from "./schema";
 import { requireUser } from "./lib/auth";
 import { requireEventAccess, requireEventMember } from "./lib/permissions";
 import {
@@ -170,14 +171,15 @@ export const setInvitationTemplate = mutation({
   args: {
     eventId: v.id("events"),
     templateId: v.optional(v.string()),
-    layoutBlocks: v.optional(
-      v.array(
-        v.object({
-          id: v.string(),
-          type: v.string(),
-          config: v.optional(v.any()),
-        })
-      )
+    // Legacy single layout (still accepted for back-compat).
+    layoutBlocks: v.optional(LAYOUT_BLOCKS_VALIDATOR),
+    // Per-RSVP-state layouts authored in the template editor.
+    layoutVariants: v.optional(
+      v.object({
+        pending: v.optional(LAYOUT_BLOCKS_VALIDATOR),
+        accepted: v.optional(LAYOUT_BLOCKS_VALIDATOR),
+        declined: v.optional(LAYOUT_BLOCKS_VALIDATOR),
+      })
     ),
   },
   handler: async (ctx, args) => {

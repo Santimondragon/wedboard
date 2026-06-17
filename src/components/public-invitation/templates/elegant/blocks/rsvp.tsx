@@ -115,10 +115,18 @@ export function ElegantRsvp({ block, data }: BlockComponentProps) {
     error: "No pudimos enviar tu confirmación. Inténtalo de nuevo.",
   })
 
-  const canSubmit = Boolean(data.eventSlug && data.invitationSlug)
+  // Every named guest must pick a choice before submitting, so the derived
+  // public layout (pending/accepted/declined) is unambiguous. The +1 row has no
+  // guest record, so it's excluded from this requirement.
+  const allNamedAnswered = data.guests.every((g) => choices[g._id])
+  const canSubmit = Boolean(data.eventSlug && data.invitationSlug) && allNamedAnswered
 
   const handleSubmit = async () => {
     if (!data.eventSlug || !data.invitationSlug) return
+    if (!allNamedAnswered) {
+      toast.error("Por favor responde por cada invitado.")
+      return
+    }
     const guestUpdates = rows.flatMap((row) =>
       row.guestId && choices[row.key]
         ? [{ guestId: row.guestId, rsvpStatus: choices[row.key] }]

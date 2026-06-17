@@ -45,6 +45,7 @@ export function PublicInvitationPage({
       data={{ ...data, eventSlug, invitationSlug }}
       templateId={data.event.templateId}
       blocks={data.event.layoutBlocks as LayoutBlock[] | undefined}
+      rsvpState={data.rsvpState}
     />
   )
 }

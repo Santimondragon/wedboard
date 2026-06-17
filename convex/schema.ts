@@ -1,6 +1,17 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+// Ordered page-builder blocks for the public invitation (see
+// public-invitation/blocks). Shared by `events.layoutBlocks`,
+// `events.layoutVariants`, and `events.setInvitationTemplate`.
+export const LAYOUT_BLOCKS_VALIDATOR = v.array(
+  v.object({
+    id: v.string(),
+    type: v.string(),
+    config: v.optional(v.any()),
+  })
+);
+
 export default defineSchema({
   users: defineTable({
     clerkId: v.string(),
@@ -27,16 +38,18 @@ export default defineSchema({
     subdomain: v.optional(v.string()),
     customDomain: v.optional(v.string()),
     templateId: v.optional(v.string()),
-    // Ordered page-builder blocks for the public invitation (see
-    // public-invitation/blocks). Undefined means "use the default layout".
-    layoutBlocks: v.optional(
-      v.array(
-        v.object({
-          id: v.string(),
-          type: v.string(),
-          config: v.optional(v.any()),
-        })
-      )
+    // Legacy single layout. Kept for back-compat; read as the "accepted"
+    // variant fallback when `layoutVariants.accepted` is unset.
+    layoutBlocks: v.optional(LAYOUT_BLOCKS_VALIDATOR),
+    // Per-RSVP-state layouts for the public invitation. The public page picks
+    // one based on the invitation's guests' RSVP state (see getPublicInvitation).
+    // Each variant undefined = "use the selected template's default for that state".
+    layoutVariants: v.optional(
+      v.object({
+        pending: v.optional(LAYOUT_BLOCKS_VALIDATOR),
+        accepted: v.optional(LAYOUT_BLOCKS_VALIDATOR),
+        declined: v.optional(LAYOUT_BLOCKS_VALIDATOR),
+      })
     ),
     status: v.union(
       v.literal("draft"),
@@ -177,4 +190,16 @@ export default defineSchema({
     seatsCount: v.number(),
     sortOrder: v.number(),
   }).index("by_eventId", ["eventId"]),
+
+  // Messages guests leave for the host (e.g. from the "declined" public layout,
+  // when they can't attend). Read by the planner in the dashboard.
+  guestMessages: defineTable({
+    eventId: v.id("events"),
+    invitationId: v.id("invitations"),
+    name: v.string(),
+    message: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_eventId", ["eventId"])
+    .index("by_invitationId", ["invitationId"]),
 });

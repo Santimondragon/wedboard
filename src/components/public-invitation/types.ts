@@ -1,6 +1,8 @@
 // Shapes returned by the public `getPublicInvitation` query. Kept local to the
 // public template so section components can be typed without importing server code.
 
+import type { RsvpVariant } from "./blocks"
+
 export interface PublicEvent {
   name: string
   brideName?: string
@@ -39,4 +41,6 @@ export interface PublicInvitationData {
    */
   eventSlug?: string
   invitationSlug?: string
+  /** RSVP variant the server resolved for this invitation; drives default layout. */
+  rsvpState?: RsvpVariant
 }

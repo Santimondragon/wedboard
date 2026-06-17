@@ -50,10 +50,28 @@ export const getPublicInvitation = query({
       )
       .take(100);
 
+    // Derive which layout variant to show from the guests' RSVP states:
+    // any attending → accepted; else any pending → pending; else declined.
+    // No guests → pending.
+    const rsvpState: "pending" | "accepted" | "declined" = guests.some(
+      (g) => g.rsvpStatus === "attending"
+    )
+      ? "accepted"
+      : guests.length === 0 || guests.some((g) => g.rsvpStatus === "pending")
+        ? "pending"
+        : "declined";
+
+    // Saved blocks for the resolved state. `layoutBlocks` is the legacy single
+    // layout, used as the accepted fallback. Undefined → the public page falls
+    // back to the selected template's default layout for this state.
+    const layoutBlocks =
+      event.layoutVariants?.[rsvpState] ??
+      (rsvpState === "accepted" ? event.layoutBlocks : undefined);
+
     // Resolve media references in the layout config ("image" fields store a
     // media id string) to signed URLs so the public page can render them.
     const mediaUrls: Record<string, string> = {};
-    for (const block of event.layoutBlocks ?? []) {
+    for (const block of layoutBlocks ?? []) {
       for (const value of Object.values(
         (block.config ?? {}) as Record<string, unknown>
       )) {
@@ -77,8 +95,9 @@ export const getPublicInvitation = query({
         venueAddress: event.venueAddress,
         venueMapUrl: event.venueMapUrl,
         templateId: event.templateId,
-        layoutBlocks: event.layoutBlocks,
+        layoutBlocks,
       },
+      rsvpState,
       invitation: {
         _id: invitation._id,
         title: invitation.title,

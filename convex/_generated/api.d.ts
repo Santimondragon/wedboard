@@ -20,6 +20,7 @@ import type * as lib_public from "../lib/public.js";
 import type * as lib_slug from "../lib/slug.js";
 import type * as media from "../media.js";
 import type * as menu from "../menu.js";
+import type * as messages from "../messages.js";
 import type * as seed from "../seed.js";
 import type * as specialEvents from "../specialEvents.js";
 import type * as tables from "../tables.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "lib/slug": typeof lib_slug;
   media: typeof media;
   menu: typeof menu;
+  messages: typeof messages;
   seed: typeof seed;
   specialEvents: typeof specialEvents;
   tables: typeof tables;

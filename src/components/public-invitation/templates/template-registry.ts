@@ -3,9 +3,9 @@
 // have completely different markup from each other — not just different theming.
 
 import { TEMPLATE_THEMES, type TemplateTheme } from "../template-theme"
-import type { BlockType, LayoutBlock } from "../blocks"
+import type { BlockType, LayoutBlock, RsvpVariant } from "../blocks"
 import type { BlockComponent, FrameComponent } from "./types"
-import { ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout } from "./elegant"
+import { ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayouts } from "./elegant"
 import { ELEGANT_BLOCK_CONFIG } from "./elegant/default-copy"
 
 export interface TemplateDef {
@@ -18,8 +18,8 @@ export interface TemplateDef {
   Frame: FrameComponent
   /** Markup for each block type. Block types the template omits render nothing. */
   blocks: Partial<Record<BlockType, BlockComponent>>
-  /** Preset layout used when an event has no saved layout. */
-  defaultLayout?: () => LayoutBlock[]
+  /** Preset layout per RSVP variant, used when an event has no saved layout. */
+  defaultLayouts?: Record<RsvpVariant, () => LayoutBlock[]>
   /**
    * Per-block default config used to pre-fill newly added blocks in the
    * editor (so the template's copy is editable from the start).
@@ -40,7 +40,7 @@ export const TEMPLATES: Record<string, TemplateDef> = {
     theme: TEMPLATE_THEMES.elegant,
     Frame: ElegantFrame,
     blocks: ELEGANT_BLOCKS,
-    defaultLayout: elegantDefaultLayout,
+    defaultLayouts: elegantDefaultLayouts,
     defaultBlockConfig: ELEGANT_BLOCK_CONFIG,
   },
 }

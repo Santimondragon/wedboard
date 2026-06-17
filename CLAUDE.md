@@ -93,7 +93,8 @@ Top-level board. One event = one wedding/occasion.
 | subdomain | string? | Future |
 | customDomain | string? | Future |
 | templateId | string? | Public invitation template id (`"elegant"`); defaults to elegant when unset |
-| layoutBlocks | `{id,type,config?}[]`? | Ordered page-builder blocks for the public invitation (see `public-invitation/blocks`). Undefined = default layout. `config` is `v.any()` (per-instance content, e.g. text headline/body) |
+| layoutBlocks | `{id,type,config?}[]`? | **Legacy** single layout. Kept for back-compat; read as the `accepted` variant fallback when `layoutVariants.accepted` is unset. Validator shared via `LAYOUT_BLOCKS_VALIDATOR` (exported from `schema.ts`) |
+| layoutVariants | `{pending?,accepted?,declined?}`? | Per-RSVP-state page-builder layouts (each a `{id,type,config?}[]`). The public page picks one from the invitation's guests' RSVP state (see `getPublicInvitation`). Each variant undefined = the selected template's default layout for that state |
 | status | `"draft" \| "active" \| "archived"` |
 
 Indexes: `by_ownerUserId`, `by_slug`, `by_subdomain`, `by_customDomain`
@@ -252,6 +253,21 @@ Index: `by_eventId`
 
 ---
 
+### `guestMessages`
+Messages guests leave for the host (e.g. from the `declined` public layout, when they can't attend). Read by the planner in the dashboard.
+
+| Field | Type |
+|---|---|
+| eventId | Id<"events"> |
+| invitationId | Id<"invitations"> |
+| name | string |
+| message | string |
+| createdAt | number | Unix ms |
+
+Indexes: `by_eventId`, `by_invitationId`
+
+---
+
 ## Convex Modules
 
 ### `convex/lib/auth.ts`
@@ -292,7 +308,7 @@ Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPub
 | `getEventSummary` | query — event + counts |
 | `createEvent` | mutation — creates eventMember with owner role; returns `{ eventId, slug }` |
 | `updateEvent` | mutation — accepts optional `slug` (validates format, reserved words, global uniqueness) |
-| `setInvitationTemplate` | mutation — sets `templateId` and/or `layoutBlocks` (min role planner) |
+| `setInvitationTemplate` | mutation — sets `templateId`, `layoutVariants` (`{pending,accepted,declined}`), and/or legacy `layoutBlocks` (min role planner). The editor writes `layoutVariants` |
 | `archiveEvent` | mutation |
 
 ### `convex/invitations.ts`
@@ -300,7 +316,7 @@ Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPub
 |---|---|---|
 | `listByEvent` | query | Auth required |
 | `getById` | query | Auth required |
-| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; resolves via `lib/public.ts` (null for archived events / inactive invitations); returns `{event (incl. brideName, groomName, venueMapUrl, templateId, layoutBlocks), invitation, guests:[{firstName,lastName}], mediaUrls}` where `mediaUrls` maps media ids referenced in layout config → signed URLs |
+| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; resolves via `lib/public.ts` (null for archived events / inactive invitations). Derives `rsvpState` (`pending`/`accepted`/`declined`) from the invitation's guests (any attending → accepted; else any pending or no guests → pending; else declined) and returns the **state-resolved** layout: `event.layoutBlocks` is set to `layoutVariants[state]` (accepted falls back to legacy `layoutBlocks`), or undefined to let the client use the template default for that state. Returns `{event (incl. brideName, groomName, venueMapUrl, templateId, layoutBlocks), rsvpState, invitation, guests:[{firstName,lastName}], mediaUrls}` (media resolved over the chosen layout only) |
 | `createInvitation` | mutation | Per-event-unique slug; optional `guestIds` (≤20) links selected un-invited guests |
 | `updateInvitation` | mutation | |
 | `deleteInvitation` | mutation | **Unassigns** its guests (sets invitationId undefined), does not delete them |
@@ -351,6 +367,12 @@ Same shape as `menu.ts` (thin wrappers over `lib/options.ts`).
 | `assignGuestToSeat` | Moves guest if already seated; bumps occupant if seat taken |
 | `unassignGuestFromSeat` | Sets tableId + seatNumber to undefined |
 
+### `convex/messages.ts`
+| Function | Notes |
+|---|---|
+| `submitGuestMessage` | **Public** mutation — args `{eventSlug, invitationSlug, name, message}`; resolves via `lib/public.ts`, trims + validates (`message` non-empty ≤1000, `name` ≤200), caps at 20 messages per invitation, inserts a `guestMessages` row. Wired to the elegant `guestMessage` block |
+| `listMessagesByEvent` | query (auth via `requireEventEditor`) — `guestMessages` for the event, newest first, each enriched with `invitationTitle` |
+
 ### `convex/dashboard.ts`
 `getOverviewStats` — returns `{totalInvitations, guestCapacity, totalGuests, attendingCount, declinedCount, pendingCount, allergyCount, menuCompletionCount, tableAssignmentCount}`
 
@@ -372,7 +394,8 @@ Same shape as `menu.ts` (thin wrappers over `lib/options.ts`).
 /dashboard/[eventSlug]/guests         Guest table with search/filter + detail sheet + Add Guest
 /dashboard/[eventSlug]/menu           Food & drink option management
 /dashboard/[eventSlug]/tables         Drag-free seat assignment grid
-/dashboard/[eventSlug]/template       Template picker + block page-builder (add/reorder/duplicate/remove/edit incl. list + image fields) + live preview (dummy data + real media)
+/dashboard/[eventSlug]/messages       Guest messages left for the host (listMessagesByEvent)
+/dashboard/[eventSlug]/template       Template picker + per-RSVP-variant block page-builder (Pending/Accepted/Declined tabs; add/reorder/duplicate/remove/edit incl. list + image fields) + live preview (dummy data + real media)
 /dashboard/[eventSlug]/media          Per-event image library — upload (Convex storage), rename, delete
 /dashboard/[eventSlug]/settings       Event metadata + editable event key + archive
 
@@ -436,6 +459,9 @@ src/components/
     upload-button.tsx           File input → Convex upload URL → media.register (client-side type/size checks)
     media-picker-dialog.tsx     Pick (or upload) one image from the event library — used by the template editor's image fields
 
+  messages/
+    message-list.tsx            List of host messages (name, invitation title, relative date, body) — exports GuestMessageItem type
+
   tables/
     table-grid.tsx              Responsive grid of TableCards
     table-card.tsx              Single table: seats, assign/unassign, edit/delete
@@ -445,22 +471,22 @@ src/components/
   public-invitation/
     public-invitation-page.tsx  Loads {eventSlug, invitationSlug} via getPublicInvitation; handles loading/not-found, then renders InvitationTemplate with event.templateId + event.layoutBlocks
     types.ts                    Local PublicEvent/PublicInvitation/PublicGuest/PublicInvitationData (incl. mediaUrls) types for the template
-    blocks.ts                   Page-builder model: BlockType union, LayoutBlock, ConfigField (input: text | textarea | list | image; list supports itemFields for structured rows), BLOCK_DEFS, BLOCK_PALETTE, createBlock(), defaultLayout(), resolveLayout(), getConfigString(), getConfigList()
+    blocks.ts                   Page-builder model: BlockType union (incl. `guestMessage`), RsvpVariant (`pending`/`accepted`/`declined`) + RSVP_VARIANTS, LayoutBlock, ConfigField (input: text | textarea | list | image | toggle; list supports itemFields for structured rows), BLOCK_DEFS, BLOCK_PALETTE, createBlock(), defaultLayout(variant) (per-variant fallback order), resolveLayout(), getConfigString(), getConfigList()
     template-theme.tsx          "use client" — TemplateTheme tokens for elegant; TemplateThemeProvider + useTemplateTheme (consumed by the template frame/blocks)
     templates/
-      template-registry.ts      Source of truth for templates: TemplateDef ({id,label,description,theme, Frame, blocks (per-BlockType markup), optional defaultLayout, optional defaultBlockConfig used to seed configs of newly added blocks}), TEMPLATES, TEMPLATE_LIST, DEFAULT_TEMPLATE_ID (="elegant"), resolveTemplate()
+      template-registry.ts      Source of truth for templates: TemplateDef ({id,label,description,theme, Frame, blocks (per-BlockType markup), optional defaultLayouts (per RsvpVariant), optional defaultBlockConfig used to seed configs of newly added blocks}), TEMPLATES, TEMPLATE_LIST, DEFAULT_TEMPLATE_ID (="elegant"), resolveTemplate()
       types.ts                  Shared template contracts: BlockComponentProps/BlockComponent + FrameProps/FrameComponent (imported by every template's frame + blocks)
-      invitation-template.tsx   "use client" — resolves the template, renders its Frame, and for each LayoutBlock its block component (block types the template omits render nothing); layout = saved blocks ?? template.defaultLayout() ?? defaultLayout()
+      invitation-template.tsx   "use client" — resolves the template, renders its Frame, and for each LayoutBlock its block component (block types the template omits render nothing); takes `rsvpState`; layout = saved blocks ?? template.defaultLayouts[rsvpState]() ?? defaultLayout(rsvpState)
       dummy-data.ts             DUMMY_INVITATION_DATA sample used by the live preview
       elegant/                  The official template (Figma design, node 452:172) — its own markup, not the default sections
         frame.tsx               ElegantFrame — phone-width card, NO global gap (each block owns padding)
-        blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/stayInvite/footer) + primitives (ElegantSection [24px horizontal padding; each block sets its own vertical padding/gap], WeddingButton [renders an `<a>` when given `href` — location "Ver mapa" links to `event.venueMapUrl`], CheckRow [real interactive checkbox/radio], CircularPhoto/ImagePlaceholder render real images from mediaUrls when an "image" config field is set). Hero uses `event.brideName`/`groomName` (stacked on two lines). All copy reads block.config first, falling back to ELEGANT_COPY
+        blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/stayInvite/guestMessage/footer) + primitives (ElegantSection [24px horizontal padding; each block sets its own vertical padding/gap], WeddingButton [renders an `<a>` when given `href` — location "Ver mapa" links to `event.venueMapUrl`], CheckRow [real interactive checkbox/radio], CircularPhoto/ImagePlaceholder render real images from mediaUrls when an "image" config field is set). The `guestMessage` block (`blocks/guest-message.tsx`) is a working name + message form wired to `messages.submitGuestMessage`. Hero uses `event.brideName`/`groomName` (stacked on two lines). All copy reads block.config first, falling back to ELEGANT_COPY
         default-copy.ts         ELEGANT_COPY (the design's Spanish copy) + ELEGANT_BLOCK_CONFIG (per-block default configs)
-        default-layout.ts       elegantDefaultLayout() — preset blocks in the design's order, configs seeded from ELEGANT_BLOCK_CONFIG
-        index.ts                Re-exports ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout
+        default-layout.ts       elegantDefaultLayouts: Record<RsvpVariant,()=>LayoutBlock[]> — accepted (full design order), pending (hero/location/rsvp/footer), declined (hero/location/guestMessage/footer); configs seeded from ELEGANT_BLOCK_CONFIG. elegantDefaultLayout() = the accepted layout
+        index.ts                Re-exports ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout(s)
 
   template-selection/
-    template-settings.tsx       "use client" — template picker + block page-builder (add via Select with template-seeded config, reorder up/down, duplicate, remove, edit fields) + live InvitationTemplate preview (dummy data + the event's real media URLs); saves via events.setInvitationTemplate. Rendered by /dashboard/[eventSlug]/template
+    template-settings.tsx       "use client" — template picker + per-RSVP-variant block page-builder (Pending/Accepted/Declined Tabs; add via Select with template-seeded config, reorder up/down, duplicate, remove, edit fields) + live InvitationTemplate preview (dummy data + the event's real media URLs, `rsvpState` = active tab); saves all three variants via events.setInvitationTemplate `layoutVariants`. Rendered by /dashboard/[eventSlug]/template
     config-field-input.tsx      "use client" — ConfigFieldInput: renders one block-config field switching on field.input (text / textarea / list with add-remove rows / image via MediaPickerDialog)
 
 src/hooks/
@@ -468,9 +494,12 @@ src/hooks/
 ```
 
 > **Public template (page builder):** the public invitation is a **page builder** — an ordered list
-> of `LayoutBlock`s (`{id, type, config?}`) defined in `blocks.ts`. Block types (hero, text, location,
-> countdown, itinerary, dressCode, specialInvitation, rsvp, allergies, menuSelection, drinkSelection,
-> stayInvite, footer) may repeat (e.g. several `text` blocks). **All non-derived text is authorable**:
+> of `LayoutBlock`s (`{id, type, config?}`) defined in `blocks.ts`, authored **per RSVP variant**
+> (`pending`/`accepted`/`declined`). The public page derives the variant from the invitation's guests
+> and renders that variant's layout (see `getPublicInvitation`); the owner authors all three in the
+> template editor's tabs. Block types (hero, text, location, countdown, itinerary, dressCode,
+> specialInvitation, rsvp, allergies, menuSelection, drinkSelection, stayInvite, guestMessage, footer)
+> may repeat (e.g. several `text` blocks). **All non-derived text is authorable**:
 > every block with copy carries it in `config` (incl. `rsvp` title/deadline/attendLabel/declineLabel/note/submitLabel, `footer.body`, `allergies`
 > headline/note/options string-list, `itinerary.items` `{time,label}` list); only derived data (event
 > name/bride/groom names/date/venue/map link, guest names — managed in event settings) is not. The
@@ -479,13 +508,17 @@ src/hooks/
 > of the address). Image slots are `config` fields of input kind `"image"`
 > storing a media id (`hero.heroImage`, `location.mapImage`, `dressCode.photo`, `stayInvite.image`),
 > resolved to URLs via `getPublicInvitation.mediaUrls`.
-> The owner builds the layout at `/dashboard/[eventSlug]/template` (pick template +
-> add/reorder/duplicate/remove/edit + live preview). Layout is stored on `events.layoutBlocks`
-> (undefined = the selected template's `defaultLayout()`, then the global `defaultLayout()`).
+> The owner builds the layouts at `/dashboard/[eventSlug]/template` (pick template + Pending/Accepted/Declined
+> tabs + add/reorder/duplicate/remove/edit + live preview). Layouts are stored on `events.layoutVariants`
+> (`{pending,accepted,declined}`); a variant undefined = the selected template's `defaultLayouts[variant]()`,
+> then the global `defaultLayout(variant)`. The legacy single `events.layoutBlocks` is read as the `accepted`
+> fallback (migration path). **RSVP-state rule:** any guest attending → `accepted`; else any pending or no
+> guests → `pending`; else (all declined) → `declined`. The elegant `rsvp` block requires every named guest
+> to pick a choice before submitting, so the derived state stays unambiguous.
 >
 > **Templates own their markup.** A `TemplateDef` (template-registry) supplies its own page `Frame`,
-> a per-`BlockType` component map, and an optional preset `defaultLayout`; block types a template
-> omits render nothing. There is no shared default markup — the shared `BlockComponentProps`/`FrameProps`
+> a per-`BlockType` component map, and an optional preset `defaultLayouts` (per RsvpVariant); block types a
+> template omits render nothing. There is no shared default markup — the shared `BlockComponentProps`/`FrameProps`
 > contracts live in `templates/types.ts`. So templates differ in **markup and structure**, not just theme.
 >
 > - **`elegant`** is the **only official template** (default), implementing the Figma
@@ -505,7 +538,9 @@ src/hooks/
 >   choices (the +1 row has no guest record so it isn't persisted). Submission needs `data.eventSlug` +
 >   `data.invitationSlug` (injected by `public-invitation-page`); they're absent in the editor preview,
 >   so the button is disabled there. Image slots render the configured media image or a placeholder.
-> - Add more templates by giving each its own `Frame`/`blocks` (and optional `defaultLayout`) in its
+>   The `guestMessage` block (shown on the `declined` layout) is likewise wired — a name + message form
+>   that calls `messages.submitGuestMessage`; messages surface at `/dashboard/[eventSlug]/messages`.
+> - Add more templates by giving each its own `Frame`/`blocks` (and optional `defaultLayouts`) in its
 >   `TemplateDef`; a template implements the markup for every block type it intends to render.
 
 ---
@@ -567,5 +602,6 @@ Since AGENTS.md is a copy of CLAUDE.md, both must be kept in sync. Update one, t
 | `menu.ts` | `menuOptionSchema` | name required, isActive boolean |
 | `table.ts` | `tableSchema` | name required, seatsCount 1–20 |
 | `public-rsvp.ts` | `publicRsvpSchema` | array of guest updates + optional special event RSVPs |
+| `guest-message.ts` | `guestMessageSchema` | optional name ≤200, message required 1–1000 chars |
 
 > **Note:** Do not use `.default()` on Zod booleans — it causes Resolver type mismatches with react-hook-form. Use `defaultValues` in `useForm` instead.

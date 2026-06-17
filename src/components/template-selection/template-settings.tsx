@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useEvent } from "@/components/dashboard/event-provider"
 import {
   TEMPLATE_LIST,
@@ -31,8 +32,10 @@ import {
   BLOCK_PALETTE,
   createBlock,
   defaultLayout,
+  RSVP_VARIANTS,
   type BlockType,
   type LayoutBlock,
+  type RsvpVariant,
 } from "@/components/public-invitation/blocks"
 import { ConfigFieldInput } from "@/components/template-selection/config-field-input"
 import { InvitationTemplate } from "@/components/public-invitation/templates/invitation-template"
@@ -49,21 +52,49 @@ export function TemplateSettings() {
   const [templateId, setTemplateId] = useState<string>(
     event.templateId ?? DEFAULT_TEMPLATE_ID
   )
-  const [blocks, setBlocks] = useState<LayoutBlock[]>(() => {
-    const preset = resolveTemplate(event.templateId ?? DEFAULT_TEMPLATE_ID)
-    const defaults = preset.defaultBlockConfig ?? {}
+  // One independent block list per RSVP variant; the public page picks one based
+  // on the invitation's guests' RSVP state.
+  const [variants, setVariants] = useState<Record<RsvpVariant, LayoutBlock[]>>(
+    () => {
+      const preset = resolveTemplate(event.templateId ?? DEFAULT_TEMPLATE_ID)
+      const defaults = preset.defaultBlockConfig ?? {}
 
-    const applyDefaults = (block: LayoutBlock): LayoutBlock => {
-      const seed = defaults[block.type] ?? {}
-      const eventDerived = deriveEventConfig(event, block.type)
-      // Priority: user's saved values > event-derived > template text defaults
-      return { ...block, config: { ...seed, ...eventDerived, ...block.config } }
+      const applyDefaults = (block: LayoutBlock): LayoutBlock => {
+        const seed = defaults[block.type] ?? {}
+        const eventDerived = deriveEventConfig(event, block.type)
+        // Priority: user's saved values > event-derived > template text defaults
+        return { ...block, config: { ...seed, ...eventDerived, ...block.config } }
+      }
+
+      const build = (variant: RsvpVariant): LayoutBlock[] => {
+        // Existing single layouts migrate to the "accepted" variant.
+        const saved = (event.layoutVariants?.[variant] ??
+          (variant === "accepted" ? event.layoutBlocks : undefined)) as
+          | LayoutBlock[]
+          | undefined
+        if (saved && saved.length > 0) return saved.map(applyDefaults)
+        return (preset.defaultLayouts?.[variant]?.() ?? defaultLayout(variant)).map(
+          applyDefaults
+        )
+      }
+
+      return {
+        pending: build("pending"),
+        accepted: build("accepted"),
+        declined: build("declined"),
+      }
     }
+  )
+  const [activeVariant, setActiveVariant] = useState<RsvpVariant>("pending")
 
-    const saved = event.layoutBlocks as LayoutBlock[] | undefined
-    if (saved && saved.length > 0) return saved.map(applyDefaults)
-    return (preset.defaultLayout?.() ?? defaultLayout()).map(applyDefaults)
-  })
+  // The active variant's block list, plus a setter that only touches it.
+  const blocks = variants[activeVariant]
+  const setBlocks = (updater: (prev: LayoutBlock[]) => LayoutBlock[]) =>
+    setVariants((prev) => ({
+      ...prev,
+      [activeVariant]: updater(prev[activeVariant]),
+    }))
+
   function addBlock(type: BlockType) {
     const seed = resolveTemplate(templateId).defaultBlockConfig?.[type]
     const eventDerived = deriveEventConfig(event, type)
@@ -146,7 +177,7 @@ export function TemplateSettings() {
     await setTemplate.run({
       eventId: event._id,
       templateId,
-      layoutBlocks: blocks,
+      layoutVariants: variants,
     })
   }
 
@@ -182,6 +213,20 @@ export function TemplateSettings() {
         )}
 
         <section className="space-y-3">
+          <Tabs
+            value={activeVariant}
+            onValueChange={(v) => setActiveVariant(v as RsvpVariant)}
+          >
+            <TabsList className="w-full">
+              {RSVP_VARIANTS.map((variant) => (
+                <TabsTrigger key={variant} value={variant} className="capitalize">
+                  {VARIANT_LABELS[variant]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <p className="text-xs text-zinc-500">{VARIANT_HINTS[activeVariant]}</p>
+
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-zinc-900">Blocks</h2>
             <button
@@ -189,7 +234,10 @@ export function TemplateSettings() {
               className="text-xs text-zinc-500 hover:text-zinc-900 cursor-pointer hover:underline"
               onClick={() =>
                 setBlocks(
-                  resolveTemplate(templateId).defaultLayout?.() ?? defaultLayout()
+                  () =>
+                    resolveTemplate(templateId).defaultLayouts?.[
+                      activeVariant
+                    ]?.() ?? defaultLayout(activeVariant)
                 )
               }
             >
@@ -203,7 +251,7 @@ export function TemplateSettings() {
               return (
                 <li
                   key={block.id}
-                  className="rounded-lg border border-zinc-200 p-3 space-y-2"
+                  className="rounded-lg border border-zinc-200 p-4 space-y-2"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium text-zinc-900">
@@ -289,6 +337,7 @@ export function TemplateSettings() {
               data={previewData}
               templateId={templateId}
               blocks={blocks}
+              rsvpState={activeVariant}
             />
           </div>
         </div>
@@ -303,6 +352,18 @@ export function TemplateSettings() {
       </div>
     </div>
   )
+}
+
+const VARIANT_LABELS: Record<RsvpVariant, string> = {
+  pending: "Pending",
+  accepted: "Accepted",
+  declined: "Declined",
+}
+
+const VARIANT_HINTS: Record<RsvpVariant, string> = {
+  pending: "Shown while the invitation is unanswered (guests still need to RSVP).",
+  accepted: "Shown once at least one guest confirms they're attending.",
+  declined: "Shown when every guest has declined.",
 }
 
 function deriveEventConfig(

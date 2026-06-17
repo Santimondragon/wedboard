@@ -1,6 +1,6 @@
 "use client"
 
-import { defaultLayout, type LayoutBlock } from "../blocks"
+import { defaultLayout, type LayoutBlock, type RsvpVariant } from "../blocks"
 import { TemplateThemeProvider } from "../template-theme"
 import type { PublicInvitationData } from "../types"
 import { resolveTemplate } from "./template-registry"
@@ -9,8 +9,10 @@ interface InvitationTemplateProps {
   data: PublicInvitationData
   /** Template id; falls back to the elegant template when unknown/absent. */
   templateId?: string | null
-  /** Ordered layout blocks; null/undefined falls back to the default layout. */
+  /** Ordered layout blocks; null/undefined falls back to the variant default. */
   blocks?: LayoutBlock[] | null
+  /** RSVP variant whose default layout to use when `blocks` is empty. */
+  rsvpState?: RsvpVariant
 }
 
 /**
@@ -22,15 +24,16 @@ export function InvitationTemplate({
   data,
   templateId,
   blocks,
+  rsvpState = "accepted",
 }: InvitationTemplateProps) {
   const template = resolveTemplate(templateId)
   const Frame = template.Frame
-  // Saved blocks win; otherwise use the template's preset layout, then the
-  // global default.
+  // Saved blocks win; otherwise use the template's preset layout for this RSVP
+  // variant, then the global variant default.
   const layout =
     blocks && blocks.length > 0
       ? blocks
-      : template.defaultLayout?.() ?? defaultLayout()
+      : template.defaultLayouts?.[rsvpState]?.() ?? defaultLayout(rsvpState)
 
   return (
     <TemplateThemeProvider templateId={templateId}>

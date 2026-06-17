@@ -4,6 +4,7 @@ import { ElegantAllergies } from "./allergies"
 import { ElegantCountdown } from "./countdown"
 import { ElegantDressCode } from "./dress-code"
 import { ElegantFooter } from "./footer"
+import { ElegantGuestMessage } from "./guest-message"
 import { ElegantHero } from "./hero"
 import { ElegantItinerary } from "./itinerary"
 import { ElegantLocation } from "./location"
@@ -23,5 +24,6 @@ export const ELEGANT_BLOCKS: Partial<Record<BlockType, BlockComponent>> = {
   dressCode: ElegantDressCode,
   specialInvitation: ElegantSpecialInvitation,
   stayInvite: ElegantStayInvite,
+  guestMessage: ElegantGuestMessage,
   footer: ElegantFooter,
 }

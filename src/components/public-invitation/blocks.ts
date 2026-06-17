@@ -15,7 +15,19 @@ export type BlockType =
   | "menuSelection"
   | "drinkSelection"
   | "stayInvite"
+  | "guestMessage"
   | "footer"
+
+/**
+ * The public page renders one of three layout variants per invitation, chosen
+ * from the invitation's guests' RSVP state (see getPublicInvitation):
+ * - "pending"  — nobody has responded yet
+ * - "accepted" — at least one guest is attending
+ * - "declined" — everyone declined
+ */
+export type RsvpVariant = "pending" | "accepted" | "declined"
+
+export const RSVP_VARIANTS: RsvpVariant[] = ["pending", "accepted", "declined"]
 
 export interface LayoutBlock {
   /** Stable per-instance id (React key + reorder identity). */
@@ -156,6 +168,18 @@ export const BLOCK_DEFS: Record<BlockType, BlockDef> = {
       { key: "image", label: "Image", input: "image" },
     ],
   },
+  guestMessage: {
+    label: "Message to the host",
+    description: "Lets a guest leave the host a message (e.g. when they can't attend).",
+    fields: [
+      { key: "headline", label: "Headline", input: "text", placeholder: "Déjanos un mensaje" },
+      { key: "note", label: "Note", input: "textarea", placeholder: "Optional note shown above the form…" },
+      { key: "nameLabel", label: "Name label", input: "text", placeholder: "Tu nombre" },
+      { key: "messageLabel", label: "Message label", input: "text", placeholder: "Tu mensaje" },
+      { key: "placeholder", label: "Message placeholder", input: "text", placeholder: "Escribe aquí…" },
+      { key: "submitLabel", label: "Submit button", input: "text", placeholder: "Enviar" },
+    ],
+  },
   footer: {
     label: "Footer",
     description: "Closing line with the event name.",
@@ -179,26 +203,34 @@ export const BLOCK_PALETTE: BlockType[] = [
   "menuSelection",
   "drinkSelection",
   "stayInvite",
+  "guestMessage",
   "footer",
 ]
 
 /**
- * Order used to build the default layout for events with no saved layout, and
- * the canonical arrangement of the official template. A template may override
- * this with its own preset layout (see TemplateDef.defaultLayout).
+ * Per-RSVP-variant default block order, used to build the fallback layout for
+ * events with no saved layout. A template may override these with its own
+ * preset layouts (see TemplateDef.defaultLayouts):
+ * - accepted — the full event-details page
+ * - pending  — short page: hero, location, rsvp, footer
+ * - declined — hero, location, leave-a-message, footer
  */
-const DEFAULT_ORDER: BlockType[] = [
-  "hero",
-  "location",
-  "rsvp",
-  "countdown",
-  "itinerary",
-  "allergies",
-  "dressCode",
-  "specialInvitation",
-  "stayInvite",
-  "footer",
-]
+const DEFAULT_ORDER: Record<RsvpVariant, BlockType[]> = {
+  accepted: [
+    "hero",
+    "location",
+    "rsvp",
+    "countdown",
+    "itinerary",
+    "allergies",
+    "dressCode",
+    "specialInvitation",
+    "stayInvite",
+    "footer",
+  ],
+  pending: ["hero", "location", "rsvp", "footer"],
+  declined: ["hero", "location", "guestMessage", "footer"],
+}
 
 function newId(type: BlockType): string {
   const rand =
@@ -213,11 +245,15 @@ export function createBlock(type: BlockType): LayoutBlock {
 }
 
 /**
- * Default layout (one of each section in a sensible order). Uses deterministic
- * ids so it renders identically on server and client.
+ * Default layout for a given RSVP variant. Uses deterministic ids so it renders
+ * identically on server and client.
  */
-export function defaultLayout(): LayoutBlock[] {
-  return DEFAULT_ORDER.map((type, i) => ({ id: `${type}-default-${i}`, type, config: {} }))
+export function defaultLayout(variant: RsvpVariant = "accepted"): LayoutBlock[] {
+  return DEFAULT_ORDER[variant].map((type, i) => ({
+    id: `${variant}-${type}-default-${i}`,
+    type,
+    config: {},
+  }))
 }
 
 /**

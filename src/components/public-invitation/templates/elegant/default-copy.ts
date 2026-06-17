@@ -34,6 +34,13 @@ export const ELEGANT_COPY = {
     "Después de una noche inolvidable, queremos que puedas descansar y disfrutar con tranquilidad. Si deseas hospedarte en la hacienda, por favor confírmanos tu asistencia.",
   footerNote:
     "Esperamos celebrar juntos este comienzo tan importante en nuestras vidas.",
+  messageHeadline: "Déjanos un mensaje",
+  messageNote:
+    "Sentimos que no puedas acompañarnos. Si quieres, déjanos unas palabras: nos encantará leerte.",
+  messageNameLabel: "Tu nombre",
+  messageMessageLabel: "Tu mensaje",
+  messagePlaceholder: "Escribe aquí…",
+  messageSubmitLabel: "Enviar",
   itineraryItems: [
     { time: "00:00 pm", label: "Ceremonia" },
     { time: "00:00 pm", label: "Recepción" },
@@ -72,6 +79,14 @@ export const ELEGANT_BLOCK_CONFIG: Record<string, Record<string, unknown>> = {
   stayInvite: {
     headline: ELEGANT_COPY.stayHeadline,
     body: ELEGANT_COPY.stayBody,
+  },
+  guestMessage: {
+    headline: ELEGANT_COPY.messageHeadline,
+    note: ELEGANT_COPY.messageNote,
+    nameLabel: ELEGANT_COPY.messageNameLabel,
+    messageLabel: ELEGANT_COPY.messageMessageLabel,
+    placeholder: ELEGANT_COPY.messagePlaceholder,
+    submitLabel: ELEGANT_COPY.messageSubmitLabel,
   },
   footer: { body: ELEGANT_COPY.footerNote },
 }
