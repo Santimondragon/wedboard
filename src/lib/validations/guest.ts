@@ -5,8 +5,7 @@ export const guestSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
-  isPrimaryContact: z.boolean(),
-  isPlusOne: z.boolean(),
+  allowsPlusOne: z.boolean(),
 })
 
 export type GuestFormData = z.infer<typeof guestSchema>

@@ -29,21 +29,40 @@ import {
 } from "@/components/ui/table"
 import { Pencil } from "lucide-react"
 
+export type SpecialEventStatus =
+  | "notInvited"
+  | "pending"
+  | "attending"
+  | "declined"
+
 type GuestRow = Doc<"guests"> & {
   invitationTitle?: string
   menuOptionName?: string
   drinkOptionName?: string
   tableName?: string
+  // What to show in the +1 column.
+  plusOneLabel?: string
+  // Per-special-event status, keyed by specialEventId.
+  specialStatuses?: Record<string, SpecialEventStatus>
 }
 
 interface GuestTableProps {
   guests: GuestRow[]
   onEditGuest: (guestId: Id<"guests">) => void
+  specialEvents?: { _id: string; name: string }[]
+  showMenu?: boolean
+  showDrink?: boolean
 }
 
 const columnHelper = createColumnHelper<GuestRow>()
 
-export function GuestTable({ guests, onEditGuest }: GuestTableProps) {
+export function GuestTable({
+  guests,
+  onEditGuest,
+  specialEvents = [],
+  showMenu = true,
+  showDrink = true,
+}: GuestTableProps) {
   const [search, setSearch] = useState("")
   const [rsvpFilter, setRsvpFilter] = useState("all")
 
@@ -76,18 +95,46 @@ export function GuestTable({ guests, onEditGuest }: GuestTableProps) {
         header: "RSVP",
         cell: (info) => <RsvpStatusBadge status={info.getValue() ?? "pending"} />,
       }),
-      columnHelper.accessor("menuOptionName", {
-        header: "Menu",
+      columnHelper.accessor("plusOneLabel", {
+        id: "plusOne",
+        header: "+1",
         cell: (info) => (
-          <span className="text-sm">{info.getValue() ?? "—"}</span>
+          <span className="text-sm text-zinc-600">{info.getValue() ?? "—"}</span>
         ),
       }),
-      columnHelper.accessor("drinkOptionName", {
-        header: "Drink",
-        cell: (info) => (
-          <span className="text-sm">{info.getValue() ?? "—"}</span>
-        ),
-      }),
+      ...specialEvents.map((se) =>
+        columnHelper.accessor((row) => row.specialStatuses?.[se._id], {
+          id: `special-${se._id}`,
+          header: se.name,
+          cell: (info) => {
+            const status = info.getValue()
+            if (!status || status === "notInvited") {
+              return <span className="text-zinc-400 text-sm">Not invited</span>
+            }
+            return <RsvpStatusBadge status={status} />
+          },
+        }),
+      ),
+      ...(showMenu
+        ? [
+            columnHelper.accessor("menuOptionName", {
+              header: "Menu",
+              cell: (info) => (
+                <span className="text-sm">{info.getValue() ?? "—"}</span>
+              ),
+            }),
+          ]
+        : []),
+      ...(showDrink
+        ? [
+            columnHelper.accessor("drinkOptionName", {
+              header: "Drink",
+              cell: (info) => (
+                <span className="text-sm">{info.getValue() ?? "—"}</span>
+              ),
+            }),
+          ]
+        : []),
       columnHelper.accessor("allergies", {
         header: "Allergies",
         cell: (info) => {
@@ -128,7 +175,7 @@ export function GuestTable({ guests, onEditGuest }: GuestTableProps) {
         ),
       }),
     ],
-    [onEditGuest],
+    [onEditGuest, specialEvents, showMenu, showDrink],
   )
 
   const table = useReactTable({

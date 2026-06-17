@@ -86,7 +86,9 @@ export default defineSchema({
       v.literal("plusOne")
     ),
     maxGuests: v.number(),
-    allowPlusOne: v.boolean(),
+    // Deprecated: +1 is now a per-guest flag (`guests.allowsPlusOne`). Kept
+    // optional for back-compat with existing docs; no longer read or written.
+    allowPlusOne: v.optional(v.boolean()),
     isActive: v.boolean(),
     notes: v.optional(v.string()),
   })
@@ -101,8 +103,15 @@ export default defineSchema({
     lastName: v.string(),
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
-    isPrimaryContact: v.boolean(),
+    // Deprecated: never surfaced or used. Optional for back-compat.
+    isPrimaryContact: v.optional(v.boolean()),
+    // `isPlusOne` marks a record that *is* a +1 (created from a host guest).
     isPlusOne: v.boolean(),
+    // Host guest is permitted to bring a +1.
+    allowsPlusOne: v.optional(v.boolean()),
+    // Set on a +1 record, points to its host guest. Lets us cascade the +1
+    // when the host declines or is deleted.
+    plusOneOfGuestId: v.optional(v.id("guests")),
     rsvpStatus: v.union(
       v.literal("pending"),
       v.literal("attending"),
@@ -118,6 +127,7 @@ export default defineSchema({
     .index("by_eventId", ["eventId"])
     .index("by_eventId_and_invitationId", ["eventId", "invitationId"])
     .index("by_invitationId", ["invitationId"])
+    .index("by_plusOneOf", ["plusOneOfGuestId"])
     .index("by_tableId", ["tableId"])
     .index("by_tableId_and_seatNumber", ["tableId", "seatNumber"])
     .index("by_eventId_and_rsvpStatus", ["eventId", "rsvpStatus"]),

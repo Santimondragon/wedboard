@@ -13,7 +13,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
+import { RsvpStatusBadge } from "@/components/guests/rsvp-status-badge"
 import {
   Select,
   SelectContent,
@@ -42,6 +44,10 @@ interface GuestDetailsSheetProps {
   onOpenChange: (open: boolean) => void
   menuOptions: Array<Doc<"menuOptions">>
   drinkOptions: Array<Doc<"drinkOptions">>
+  // The +1 record linked to this guest (when it hosts one).
+  plusOne?: Doc<"guests"> | null
+  // The host's display name when this guest *is* a +1.
+  hostName?: string | null
 }
 
 export function GuestDetailsSheet({
@@ -50,6 +56,8 @@ export function GuestDetailsSheet({
   onOpenChange,
   menuOptions,
   drinkOptions,
+  plusOne,
+  hostName,
 }: GuestDetailsSheetProps) {
   const updateGuest = useToastMutation(api.guests.updateGuest, {
     success: "Guest updated successfully",
@@ -58,6 +66,14 @@ export function GuestDetailsSheet({
   const deleteGuest = useToastMutation(api.guests.deleteGuest, {
     success: "Guest deleted",
     error: "Failed to delete guest",
+  })
+  const addPlusOne = useToastMutation(api.guests.addPlusOne, {
+    success: "+1 added",
+    error: "Failed to add +1",
+  })
+  const removePlusOne = useToastMutation(api.guests.removePlusOne, {
+    success: "+1 removed",
+    error: "Failed to remove +1",
   })
 
   const [firstName, setFirstName] = useState("")
@@ -69,6 +85,7 @@ export function GuestDetailsSheet({
   const [specialRequests, setSpecialRequests] = useState("")
   const [menuOptionId, setMenuOptionId] = useState<string | undefined>(undefined)
   const [drinkOptionId, setDrinkOptionId] = useState<string | undefined>(undefined)
+  const [allowsPlusOne, setAllowsPlusOne] = useState(false)
   const saving = updateGuest.pending
   const deleting = deleteGuest.pending
 
@@ -88,6 +105,7 @@ export function GuestDetailsSheet({
       setSpecialRequests(guest.specialRequests ?? "")
       setMenuOptionId(guest.menuOptionId ?? undefined)
       setDrinkOptionId(guest.drinkOptionId ?? undefined)
+      setAllowsPlusOne(guest.allowsPlusOne ?? false)
     }
   }
 
@@ -104,6 +122,7 @@ export function GuestDetailsSheet({
       specialRequests: specialRequests || undefined,
       menuOptionId: menuOptionId as Id<"menuOptions"> | undefined,
       drinkOptionId: drinkOptionId as Id<"drinkOptions"> | undefined,
+      allowsPlusOne,
     })
     if (result.ok) onOpenChange(false)
   }
@@ -181,6 +200,65 @@ export function GuestDetailsSheet({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* +1 management — a guest that IS a +1 shows its host; a host
+                guest can allow and manage its +1. */}
+            {guest.isPlusOne ? (
+              <div className="rounded-md border bg-zinc-50 p-3 text-sm text-zinc-600">
+                ↳ +1 de {hostName ?? "—"}
+              </div>
+            ) : (
+              <div className="space-y-3 rounded-md border bg-zinc-50 p-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="allowsPlusOne"
+                    checked={allowsPlusOne}
+                    onCheckedChange={(checked) => setAllowsPlusOne(!!checked)}
+                  />
+                  <Label htmlFor="allowsPlusOne" className="font-normal cursor-pointer">
+                    Allows +1
+                  </Label>
+                </div>
+                {allowsPlusOne &&
+                  (plusOne ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-sm text-zinc-700">
+                        <span>
+                          {plusOne.firstName} {plusOne.lastName}
+                        </span>
+                        <RsvpStatusBadge status={plusOne.rsvpStatus} />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={removePlusOne.pending}
+                        onClick={() =>
+                          removePlusOne.run({ hostGuestId: guest._id })
+                        }
+                      >
+                        Remove +1
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={addPlusOne.pending}
+                      onClick={() => addPlusOne.run({ hostGuestId: guest._id })}
+                    >
+                      Add +1
+                    </Button>
+                  ))}
+                {!allowsPlusOne && plusOne && (
+                  <p className="text-xs text-zinc-500">
+                    Turning off &ldquo;Allows +1&rdquo; and saving will remove the
+                    linked +1.
+                  </p>
+                )}
+              </div>
+            )}
 
             {menuOptions.length > 0 && (
               <div className="space-y-1.5">

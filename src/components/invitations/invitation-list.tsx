@@ -23,9 +23,10 @@ interface Invitation {
   slug: string
   type: string
   maxGuests: number
-  allowPlusOne: boolean
   isActive: boolean
   notes?: string
+  guestCount?: number
+  specialEvents?: { _id: string; name: string }[]
 }
 
 interface InvitationListProps {

@@ -3,6 +3,7 @@ import { query, mutation } from "./_generated/server";
 import { requireEventEditor } from "./lib/permissions";
 import { generateSlug, generateUniqueInvitationSlug } from "./lib/slug";
 import { resolvePublicEvent, resolvePublicInvitation } from "./lib/public";
+import { Id } from "./_generated/dataModel";
 
 export const listByEvent = query({
   args: { eventId: v.id("events") },
@@ -23,6 +24,64 @@ export const getById = query({
     if (!invitation) throw new ConvexError("Invitation not found");
     await requireEventEditor(ctx, invitation.eventId);
     return invitation;
+  },
+});
+
+// Invitations for the dashboard, each enriched with a guest count (including
+// materialized +1s) and the special invitations it can see. One round trip.
+export const getInvitationsPageData = query({
+  args: { eventId: v.id("events") },
+  handler: async (ctx, args) => {
+    await requireEventEditor(ctx, args.eventId);
+
+    const [invitations, guests, specialEvents] = await Promise.all([
+      ctx.db
+        .query("invitations")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(500),
+      ctx.db
+        .query("guests")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(2000),
+      ctx.db
+        .query("specialEvents")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(10),
+    ]);
+
+    // Guest count per invitation (counts +1 records too — they're linked guests).
+    const guestCount: Record<string, number> = {};
+    for (const g of guests) {
+      if (g.invitationId) {
+        guestCount[g.invitationId] = (guestCount[g.invitationId] ?? 0) + 1;
+      }
+    }
+
+    const specialEventName = new Map(specialEvents.map((se) => [se._id, se.name]));
+
+    // Special invitations each invitation can see.
+    const specialByInvitation: Record<
+      string,
+      { _id: Id<"specialEvents">; name: string }[]
+    > = {};
+    await Promise.all(
+      invitations.map(async (inv) => {
+        const rows = await ctx.db
+          .query("invitationSpecialEventAccess")
+          .withIndex("by_invitationId", (q) => q.eq("invitationId", inv._id))
+          .take(50);
+        specialByInvitation[inv._id] = rows.flatMap((r) => {
+          const name = specialEventName.get(r.specialEventId);
+          return name ? [{ _id: r.specialEventId, name }] : [];
+        });
+      })
+    );
+
+    return invitations.map((inv) => ({
+      ...inv,
+      guestCount: guestCount[inv._id] ?? 0,
+      specialEvents: specialByInvitation[inv._id] ?? [],
+    }));
   },
 });
 
@@ -89,6 +148,8 @@ export const getPublicInvitation = query({
         "pending" | "attending" | "declined"
       > = {};
       rsvpRowsByGuest.forEach((rows, i) => {
+        // Declined guests are off the special invitations entirely.
+        if (guests[i].rsvpStatus === "declined") return;
         const row = rows.find((r) => r.specialEventId === se._id);
         if (row) guestStatuses[guests[i]._id] = row.status;
       });
@@ -145,12 +206,15 @@ export const getPublicInvitation = query({
         slug: invitation.slug,
         type: invitation.type,
         maxGuests: invitation.maxGuests,
-        allowPlusOne: invitation.allowPlusOne,
       },
       guests: guests.map((g) => ({
         _id: g._id,
         firstName: g.firstName,
         lastName: g.lastName,
+        rsvpStatus: g.rsvpStatus,
+        allowsPlusOne: g.allowsPlusOne ?? false,
+        isPlusOne: g.isPlusOne,
+        plusOneOfGuestId: g.plusOneOfGuestId,
       })),
       specialEvents,
       mediaUrls,
@@ -169,9 +233,9 @@ export const createInvitation = mutation({
       v.literal("plusOne")
     ),
     maxGuests: v.number(),
-    allowPlusOne: v.boolean(),
     notes: v.optional(v.string()),
     guestIds: v.optional(v.array(v.id("guests"))),
+    specialEventIds: v.optional(v.array(v.id("specialEvents"))),
   },
   handler: async (ctx, args) => {
     await requireEventEditor(ctx, args.eventId);
@@ -192,7 +256,6 @@ export const createInvitation = mutation({
       slug,
       type: args.type,
       maxGuests: args.maxGuests,
-      allowPlusOne: args.allowPlusOne,
       isActive: true,
       notes: args.notes,
     });
@@ -214,6 +277,20 @@ export const createInvitation = mutation({
       }
     }
 
+    // Grant access to the chosen special invitations.
+    if (args.specialEventIds) {
+      for (const specialEventId of args.specialEventIds) {
+        const specialEvent = await ctx.db.get(specialEventId);
+        if (specialEvent && specialEvent.eventId === args.eventId) {
+          await ctx.db.insert("invitationSpecialEventAccess", {
+            eventId: args.eventId,
+            invitationId,
+            specialEventId,
+          });
+        }
+      }
+    }
+
     return invitationId;
   },
 });
@@ -231,7 +308,6 @@ export const updateInvitation = mutation({
       )
     ),
     maxGuests: v.optional(v.number()),
-    allowPlusOne: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()),
     notes: v.optional(v.string()),
   },

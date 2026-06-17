@@ -20,13 +20,19 @@ export interface PublicInvitation {
   slug: string
   type: "single" | "group" | "plusOne"
   maxGuests: number
-  allowPlusOne: boolean
 }
 
 export interface PublicGuest {
   _id: string
   firstName: string
   lastName: string
+  rsvpStatus: "pending" | "attending" | "declined"
+  /** Host guest is permitted to bring a +1. */
+  allowsPlusOne: boolean
+  /** This record *is* a +1. */
+  isPlusOne: boolean
+  /** When a +1, the host guest's id. */
+  plusOneOfGuestId?: string
 }
 
 export interface PublicSpecialEvent {

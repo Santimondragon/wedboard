@@ -59,34 +59,40 @@ export function ElegantRsvp({ block, data }: BlockComponentProps) {
   const submitLabel =
     getConfigString(block, "submitLabel") ?? ELEGANT_COPY.rsvpSubmitLabel
 
-  // One row per named guest, plus an extra row for the invitation's plus-one
-  // when allowed. The +1 belongs to the primary (first) guest, so it's labelled
-  // with that guest's name and a "(+1)" suffix. The +1 has no guest record, so
-  // it isn't submitted — only named guests are persisted.
-  const rows: { key: string; name: string; guestId: Id<"guests"> | null }[] =
-    data.guests.map((guest) => ({
-      key: guest._id,
-      name: `${guest.firstName} ${guest.lastName}`.trim(),
-      guestId: guest._id as Id<"guests">,
-    }))
-  if (data.invitation.allowPlusOne && rows.length > 0) {
-    rows.push({
-      key: "plus-one",
-      name: `${rows[0].name} ${ELEGANT_COPY.rsvpPlusOneSuffix}`,
-      guestId: null,
-    })
-  }
+  // One row per named guest. Existing +1 records are not shown as their own
+  // primary row — instead each host that allows a +1 gets a sub-question.
+  const namedGuests = data.guests.filter((g) => !g.isPlusOne)
+  // Existing +1 record per host, so we can prefill its name and answer.
+  const plusOneByHost = new Map(
+    data.guests
+      .filter((g) => g.isPlusOne && g.plusOneOfGuestId)
+      .map((g) => [g.plusOneOfGuestId as string, g])
+  )
 
   const [choices, setChoices] = useState<Record<string, Choice>>({})
+  // Per-host +1 state: whether they bring one, and the optional name.
+  const [plusOnes, setPlusOnes] = useState<
+    Record<string, { attending: boolean; name: string }>
+  >(() => {
+    const init: Record<string, { attending: boolean; name: string }> = {}
+    for (const g of data.guests) {
+      if (g.isPlusOne && g.plusOneOfGuestId) {
+        init[g.plusOneOfGuestId] = {
+          attending: true,
+          name: `${g.firstName} ${g.lastName}`.trim(),
+        }
+      }
+    }
+    return init
+  })
   const { run, pending } = useToastMutation(api.guests.submitPublicRsvp, {
     success: "¡Gracias! Tu confirmación fue recibida.",
     error: "No pudimos enviar tu confirmación. Inténtalo de nuevo.",
   })
 
   // Every named guest must pick a choice before submitting, so the derived
-  // public layout (pending/accepted/declined) is unambiguous. The +1 row has no
-  // guest record, so it's excluded from this requirement.
-  const allNamedAnswered = data.guests.every((g) => choices[g._id])
+  // public layout (pending/accepted/declined) is unambiguous.
+  const allNamedAnswered = namedGuests.every((g) => choices[g._id])
   const canSubmit = Boolean(data.eventSlug && data.invitationSlug) && allNamedAnswered
 
   const handleSubmit = async () => {
@@ -95,19 +101,31 @@ export function ElegantRsvp({ block, data }: BlockComponentProps) {
       toast.error("Por favor responde por cada invitado.")
       return
     }
-    const guestUpdates = rows.flatMap((row) =>
-      row.guestId && choices[row.key]
-        ? [{ guestId: row.guestId, rsvpStatus: choices[row.key] }]
-        : []
-    )
-    if (guestUpdates.length === 0) {
-      toast.error("Selecciona una opción para confirmar.")
-      return
-    }
+    const guestUpdates = namedGuests.map((g) => ({
+      guestId: g._id as Id<"guests">,
+      rsvpStatus: choices[g._id],
+    }))
+    // A +1 is only sent for an attending host that allows one.
+    const plusOneUpdates = namedGuests.flatMap((g) => {
+      if (!g.allowsPlusOne) return []
+      const state = plusOnes[g._id]
+      const attending = choices[g._id] === "attending" && !!state?.attending
+      const name = state?.name?.trim() ?? ""
+      const [firstName, ...rest] = name.split(/\s+/)
+      return [
+        {
+          hostGuestId: g._id as Id<"guests">,
+          attending,
+          firstName: firstName || undefined,
+          lastName: rest.join(" ") || undefined,
+        },
+      ]
+    })
     await run({
       eventSlug: data.eventSlug,
       invitationSlug: data.invitationSlug,
       guestUpdates,
+      plusOneUpdates,
     })
   }
 
@@ -119,19 +137,63 @@ export function ElegantRsvp({ block, data }: BlockComponentProps) {
         </h2>
         <p className="font-elegant text-[16px] text-wedding-gold">{deadline}</p>
       </div>
-      {rows.map((row) => (
-        <GuestRsvp
-          key={row.key}
-          name={row.name}
-          group={`rsvp-${block.id}-${row.key}`}
-          value={choices[row.key]}
-          onChange={(choice) =>
-            setChoices((prev) => ({ ...prev, [row.key]: choice }))
-          }
-          attendLabel={attendLabel}
-          declineLabel={declineLabel}
-        />
-      ))}
+      {namedGuests.map((guest) => {
+        const guestName = `${guest.firstName} ${guest.lastName}`.trim()
+        const plusOneState = plusOnes[guest._id] ?? {
+          attending: !!plusOneByHost.get(guest._id),
+          name: "",
+        }
+        return (
+          <div key={guest._id} className="space-y-3">
+            <GuestRsvp
+              name={guestName}
+              group={`rsvp-${block.id}-${guest._id}`}
+              value={choices[guest._id]}
+              onChange={(choice) =>
+                setChoices((prev) => ({ ...prev, [guest._id]: choice }))
+              }
+              attendLabel={attendLabel}
+              declineLabel={declineLabel}
+            />
+            {guest.allowsPlusOne && choices[guest._id] === "attending" && (
+              <div className="space-y-2 pl-4">
+                <CheckRow
+                  type="checkbox"
+                  name={`plusone-${block.id}-${guest._id}`}
+                  label={ELEGANT_COPY.rsvpPlusOneQuestion}
+                  checked={plusOneState.attending}
+                  onChange={() =>
+                    setPlusOnes((prev) => ({
+                      ...prev,
+                      [guest._id]: {
+                        attending: !plusOneState.attending,
+                        name: plusOneState.name,
+                      },
+                    }))
+                  }
+                />
+                {plusOneState.attending && (
+                  <input
+                    type="text"
+                    value={plusOneState.name}
+                    onChange={(e) =>
+                      setPlusOnes((prev) => ({
+                        ...prev,
+                        [guest._id]: {
+                          attending: true,
+                          name: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder={ELEGANT_COPY.rsvpPlusOneNamePlaceholder}
+                    className="w-full rounded-md border border-wedding-muted bg-transparent px-3 py-2 font-elegant text-[16px] text-wedding-ink placeholder:text-wedding-muted focus:border-wedding-gold focus:outline-none"
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
       {note && (
         <p className="font-elegant text-[16px] text-wedding-ink">{note}</p>
       )}

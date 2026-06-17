@@ -11,6 +11,16 @@ export const publicRsvpSchema = z.object({
       specialRequests: z.string().optional(),
     }),
   ),
+  plusOneUpdates: z
+    .array(
+      z.object({
+        hostGuestId: z.string(),
+        attending: z.boolean(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+      }),
+    )
+    .optional(),
   specialEventRsvps: z
     .array(
       z.object({

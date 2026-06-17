@@ -125,7 +125,7 @@ Public URL: `/{event-key}/invitations/{slug}`
 | slug | string | URL-safe, unique per event |
 | type | `"single" \| "group" \| "plusOne"` |
 | maxGuests | number | 1–10 |
-| allowPlusOne | boolean |
+| allowPlusOne | boolean? | **Deprecated** — +1 is now per-guest (`guests.allowsPlusOne`). Kept optional for back-compat; not read or written |
 | isActive | boolean |
 | notes | string? | Admin-only |
 
@@ -136,6 +136,9 @@ Indexes: `by_eventId`, `by_slug`, `by_eventId_and_slug`
 ### `guests`
 Individual attendees. Belong to an event; optionally linked to an invitation.
 A guest with no `invitationId` is "un-invited" and can be selected when creating an invitation.
+A guest may host a **+1**: a separate, fully-manageable guest record (`isPlusOne: true`,
+`plusOneOfGuestId` → host) that is materialized when the host RSVPs attending **and** brings it,
+and torn down if the host declines or is deleted (see `convex/lib/guests.ts`).
 
 | Field | Type |
 |---|---|
@@ -145,8 +148,10 @@ A guest with no `invitationId` is "un-invited" and can be selected when creating
 | lastName | string |
 | email | string? |
 | phone | string? |
-| isPrimaryContact | boolean |
-| isPlusOne | boolean |
+| isPrimaryContact | boolean? | **Deprecated** — never surfaced; optional for back-compat |
+| isPlusOne | boolean | This record *is* a +1 (created from a host guest) |
+| allowsPlusOne | boolean? | Host guest is permitted to bring a +1 |
+| plusOneOfGuestId | Id<"guests">? | Set on a +1 record → its host; powers cascade delete |
 | rsvpStatus | `"pending" \| "attending" \| "declined"` |
 | allergies | string? |
 | specialRequests | string? |
@@ -155,7 +160,14 @@ A guest with no `invitationId` is "un-invited" and can be selected when creating
 | tableId | Id<"tables">? |
 | seatNumber | number? | 0-based internally, 1-based in UI |
 
-Indexes: `by_eventId`, `by_eventId_and_invitationId` (powers the un-invited guests query via `eq("invitationId", undefined)`), `by_invitationId`, `by_tableId`, `by_tableId_and_seatNumber`, `by_eventId_and_rsvpStatus`
+Indexes: `by_eventId`, `by_eventId_and_invitationId` (powers the un-invited guests query via `eq("invitationId", undefined)`), `by_invitationId`, `by_plusOneOf` (find a host's +1), `by_tableId`, `by_tableId_and_seatNumber`, `by_eventId_and_rsvpStatus`
+
+> **+1 / decline lifecycle:** +1 is a per-guest flag (`allowsPlusOne`), not per-invitation. The +1
+> becomes a real linked guest (sharing the host's `invitationId`) only on RSVP=attending; name is
+> optional at RSVP. A guest who RSVPs **declined stays linked** to its invitation (so the public
+> `declined` layout still triggers) but is **removed from every special invitation** (its
+> `guestSpecialEventRsvps` rows are deleted) and loses its +1. Shared helpers live in
+> `convex/lib/guests.ts` (`findPlusOne`, `applyDeclineEffects`, `deletePlusOneCascade`).
 
 ---
 
@@ -286,6 +298,12 @@ Indexes: `by_eventId`, `by_invitationId`
 ### `convex/lib/options.ts`
 Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPublicOptions`, `listAdminOptions`, `createOption`, `updateOption`, `deleteOption`, plus `nextSortOrder(ctx, table, eventId)` (also used by `tables.createTable`).
 
+### `convex/lib/guests.ts`
++1 / decline cascade helpers shared by `guests.ts` mutations:
+- `findPlusOne(ctx, hostGuestId)` — the +1 record linked to a host (via `by_plusOneOf`), or null
+- `deletePlusOneCascade(ctx, plusOne)` — delete a +1 guest + its `guestSpecialEventRsvps`
+- `applyDeclineEffects(ctx, guest)` — on a guest becoming `declined`: delete its special-event RSVPs and its +1 (the guest itself stays linked to its invitation)
+
 ### `convex/lib/slug.ts`
 - `generateSlug(text)` — lowercases and hyphenates
 - `generateUniqueSlug(ctx, tableName, slug, existingId?)` — global uniqueness (used for event slugs); appends -2, -3 etc.
@@ -316,8 +334,9 @@ Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPub
 |---|---|---|
 | `listByEvent` | query | Auth required |
 | `getById` | query | Auth required |
-| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; resolves via `lib/public.ts` (null for archived events / inactive invitations). Derives `rsvpState` (`pending`/`accepted`/`declined`) from the invitation's guests (any attending → accepted; else any pending or no guests → pending; else declined) and returns the **state-resolved** layout: `event.layoutBlocks` is set to `layoutVariants[state]` (accepted falls back to legacy `layoutBlocks`), or undefined to let the client use the template default for that state. Returns `{event (incl. brideName, groomName, venueMapUrl, templateId, layoutBlocks), rsvpState, invitation, guests:[{_id,firstName,lastName}], specialEvents:[{_id,name,description,date,location,guestStatuses:{guestId→status}}] (the invitation's accessible special events — via `invitationSpecialEventAccess` — each enriched with every guest's current per-event RSVP status; powers the elegant `specialInvitation` confirm modal), mediaUrls}` (media resolved over the chosen layout only) |
-| `createInvitation` | mutation | Per-event-unique slug; optional `guestIds` (≤20) links selected un-invited guests |
+| `getInvitationsPageData` | query | Auth required — invitations for the event each enriched with `guestCount` (linked guests **incl. +1s**) and `specialEvents:[{_id,name}]` (its accessible special invitations). Powers the invitations dashboard |
+| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; resolves via `lib/public.ts` (null for archived events / inactive invitations). Derives `rsvpState` (`pending`/`accepted`/`declined`) from the invitation's guests (any attending → accepted; else any pending or no guests → pending; else declined) and returns the **state-resolved** layout: `event.layoutBlocks` is set to `layoutVariants[state]` (accepted falls back to legacy `layoutBlocks`), or undefined to let the client use the template default for that state. Returns `{event (incl. brideName, groomName, venueMapUrl, templateId, layoutBlocks), rsvpState, invitation, guests:[{_id,firstName,lastName,rsvpStatus,allowsPlusOne,isPlusOne,plusOneOfGuestId}], specialEvents:[{_id,name,description,date,location,guestStatuses:{guestId→status}}] (accessible special events — via `invitationSpecialEventAccess` — each enriched with every **non-declined** guest's per-event RSVP status; powers the elegant `specialInvitation` confirm modal), mediaUrls}` (media resolved over the chosen layout only) |
+| `createInvitation` | mutation | Per-event-unique slug; optional `guestIds` (≤20) links selected un-invited guests; optional `specialEventIds` grants `invitationSpecialEventAccess` to the chosen special invitations |
 | `updateInvitation` | mutation | |
 | `deleteInvitation` | mutation | **Unassigns** its guests (sets invitationId undefined), does not delete them |
 | `setSpecialEventAccess` | mutation | Adds/removes invitationSpecialEventAccess row; verifies the special event belongs to the same event |
@@ -329,13 +348,15 @@ Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPub
 | `listByEvent` | query | Auth required |
 | `listByInvitation` | query | Auth required |
 | `listUnassignedByEvent` | query | Auth required — event guests with no `invitationId` (uses `by_eventId_and_invitationId` with `eq(undefined)`) |
-| `getGuestsPageData` | query | Auth required — `{guests, invitations, menuOptions, drinkOptions, tables}` in one round trip; powers the guests dashboard page |
+| `getGuestsPageData` | query | Auth required — `{guests, invitations, menuOptions, drinkOptions, tables, specialEvents, accessByEvent (specialEventId→invitationId[]), specialRsvpByGuest (guestId→specialEventId→status)}` in one round trip; powers the guests dashboard page (incl. per-special-event + +1 columns) |
 | `getGuestById` | query | |
-| `createGuest` | mutation | Requires `eventId`; optional `invitationId` (creates un-invited guest if omitted) |
-| `updateGuest` | mutation | |
-| `deleteGuest` | mutation | Cascades to guestSpecialEventRsvps |
-| `bulkCreateGuestsForInvitation` | mutation | ≤20 guests per call |
-| `submitPublicRsvp` | mutation | **Public** — resolves via `{eventSlug, invitationSlug}`; only patches whitelisted RSVP fields, validates menu/drink option ownership + `invitationSpecialEventAccess`, bounds arrays (≤20 guest updates) and strings (≤1000 chars). Wired to the elegant `rsvp` block's submit button |
+| `createGuest` | mutation | Requires `eventId`; optional `invitationId` (creates un-invited guest if omitted); optional `allowsPlusOne` |
+| `updateGuest` | mutation | Optional `allowsPlusOne`. On transition to `declined` runs `applyDeclineEffects`; turning `allowsPlusOne` off removes the +1 |
+| `addPlusOne` | mutation | Auth — `{hostGuestId, firstName?, lastName?}`: creates (or returns) the +1 guest linked to a host that `allowsPlusOne`; placeholder name when blank |
+| `removePlusOne` | mutation | Auth — `{hostGuestId}` → `deletePlusOneCascade` |
+| `deleteGuest` | mutation | Cascades to guestSpecialEventRsvps **and** the guest's +1 |
+| `bulkCreateGuestsForInvitation` | mutation | ≤20 guests per call; optional `allowsPlusOne` per guest |
+| `submitPublicRsvp` | mutation | **Public** — resolves via `{eventSlug, invitationSlug}`; patches whitelisted RSVP fields, validates menu/drink ownership + `invitationSpecialEventAccess`, bounds arrays/strings. Optional `plusOneUpdates:[{hostGuestId,attending,firstName?,lastName?}]` materialize/remove each host's +1 (only for attending hosts that `allowsPlusOne`). Declining guests run `applyDeclineEffects` and are skipped for special-event RSVPs. Wired to the elegant `rsvp` block's submit button |
 
 ### `convex/specialEvents.ts`
 `listByEvent` (auth), `getSpecialEventsPageData` (auth — `{specialEvents, invitations, accessByEvent}` in one round trip; powers the special-events dashboard page, incl. the per-invitation assignment checkboxes), `listForInvitation` (**public**), `createSpecialEvent` (enforces **`MAX_SPECIAL_EVENTS` = 2** per event), `updateSpecialEvent`, `deleteSpecialEvent` (cascades access + RSVPs). Per-invitation visibility is set via `invitations.setSpecialEventAccess`.
@@ -440,14 +461,14 @@ src/components/
 
   invitations/
     invitation-list.tsx         Renders InvitationCard rows with edit/delete state
-    invitation-card.tsx         Single row: title, slug, type, status, actions
-    invitation-form.tsx         Create/edit dialog; create mode lists un-invited guests to link (Add Guest CTA if none)
+    invitation-card.tsx         Single row: title, slug, type, **guest-count badge (incl. +1s)**, **special-invitation name badges**, status, actions (props from getInvitationsPageData)
+    invitation-form.tsx         Create/edit dialog; create mode lists un-invited guests to link (Add Guest CTA if none) + a **special-invitations checklist** (passed as `specialEventIds`; prompts to create one when none — non-blocking). No +1 switch (moved to guests)
     copy-invitation-link-button.tsx  Copies /{eventSlug}/invitations/{slug} to clipboard
 
   guests/
-    guest-table.tsx             TanStack Table with search + RSVP filter
-    guest-details-sheet.tsx     Right-side sheet — edit all guest fields
-    guest-form.tsx              Add guest form — props `{eventId, invitationId?}` (event-level or invitation-scoped)
+    guest-table.tsx             TanStack Table — search + RSVP filter; Menu/Drink columns shown only when those options exist; a **+1 column** (host → its +1 name / "Allowed"; +1 record → "↳ +1 de <host>") and **one column per special invitation** (Not invited / pending / accepted / declined)
+    guest-details-sheet.tsx     Right-side sheet — edit guest fields + **"Allows +1" toggle and +1 management** (Add/Remove via addPlusOne/removePlusOne; +1 records show their host read-only)
+    guest-form.tsx              Add guest form — props `{eventId, invitationId?}`; **"Allows +1"** checkbox (`allowsPlusOne`), no primary-contact/plus-one checkboxes
     rsvp-status-badge.tsx       attending=green, declined=rose, pending=amber
 
   menu/
@@ -541,9 +562,10 @@ src/hooks/
 >   ink `#3c3c3c`, soft `#ececec`, muted `#d9d9d9`; Fleur De Leah / Gowun Batang). Checkboxes are real
 >   interactive controls (`CheckRow` — `checkbox` for food multi-select, `radio` for stay); the food
 >   controls are not yet wired to `submitPublicRsvp`. The `rsvp` block **is** wired: it renders one
->   attending/declining radio group per guest (plus an extra row labelled `<primary guest> (+1)` when
->   `invitation.allowPlusOne`) and a submit button that calls `submitPublicRsvp` with the named guests'
->   choices (the +1 row has no guest record so it isn't persisted). Submission needs `data.eventSlug` +
+>   attending/declining radio group per **named guest** (+1 records are not shown as their own rows).
+>   Each host that `allowsPlusOne` gets a +1 sub-question (a "bring a +1" checkbox + optional name input)
+>   shown once the host is marked attending. Submit calls `submitPublicRsvp` with `guestUpdates` (named
+>   guests) + `plusOneUpdates` (per host), which materializes the +1 as a real linked guest. Submission needs `data.eventSlug` +
 >   `data.invitationSlug` (injected by `public-invitation-page`); they're absent in the editor preview,
 >   so the button is disabled there. Image slots render the configured media image or a placeholder.
 >   The `guestMessage` block (shown on the `declined` layout) is likewise wired — a name + message form
@@ -620,12 +642,12 @@ Since AGENTS.md is a copy of CLAUDE.md, both must be kept in sync. Update one, t
 | File | Schema | Key rules |
 |---|---|---|
 | `event.ts` | `eventSchema` | name min 2 chars, optional `slug` (`/^[a-z0-9-]+$/`, min 2), date optional string, optional brideName/groomName, optional `venueMapUrl` (valid URL or empty) |
-| `invitation.ts` | `invitationSchema` | slug: `/^[a-z0-9-]+$/`, maxGuests 1–10 |
-| `guest.ts` | `guestSchema` | firstName/lastName required, email optional |
+| `invitation.ts` | `invitationSchema` | slug: `/^[a-z0-9-]+$/`, maxGuests 1–10 (no `allowPlusOne` — +1 is per-guest) |
+| `guest.ts` | `guestSchema` | firstName/lastName required, email optional, `allowsPlusOne` boolean |
 | `menu.ts` | `menuOptionSchema` | name required, isActive boolean |
 | `table.ts` | `tableSchema` | name required, seatsCount 1–20 |
 | `special-event.ts` | `specialEventSchema` | name required, optional description/location, optional `date` (datetime-local string → `new Date(str).getTime()`), isActive boolean |
-| `public-rsvp.ts` | `publicRsvpSchema` | array of guest updates + optional special event RSVPs |
+| `public-rsvp.ts` | `publicRsvpSchema` | array of guest updates + optional `plusOneUpdates` + optional special event RSVPs |
 | `guest-message.ts` | `guestMessageSchema` | optional name ≤200, message required 1–1000 chars |
 
 > **Note:** Do not use `.default()` on Zod booleans — it causes Resolver type mismatches with react-hook-form. Use `defaultValues` in `useForm` instead.

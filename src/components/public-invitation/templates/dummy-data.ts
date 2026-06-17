@@ -18,12 +18,32 @@ export const DUMMY_INVITATION_DATA: PublicInvitationData = {
     slug: "the-carter-family",
     type: "group",
     maxGuests: 4,
-    allowPlusOne: true,
   },
   guests: [
-    { _id: "preview-guest-1", firstName: "Emma", lastName: "Carter" },
-    { _id: "preview-guest-2", firstName: "Noah", lastName: "Carter" },
-    { _id: "preview-guest-3", firstName: "Olivia", lastName: "Carter" },
+    {
+      _id: "preview-guest-1",
+      firstName: "Emma",
+      lastName: "Carter",
+      rsvpStatus: "pending",
+      allowsPlusOne: true,
+      isPlusOne: false,
+    },
+    {
+      _id: "preview-guest-2",
+      firstName: "Noah",
+      lastName: "Carter",
+      rsvpStatus: "pending",
+      allowsPlusOne: false,
+      isPlusOne: false,
+    },
+    {
+      _id: "preview-guest-3",
+      firstName: "Olivia",
+      lastName: "Carter",
+      rsvpStatus: "pending",
+      allowsPlusOne: false,
+      isPlusOne: false,
+    },
   ],
   // Sample sub-event so the special-invitation block renders in the live preview.
   specialEvents: [

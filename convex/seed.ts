@@ -144,7 +144,6 @@ export const seedDemoEvent = internalMutation({
       slug: "familia-garcia",
       type: "group",
       maxGuests: 4,
-      allowPlusOne: false,
       isActive: true,
     });
 
@@ -154,7 +153,6 @@ export const seedDemoEvent = internalMutation({
       slug: "familia-lopez",
       type: "group",
       maxGuests: 6,
-      allowPlusOne: false,
       isActive: true,
     });
 
@@ -164,7 +162,6 @@ export const seedDemoEvent = internalMutation({
       slug: "the-johnson-family",
       type: "group",
       maxGuests: 4,
-      allowPlusOne: true,
       isActive: true,
     });
 
@@ -174,7 +171,6 @@ export const seedDemoEvent = internalMutation({
       slug: "amigos-del-trabajo",
       type: "group",
       maxGuests: 2,
-      allowPlusOne: true,
       isActive: true,
     });
 
@@ -184,7 +180,6 @@ export const seedDemoEvent = internalMutation({
       slug: "companeros-de-universidad",
       type: "group",
       maxGuests: 4,
-      allowPlusOne: false,
       isActive: true,
     });
 
@@ -217,7 +212,6 @@ export const seedDemoEvent = internalMutation({
       firstName: "Carlos",
       lastName: "García",
       email: "carlos.garcia@email.com",
-      isPrimaryContact: true,
       isPlusOne: false,
       rsvpStatus: "attending",
       menuOptionId: menuCarne,
@@ -230,7 +224,6 @@ export const seedDemoEvent = internalMutation({
       invitationId: inv1,
       firstName: "Ana",
       lastName: "García",
-      isPrimaryContact: false,
       isPlusOne: false,
       rsvpStatus: "attending",
       menuOptionId: menuVeg,
@@ -247,7 +240,6 @@ export const seedDemoEvent = internalMutation({
       firstName: "Miguel",
       lastName: "López",
       email: "miguel.lopez@email.com",
-      isPrimaryContact: true,
       isPlusOne: false,
       rsvpStatus: "attending",
       menuOptionId: menuPescado,
@@ -260,7 +252,6 @@ export const seedDemoEvent = internalMutation({
       invitationId: inv2,
       firstName: "Elena",
       lastName: "López",
-      isPrimaryContact: false,
       isPlusOne: false,
       rsvpStatus: "attending",
       menuOptionId: menuCarne,
@@ -273,7 +264,6 @@ export const seedDemoEvent = internalMutation({
       invitationId: inv2,
       firstName: "Pablo",
       lastName: "López",
-      isPrimaryContact: false,
       isPlusOne: false,
       rsvpStatus: "declined",
     });
@@ -285,8 +275,8 @@ export const seedDemoEvent = internalMutation({
       firstName: "John",
       lastName: "Johnson",
       email: "john.johnson@email.com",
-      isPrimaryContact: true,
       isPlusOne: false,
+      allowsPlusOne: true,
       rsvpStatus: "attending",
       menuOptionId: menuCarne,
       drinkOptionId: drinkOpenBar,
@@ -298,7 +288,6 @@ export const seedDemoEvent = internalMutation({
       invitationId: inv3,
       firstName: "Sarah",
       lastName: "Johnson",
-      isPrimaryContact: false,
       isPlusOne: false,
       rsvpStatus: "attending",
       menuOptionId: menuVeg,
@@ -312,9 +301,9 @@ export const seedDemoEvent = internalMutation({
       invitationId: inv3,
       firstName: "Emma",
       lastName: "Johnson",
-      isPrimaryContact: false,
       isPlusOne: true,
-      rsvpStatus: "pending",
+      plusOneOfGuestId: g6,
+      rsvpStatus: "attending",
     });
 
     // Amigos del trabajo (pending)
@@ -324,8 +313,8 @@ export const seedDemoEvent = internalMutation({
       firstName: "Laura",
       lastName: "Martínez",
       email: "laura.m@email.com",
-      isPrimaryContact: true,
       isPlusOne: false,
+      allowsPlusOne: true,
       rsvpStatus: "pending",
     });
     const g10 = await ctx.db.insert("guests", {
@@ -333,7 +322,6 @@ export const seedDemoEvent = internalMutation({
       invitationId: inv4,
       firstName: "David",
       lastName: "Sánchez",
-      isPrimaryContact: false,
       isPlusOne: false,
       rsvpStatus: "attending",
       menuOptionId: menuPescado,
@@ -349,7 +337,6 @@ export const seedDemoEvent = internalMutation({
       firstName: "Sofía",
       lastName: "Fernández",
       email: "sofia.f@email.com",
-      isPrimaryContact: true,
       isPlusOne: false,
       rsvpStatus: "attending",
       menuOptionId: menuVeg,
@@ -362,7 +349,6 @@ export const seedDemoEvent = internalMutation({
       invitationId: inv5,
       firstName: "Javier",
       lastName: "Ruiz",
-      isPrimaryContact: false,
       isPlusOne: false,
       rsvpStatus: "attending",
       menuOptionId: menuCarne,
@@ -375,7 +361,6 @@ export const seedDemoEvent = internalMutation({
       invitationId: inv5,
       firstName: "Carmen",
       lastName: "Torres",
-      isPrimaryContact: false,
       isPlusOne: false,
       rsvpStatus: "declined",
     });
@@ -384,7 +369,6 @@ export const seedDemoEvent = internalMutation({
       invitationId: inv5,
       firstName: "Alejandro",
       lastName: "Morales",
-      isPrimaryContact: false,
       isPlusOne: false,
       rsvpStatus: "pending",
     });
@@ -393,7 +377,6 @@ export const seedDemoEvent = internalMutation({
       invitationId: inv5,
       firstName: "Isabel",
       lastName: "Jiménez",
-      isPrimaryContact: false,
       isPlusOne: false,
       rsvpStatus: "attending",
       menuOptionId: menuPescado,

@@ -28,6 +28,9 @@ export default function GuestsPage() {
   const menuOptions = pageData?.menuOptions
   const drinkOptions = pageData?.drinkOptions
   const tables = pageData?.tables
+  const specialEvents = pageData?.specialEvents
+  const accessByEvent = pageData?.accessByEvent
+  const specialRsvpByGuest = pageData?.specialRsvpByGuest
 
   const [selectedGuestId, setSelectedGuestId] = useState<Id<"guests"> | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -53,21 +56,86 @@ export default function GuestsPage() {
     return Object.fromEntries(tables.map((t) => [t._id, t.name]))
   }, [tables])
 
+  // Reverse +1 link: host guest id → its +1 record, plus a name lookup so we
+  // can label +1 rows and the details sheet.
+  const plusOneByHost = useMemo(() => {
+    const map: Record<string, Doc<"guests">> = {}
+    if (!guests) return map
+    for (const g of guests) {
+      if (g.isPlusOne && g.plusOneOfGuestId) map[g.plusOneOfGuestId] = g
+    }
+    return map
+  }, [guests])
+
+  const guestNameById = useMemo(() => {
+    if (!guests) return {} as Record<string, string>
+    return Object.fromEntries(
+      guests.map((g) => [g._id, `${g.firstName} ${g.lastName}`.trim()]),
+    )
+  }, [guests])
+
   const enrichedGuests = useMemo(() => {
     if (!guests) return []
-    return guests.map((g) => ({
-      ...g,
-      invitationTitle: g.invitationId ? invitationMap[g.invitationId] : undefined,
-      menuOptionName: g.menuOptionId ? menuOptionMap[g.menuOptionId] : undefined,
-      drinkOptionName: g.drinkOptionId ? drinkOptionMap[g.drinkOptionId] : undefined,
-      tableName: g.tableId ? tableMap[g.tableId] : undefined,
-    }))
-  }, [guests, invitationMap, menuOptionMap, drinkOptionMap, tableMap])
+    return guests.map((g) => {
+      // +1 column label.
+      let plusOneLabel: string | undefined
+      if (g.isPlusOne && g.plusOneOfGuestId) {
+        plusOneLabel = `↳ +1 de ${guestNameById[g.plusOneOfGuestId] ?? "—"}`
+      } else if (g.allowsPlusOne) {
+        const po = plusOneByHost[g._id]
+        plusOneLabel = po ? `${po.firstName} ${po.lastName}`.trim() : "Allowed"
+      }
+
+      // Per-special-event status.
+      const specialStatuses: Record<
+        string,
+        "notInvited" | "pending" | "attending" | "declined"
+      > = {}
+      for (const se of specialEvents ?? []) {
+        const invited =
+          !!g.invitationId &&
+          g.rsvpStatus !== "declined" &&
+          (accessByEvent?.[se._id]?.includes(g.invitationId) ?? false)
+        specialStatuses[se._id] = invited
+          ? (specialRsvpByGuest?.[g._id]?.[se._id] ?? "pending")
+          : "notInvited"
+      }
+
+      return {
+        ...g,
+        invitationTitle: g.invitationId ? invitationMap[g.invitationId] : undefined,
+        menuOptionName: g.menuOptionId ? menuOptionMap[g.menuOptionId] : undefined,
+        drinkOptionName: g.drinkOptionId ? drinkOptionMap[g.drinkOptionId] : undefined,
+        tableName: g.tableId ? tableMap[g.tableId] : undefined,
+        plusOneLabel,
+        specialStatuses,
+      }
+    })
+  }, [
+    guests,
+    invitationMap,
+    menuOptionMap,
+    drinkOptionMap,
+    tableMap,
+    specialEvents,
+    accessByEvent,
+    specialRsvpByGuest,
+    plusOneByHost,
+    guestNameById,
+  ])
 
   const selectedGuest = useMemo(() => {
     if (!selectedGuestId) return null
     return enrichedGuests.find((g) => g._id === selectedGuestId) ?? null
   }, [selectedGuestId, enrichedGuests])
+
+  const selectedPlusOne = selectedGuest
+    ? (plusOneByHost[selectedGuest._id] ?? null)
+    : null
+  const selectedHostName =
+    selectedGuest?.isPlusOne && selectedGuest.plusOneOfGuestId
+      ? (guestNameById[selectedGuest.plusOneOfGuestId] ?? null)
+      : null
 
   // Stable callback so GuestTable's memoized columns don't rebuild each render.
   const handleEditGuest = useCallback((guestId: Id<"guests">) => {
@@ -107,7 +175,13 @@ export default function GuestsPage() {
           action={{ label: "Add Guest", onClick: () => setAddOpen(true) }}
         />
       ) : (
-        <GuestTable guests={enrichedGuests} onEditGuest={handleEditGuest} />
+        <GuestTable
+          guests={enrichedGuests}
+          onEditGuest={handleEditGuest}
+          specialEvents={specialEvents ?? []}
+          showMenu={(menuOptions?.length ?? 0) > 0}
+          showDrink={(drinkOptions?.length ?? 0) > 0}
+        />
       )}
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -125,6 +199,8 @@ export default function GuestsPage() {
         onOpenChange={setSheetOpen}
         menuOptions={menuOptions ?? []}
         drinkOptions={drinkOptions ?? []}
+        plusOne={selectedPlusOne}
+        hostName={selectedHostName}
       />
     </div>
   )

@@ -54,10 +54,13 @@ export function SpecialInvitationDialog({
   eventSlug?: string
   invitationSlug?: string
 }) {
+  // Guests who declined the main event are off the special invitations.
+  const eligibleGuests = guests.filter((g) => g.rsvpStatus !== "declined")
+
   // Prefill each guest with their stored status (pending → unanswered).
   const [choices, setChoices] = useState<Record<string, Choice>>(() => {
     const initial: Record<string, Choice> = {}
-    for (const g of guests) {
+    for (const g of eligibleGuests) {
       const status = specialEvent.guestStatuses[g._id]
       if (status === "attending" || status === "declined") initial[g._id] = status
     }
@@ -69,7 +72,7 @@ export function SpecialInvitationDialog({
     error: "No pudimos enviar tu confirmación. Inténtalo de nuevo.",
   })
 
-  const allAnswered = guests.every((g) => choices[g._id])
+  const allAnswered = eligibleGuests.every((g) => choices[g._id])
   const canSubmit = Boolean(eventSlug && invitationSlug) && allAnswered
 
   const handleSubmit = async () => {
@@ -82,7 +85,7 @@ export function SpecialInvitationDialog({
       eventSlug,
       invitationSlug,
       guestUpdates: [],
-      specialEventRsvps: guests.map((g) => ({
+      specialEventRsvps: eligibleGuests.map((g) => ({
         guestId: g._id as Id<"guests">,
         specialEventId: specialEvent._id as Id<"specialEvents">,
         status: choices[g._id],
@@ -125,7 +128,7 @@ export function SpecialInvitationDialog({
         </div>
 
         <div className="space-y-5">
-          {guests.map((guest) => {
+          {eligibleGuests.map((guest) => {
             const fullName = `${guest.firstName} ${guest.lastName}`.trim()
             return (
               <div key={guest._id} className="space-y-2">

@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Pencil, Trash2 } from "lucide-react"
+import { Pencil, Trash2, Users, Sparkles } from "lucide-react"
 import { CopyInvitationLinkButton } from "@/components/invitations/copy-invitation-link-button"
 
 const TYPE_LABELS: Record<string, string> = {
@@ -18,6 +18,8 @@ interface Invitation {
   slug: string
   type: string
   isActive: boolean
+  guestCount?: number
+  specialEvents?: { _id: string; name: string }[]
 }
 
 interface InvitationCardProps {
@@ -31,7 +33,7 @@ export function InvitationCard({ eventSlug, invitation, onEdit, onDelete }: Invi
   return (
     <Card className="bg-white border shadow-sm">
       <CardContent className="py-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <div className="min-w-0">
             <p className="font-medium text-zinc-900 truncate">{invitation.title}</p>
             <p className="text-xs text-zinc-500 font-mono truncate">/{invitation.slug}</p>
@@ -39,6 +41,22 @@ export function InvitationCard({ eventSlug, invitation, onEdit, onDelete }: Invi
           <Badge variant="outline" className="shrink-0 text-xs">
             {TYPE_LABELS[invitation.type] ?? invitation.type}
           </Badge>
+          {invitation.guestCount != null && (
+            <Badge variant="outline" className="shrink-0 text-xs gap-1">
+              <Users className="h-3 w-3" />
+              {invitation.guestCount}
+            </Badge>
+          )}
+          {invitation.specialEvents?.map((se) => (
+            <Badge
+              key={se._id}
+              variant="outline"
+              className="shrink-0 text-xs gap-1 bg-amber-50 text-amber-700 border-amber-200"
+            >
+              <Sparkles className="h-3 w-3" />
+              {se.name}
+            </Badge>
+          ))}
           <Badge
             variant="outline"
             className={

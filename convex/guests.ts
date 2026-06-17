@@ -2,7 +2,12 @@ import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { requireEventEditor } from "./lib/permissions";
 import { resolvePublicEvent, resolvePublicInvitation } from "./lib/public";
-import { Doc } from "./_generated/dataModel";
+import {
+  applyDeclineEffects,
+  deletePlusOneCascade,
+  findPlusOne,
+} from "./lib/guests";
+import { Doc, Id } from "./_generated/dataModel";
 
 export const listByEvent = query({
   args: { eventId: v.id("events") },
@@ -55,7 +60,7 @@ export const getGuestsPageData = query({
   handler: async (ctx, args) => {
     await requireEventEditor(ctx, args.eventId);
 
-    const [guests, invitations, menuOptions, drinkOptions, tables] =
+    const [guests, invitations, menuOptions, drinkOptions, tables, specialEvents] =
       await Promise.all([
         ctx.db
           .query("guests")
@@ -77,7 +82,40 @@ export const getGuestsPageData = query({
           .query("tables")
           .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
           .take(200),
+        ctx.db
+          .query("specialEvents")
+          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+          .take(10),
       ]);
+
+    // Which invitations can see each special event (powers the per-event
+    // "not invited" vs RSVP status columns). At most a couple special events,
+    // so one query per event is fine.
+    const accessByEvent: Record<string, Id<"invitations">[]> = {};
+    await Promise.all(
+      specialEvents.map(async (se) => {
+        const rows = await ctx.db
+          .query("invitationSpecialEventAccess")
+          .withIndex("by_specialEventId", (q) =>
+            q.eq("specialEventId", se._id)
+          )
+          .take(500);
+        accessByEvent[se._id] = rows.map((r) => r.invitationId);
+      })
+    );
+
+    // Every guest's per-special-event RSVP status, indexed guestId→eventId→status.
+    const rsvpRows = await ctx.db
+      .query("guestSpecialEventRsvps")
+      .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+      .take(5000);
+    const specialRsvpByGuest: Record<
+      string,
+      Record<string, "pending" | "attending" | "declined">
+    > = {};
+    for (const row of rsvpRows) {
+      (specialRsvpByGuest[row.guestId] ??= {})[row.specialEventId] = row.status;
+    }
 
     return {
       guests,
@@ -85,6 +123,9 @@ export const getGuestsPageData = query({
       menuOptions: menuOptions.sort((a, b) => a.sortOrder - b.sortOrder),
       drinkOptions: drinkOptions.sort((a, b) => a.sortOrder - b.sortOrder),
       tables: tables.sort((a, b) => a.sortOrder - b.sortOrder),
+      specialEvents,
+      accessByEvent,
+      specialRsvpByGuest,
     };
   },
 });
@@ -107,8 +148,7 @@ export const createGuest = mutation({
     lastName: v.string(),
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
-    isPrimaryContact: v.optional(v.boolean()),
-    isPlusOne: v.optional(v.boolean()),
+    allowsPlusOne: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     await requireEventEditor(ctx, args.eventId);
@@ -127,8 +167,8 @@ export const createGuest = mutation({
       lastName: args.lastName,
       email: args.email,
       phone: args.phone,
-      isPrimaryContact: args.isPrimaryContact ?? false,
-      isPlusOne: args.isPlusOne ?? false,
+      isPlusOne: false,
+      allowsPlusOne: args.allowsPlusOne ?? false,
       rsvpStatus: "pending",
     });
   },
@@ -154,6 +194,7 @@ export const updateGuest = mutation({
     drinkOptionId: v.optional(v.id("drinkOptions")),
     tableId: v.optional(v.id("tables")),
     seatNumber: v.optional(v.number()),
+    allowsPlusOne: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const guest = await ctx.db.get(args.id);
@@ -162,6 +203,21 @@ export const updateGuest = mutation({
 
     const { id, ...updates } = args;
     await ctx.db.patch(id, updates);
+
+    // A guest who declines is pulled out of every special invitation, and
+    // loses their +1 (if any). The guest stays linked to its invitation.
+    if (
+      updates.rsvpStatus === "declined" &&
+      guest.rsvpStatus !== "declined"
+    ) {
+      await applyDeclineEffects(ctx, { ...guest, ...updates });
+    }
+
+    // Turning off "allows +1" removes any materialized +1 guest.
+    if (updates.allowsPlusOne === false && guest.allowsPlusOne) {
+      const plusOne = await findPlusOne(ctx, id);
+      if (plusOne) await deletePlusOneCascade(ctx, plusOne);
+    }
   },
 });
 
@@ -181,7 +237,67 @@ export const deleteGuest = mutation({
       await ctx.db.delete(rsvp._id);
     }
 
+    // If this guest hosts a +1, remove the +1 too.
+    const plusOne = await findPlusOne(ctx, args.id);
+    if (plusOne) await deletePlusOneCascade(ctx, plusOne);
+
     await ctx.db.delete(args.id);
+  },
+});
+
+/**
+ * Create (or return the existing) +1 guest linked to a host guest. The +1 is a
+ * real, manageable guest record sharing the host's invitation.
+ */
+export const addPlusOne = mutation({
+  args: {
+    hostGuestId: v.id("guests"),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const host = await ctx.db.get(args.hostGuestId);
+    if (!host) throw new ConvexError("Guest not found");
+    await requireEventEditor(ctx, host.eventId);
+
+    if (host.isPlusOne) {
+      throw new ConvexError("A +1 cannot have its own +1");
+    }
+    if (!host.allowsPlusOne) {
+      throw new ConvexError("This guest is not allowed a +1");
+    }
+
+    const existing = await findPlusOne(ctx, host._id);
+    if (existing) return existing._id;
+
+    const firstName = args.firstName?.trim() || "Acompañante";
+    const lastName = args.lastName?.trim() || `de ${host.firstName}`.trim();
+
+    return await ctx.db.insert("guests", {
+      eventId: host.eventId,
+      invitationId: host.invitationId,
+      firstName,
+      lastName,
+      isPlusOne: true,
+      allowsPlusOne: false,
+      plusOneOfGuestId: host._id,
+      rsvpStatus: "pending",
+    });
+  },
+});
+
+/**
+ * Remove a host guest's +1 (and its special-event RSVPs).
+ */
+export const removePlusOne = mutation({
+  args: { hostGuestId: v.id("guests") },
+  handler: async (ctx, args) => {
+    const host = await ctx.db.get(args.hostGuestId);
+    if (!host) throw new ConvexError("Guest not found");
+    await requireEventEditor(ctx, host.eventId);
+
+    const plusOne = await findPlusOne(ctx, host._id);
+    if (plusOne) await deletePlusOneCascade(ctx, plusOne);
   },
 });
 
@@ -192,8 +308,7 @@ export const bulkCreateGuestsForInvitation = mutation({
       v.object({
         firstName: v.string(),
         lastName: v.string(),
-        isPrimaryContact: v.optional(v.boolean()),
-        isPlusOne: v.optional(v.boolean()),
+        allowsPlusOne: v.optional(v.boolean()),
       })
     ),
   },
@@ -212,8 +327,8 @@ export const bulkCreateGuestsForInvitation = mutation({
         invitationId: args.invitationId,
         firstName: g.firstName,
         lastName: g.lastName,
-        isPrimaryContact: g.isPrimaryContact ?? false,
-        isPlusOne: g.isPlusOne ?? false,
+        isPlusOne: false,
+        allowsPlusOne: g.allowsPlusOne ?? false,
         rsvpStatus: "pending",
       });
       ids.push(id);
@@ -240,6 +355,16 @@ export const submitPublicRsvp = mutation({
         specialRequests: v.optional(v.string()),
       })
     ),
+    plusOneUpdates: v.optional(
+      v.array(
+        v.object({
+          hostGuestId: v.id("guests"),
+          attending: v.boolean(),
+          firstName: v.optional(v.string()),
+          lastName: v.optional(v.string()),
+        })
+      )
+    ),
     specialEventRsvps: v.optional(
       v.array(
         v.object({
@@ -257,6 +382,9 @@ export const submitPublicRsvp = mutation({
   handler: async (ctx, args) => {
     if (args.guestUpdates.length > 20) {
       throw new ConvexError("Too many guest updates");
+    }
+    if (args.plusOneUpdates && args.plusOneUpdates.length > 20) {
+      throw new ConvexError("Too many plus-one updates");
     }
     if (args.specialEventRsvps && args.specialEventRsvps.length > 100) {
       throw new ConvexError("Too many special event RSVPs");
@@ -285,7 +413,11 @@ export const submitPublicRsvp = mutation({
       )
       .take(100);
 
+    const guestById = new Map(invitationGuests.map((g) => [g._id, g]));
     const validGuestIds = new Set(invitationGuests.map((g) => g._id));
+    // Guests whose final RSVP is "declined" — excluded from +1 materialization
+    // and special-event RSVPs.
+    const declinedGuestIds = new Set<Id<"guests">>();
 
     // Update guests — only RSVP-related fields, never seating/contact data.
     for (const update of args.guestUpdates) {
@@ -321,6 +453,56 @@ export const submitPublicRsvp = mutation({
       if ("specialRequests" in update)
         patch.specialRequests = update.specialRequests;
       await ctx.db.patch(update.guestId, patch);
+
+      // A guest who declines is removed from every special invitation and
+      // loses their +1; the guest itself stays linked to the invitation.
+      if (update.rsvpStatus === "declined") {
+        declinedGuestIds.add(update.guestId);
+        const guest = guestById.get(update.guestId);
+        if (guest) await applyDeclineEffects(ctx, { ...guest, ...patch });
+      }
+    }
+
+    // Materialize / tear down each host guest's +1 from the RSVP form.
+    for (const pu of args.plusOneUpdates ?? []) {
+      const host = guestById.get(pu.hostGuestId);
+      if (!host) {
+        throw new ConvexError("Guest does not belong to this invitation");
+      }
+      const existing = await findPlusOne(ctx, host._id);
+
+      // Only attending hosts that allow a +1 can bring one.
+      const hostAttending =
+        !declinedGuestIds.has(host._id) &&
+        (args.guestUpdates.find((u) => u.guestId === host._id)?.rsvpStatus ??
+          host.rsvpStatus) === "attending";
+
+      if (pu.attending && host.allowsPlusOne && hostAttending) {
+        const firstName = pu.firstName?.trim() || "Acompañante";
+        const lastName =
+          pu.lastName?.trim() || `de ${host.firstName}`.trim();
+        if (existing) {
+          await ctx.db.patch(existing._id, {
+            firstName,
+            lastName,
+            rsvpStatus: "attending",
+          });
+        } else {
+          await ctx.db.insert("guests", {
+            eventId: host.eventId,
+            invitationId: host.invitationId,
+            firstName,
+            lastName,
+            isPlusOne: true,
+            allowsPlusOne: false,
+            plusOneOfGuestId: host._id,
+            rsvpStatus: "attending",
+          });
+        }
+      } else if (existing) {
+        // +1 declined / host not attending → remove the +1 record.
+        await deletePlusOneCascade(ctx, existing);
+      }
     }
 
     // Handle special event RSVPs
@@ -328,6 +510,10 @@ export const submitPublicRsvp = mutation({
       for (const rsvp of args.specialEventRsvps) {
         if (!validGuestIds.has(rsvp.guestId)) {
           throw new ConvexError("Guest does not belong to this invitation");
+        }
+        // Declined guests are off the special invitations entirely.
+        if (declinedGuestIds.has(rsvp.guestId)) {
+          continue;
         }
 
         const specialEvent = await ctx.db.get(rsvp.specialEventId);

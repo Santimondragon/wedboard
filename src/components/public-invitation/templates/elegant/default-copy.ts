@@ -9,7 +9,8 @@ export const ELEGANT_COPY = {
   rsvpDeadline: "Antes del 00 del Mes",
   rsvpAttendLabel: "Si asistiré",
   rsvpDeclineLabel: "Lamentablemente no podré asistir",
-  rsvpPlusOneSuffix: "(+1)",
+  rsvpPlusOneQuestion: "Vendré con un acompañante (+1)",
+  rsvpPlusOneNamePlaceholder: "Nombre del acompañante (opcional)",
   rsvpSubmitLabel: "Enviar",
   rsvpNote:
     "Aunque adoramos a los más pequeños, hemos decidido que esta celebración sea exclusivamente para adultos.",

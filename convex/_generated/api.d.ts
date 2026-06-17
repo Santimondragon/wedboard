@@ -14,6 +14,7 @@ import type * as events from "../events.js";
 import type * as guests from "../guests.js";
 import type * as invitations from "../invitations.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_guests from "../lib/guests.js";
 import type * as lib_options from "../lib/options.js";
 import type * as lib_permissions from "../lib/permissions.js";
 import type * as lib_public from "../lib/public.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   guests: typeof guests;
   invitations: typeof invitations;
   "lib/auth": typeof lib_auth;
+  "lib/guests": typeof lib_guests;
   "lib/options": typeof lib_options;
   "lib/permissions": typeof lib_permissions;
   "lib/public": typeof lib_public;

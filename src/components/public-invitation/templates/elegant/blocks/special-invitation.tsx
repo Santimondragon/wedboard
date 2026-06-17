@@ -38,15 +38,17 @@ export function ElegantSpecialInvitation({ block, data }: BlockComponentProps) {
   // on the live page, this invitation isn't assigned it — render nothing.
   if (!bound && !isPreview) return null
 
-  const canConfirm = Boolean(bound) && !isPreview && data.guests.length > 0
+  // Guests who declined the main event are off the special invitations.
+  const eligibleGuests = data.guests.filter((g) => g.rsvpStatus !== "declined")
+  const canConfirm = Boolean(bound) && !isPreview && eligibleGuests.length > 0
 
-  // Once every named guest has already responded to this special event, the
+  // Once every eligible guest has already responded to this special event, the
   // button switches from "confirm" to a read-only "view details" affordance —
   // it still opens the same modal (now showing their saved choices).
   const hasResponded =
     !!bound &&
-    data.guests.length > 0 &&
-    data.guests.every((g) => {
+    eligibleGuests.length > 0 &&
+    eligibleGuests.every((g) => {
       const status = bound.guestStatuses[g._id]
       return status === "attending" || status === "declined"
     })

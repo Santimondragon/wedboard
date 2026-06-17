@@ -20,7 +20,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -45,7 +44,6 @@ interface ExistingInvitation {
   slug: string
   type: string
   maxGuests: number
-  allowPlusOne: boolean
   notes?: string
 }
 
@@ -82,15 +80,31 @@ export function InvitationForm({
     api.guests.listUnassignedByEvent,
     mode === "create" && open ? { eventId } : "skip",
   )
+  const specialEvents = useQuery(
+    api.specialEvents.listByEvent,
+    mode === "create" && open ? { eventId } : "skip",
+  )
   const [selectedGuestIds, setSelectedGuestIds] = useState<Id<"guests">[]>([])
+  const [selectedSpecialIds, setSelectedSpecialIds] = useState<
+    Id<"specialEvents">[]
+  >([])
 
   useEffect(() => {
-    if (open && mode === "create") setSelectedGuestIds([])
+    if (open && mode === "create") {
+      setSelectedGuestIds([])
+      setSelectedSpecialIds([])
+    }
   }, [open, mode])
 
   function toggleGuest(id: Id<"guests">) {
     setSelectedGuestIds((prev) =>
       prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id],
+    )
+  }
+
+  function toggleSpecial(id: Id<"specialEvents">) {
+    setSelectedSpecialIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
     )
   }
 
@@ -108,13 +122,11 @@ export function InvitationForm({
       slug: "",
       type: "single",
       maxGuests: 1,
-      allowPlusOne: false,
       notes: "",
     },
   })
 
   const title = watch("title")
-  const allowPlusOne = watch("allowPlusOne")
 
   useEffect(() => {
     if (mode === "edit" && invitation) {
@@ -123,7 +135,6 @@ export function InvitationForm({
         slug: invitation.slug,
         type: invitation.type as "single" | "group" | "plusOne",
         maxGuests: invitation.maxGuests,
-        allowPlusOne: invitation.allowPlusOne,
         notes: invitation.notes ?? "",
       })
     } else if (mode === "create") {
@@ -132,7 +143,6 @@ export function InvitationForm({
         slug: "",
         type: "single",
         maxGuests: 1,
-        allowPlusOne: false,
         notes: "",
       })
     }
@@ -164,9 +174,9 @@ export function InvitationForm({
         slug: data.slug,
         type: data.type,
         maxGuests: data.maxGuests,
-        allowPlusOne: data.allowPlusOne,
         notes: data.notes,
         guestIds: selectedGuestIds,
+        specialEventIds: selectedSpecialIds,
       })
     } else if (mode === "edit" && invitation) {
       result = await updateInvitation.run({
@@ -175,7 +185,6 @@ export function InvitationForm({
         slug: data.slug,
         type: data.type,
         maxGuests: data.maxGuests,
-        allowPlusOne: data.allowPlusOne,
         notes: data.notes,
       })
     }
@@ -279,19 +288,48 @@ export function InvitationForm({
             )}
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border p-3">
-            <div>
-              <Label htmlFor="allowPlusOne" className="text-sm font-medium">
-                Allow Plus One
-              </Label>
-              <p className="text-xs text-zinc-500">Guest can bring an additional person</p>
+          {mode === "create" && (
+            <div className="space-y-2">
+              <Label>Special invitations</Label>
+              {specialEvents === undefined ? (
+                <p className="text-xs text-zinc-500">Loading…</p>
+              ) : specialEvents.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-3 text-center">
+                  <p className="text-sm text-zinc-500">
+                    No special invitations yet (optional).
+                  </p>
+                  <Button asChild variant="link" size="sm" className="h-auto p-0">
+                    <Link
+                      href={`/dashboard/${eventSlug}/special-events`}
+                      onClick={() => onOpenChange(false)}
+                    >
+                      Create a special invitation
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-zinc-500">
+                    Choose which special invitations this group can see.
+                  </p>
+                  <div className="space-y-1 rounded-lg border p-2">
+                    {specialEvents.map((se) => (
+                      <label
+                        key={se._id}
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-zinc-50"
+                      >
+                        <Checkbox
+                          checked={selectedSpecialIds.includes(se._id)}
+                          onCheckedChange={() => toggleSpecial(se._id)}
+                        />
+                        <span className="text-sm text-zinc-800">{se.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
-            <Switch
-              id="allowPlusOne"
-              checked={allowPlusOne}
-              onCheckedChange={(checked) => setValue("allowPlusOne", checked)}
-            />
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>

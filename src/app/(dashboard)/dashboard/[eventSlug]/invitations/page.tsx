@@ -16,7 +16,7 @@ export default function InvitationsPage() {
   const eventId = event._id
   const [createOpen, setCreateOpen] = useState(false)
 
-  const invitations = useQuery(api.invitations.listByEvent, { eventId })
+  const invitations = useQuery(api.invitations.getInvitationsPageData, { eventId })
 
   if (invitations === undefined) {
     return (

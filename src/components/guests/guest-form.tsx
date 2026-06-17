@@ -33,13 +33,11 @@ export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) 
   } = useForm<GuestFormData>({
     resolver: zodResolver(guestSchema),
     defaultValues: {
-      isPrimaryContact: false,
-      isPlusOne: false,
+      allowsPlusOne: false,
     },
   })
 
-  const isPrimaryContact = watch("isPrimaryContact")
-  const isPlusOne = watch("isPlusOne")
+  const allowsPlusOne = watch("allowsPlusOne")
 
   async function onSubmit(data: GuestFormData) {
     const result = await createGuest.run({
@@ -49,8 +47,7 @@ export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) 
       lastName: data.lastName,
       email: data.email || undefined,
       phone: data.phone || undefined,
-      isPrimaryContact: data.isPrimaryContact,
-      isPlusOne: data.isPlusOne,
+      allowsPlusOne: data.allowsPlusOne,
     })
     if (result.ok) {
       reset()
@@ -90,27 +87,15 @@ export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) 
         <Input id="phone" type="tel" {...register("phone")} />
       </div>
 
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="isPrimaryContact"
-            checked={isPrimaryContact}
-            onCheckedChange={(checked) => setValue("isPrimaryContact", !!checked)}
-          />
-          <Label htmlFor="isPrimaryContact" className="font-normal cursor-pointer">
-            Primary Contact
-          </Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="isPlusOne"
-            checked={isPlusOne}
-            onCheckedChange={(checked) => setValue("isPlusOne", !!checked)}
-          />
-          <Label htmlFor="isPlusOne" className="font-normal cursor-pointer">
-            Plus One
-          </Label>
-        </div>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="allowsPlusOne"
+          checked={allowsPlusOne}
+          onCheckedChange={(checked) => setValue("allowsPlusOne", !!checked)}
+        />
+        <Label htmlFor="allowsPlusOne" className="font-normal cursor-pointer">
+          Allows +1
+        </Label>
       </div>
 
       <Button type="submit" disabled={isSubmitting} className="w-full">
