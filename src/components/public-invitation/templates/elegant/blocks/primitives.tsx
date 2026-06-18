@@ -39,7 +39,9 @@ export function WeddingButton({
     className
   )
 
-  const Frame = () => <div className="absolute top-1 left-1 pointer-events-none w-[calc(100%-8px)] h-[calc(100%-8px)] border border-wedding-gold"></div>
+  const frame = (
+    <div className="absolute top-1 left-1 pointer-events-none w-[calc(100%-8px)] h-[calc(100%-8px)] border border-wedding-gold"></div>
+  )
 
   if (href) {
     return (
@@ -49,7 +51,7 @@ export function WeddingButton({
         rel="noopener noreferrer"
         className={buttonClassName}
       >
-        <Frame />
+        {frame}
         {children}
       </a>
     )
@@ -61,7 +63,7 @@ export function WeddingButton({
       disabled={disabled}
       className={buttonClassName}
     >
-      <Frame />
+      {frame}
       {children}
     </button>
   )
@@ -92,7 +94,6 @@ export function CircularPhoto({
 }) {
   if (src) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt={alt ?? ""}
@@ -128,7 +129,7 @@ export function SealedPhoto({
   const imageClassName = "object-cover w-full h-full";
 
   return (
-    <div className={cn("relative flex flex-col items-center w-full my-10", isTilted && "origin-center -rotate-12 scale-85")}>
+    <div className={cn("relative flex flex-col items-center w-full my-10", isTilted && "origin-center -rotate-12 scale-85", className)}>
       <img
         src={`${ASSET_BASE}/golden-seal.png`}
         alt={'golden-seal-decoration'}

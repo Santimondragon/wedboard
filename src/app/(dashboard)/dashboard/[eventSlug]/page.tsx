@@ -34,7 +34,7 @@ export default function EventOverviewPage() {
       const result = await seedDemo()
       toast.success("Demo data seeded! Redirecting…")
       router.push(`/dashboard/${result.slug}`)
-    } catch (err) {
+    } catch {
       toast.error("Failed to seed demo data")
     }
   }

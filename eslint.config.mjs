@@ -12,7 +12,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Convex codegen — not ours to lint.
+    "convex/_generated/**",
   ]),
+  {
+    rules: {
+      // The public invitation templates render Convex storage URLs with plain
+      // <img>; next/image isn't configured for those remote blobs.
+      "@next/next/no-img-element": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -9,7 +9,6 @@ export function ElegantFooter({ block }: BlockComponentProps) {
   const note = getConfigString(block, "body") ?? ELEGANT_COPY.footerNote
   return (
     <ElegantSection className="flex flex-col items-center gap-6 pt-10 pb-16 text-center">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <p className="font-elegant text-[24px] font-bold leading-relaxed text-wedding-gold">
         {note}
       </p>

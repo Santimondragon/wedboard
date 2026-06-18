@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { api } from "convex/_generated/api"
 import { Doc, Id } from "convex/_generated/dataModel"
@@ -61,7 +61,7 @@ export function MenuOptionForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors, isSubmitting },
@@ -70,7 +70,7 @@ export function MenuOptionForm({
     defaultValues: { name: "", description: "", isActive: true },
   })
 
-  const isActive = watch("isActive")
+  const isActive = useWatch({ control, name: "isActive" })
 
   useEffect(() => {
     if (open && option) {

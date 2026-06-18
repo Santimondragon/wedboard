@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
@@ -115,21 +115,30 @@ export function InvitationForm({
     })),
   ]
 
-  // Initialize the selection sets from the invitation each time the dialog opens.
-  useEffect(() => {
-    if (!open) return
-    if (mode === "create") {
-      setSelectedGuestIds([])
-      setSelectedSpecialIds([])
-    } else if (invitation) {
-      setSelectedGuestIds(
-        (invitation.guests ?? [])
-          .filter((g) => !g.isPlusOne)
-          .map((g) => g._id),
-      )
-      setSelectedSpecialIds((invitation.specialEvents ?? []).map((s) => s._id))
+  // Initialize the selection sets from the invitation each time the dialog
+  // opens (or the source invitation changes while open). Done during render via
+  // a sync key rather than an effect — the latter trips React Compiler's
+  // set-state-in-effect rule.
+  const syncKey = open ? `${mode}:${invitation?._id ?? ""}` : null
+  const [syncedFor, setSyncedFor] = useState<string | null>(null)
+  if (syncKey !== syncedFor) {
+    setSyncedFor(syncKey)
+    if (open) {
+      if (mode === "create") {
+        setSelectedGuestIds([])
+        setSelectedSpecialIds([])
+      } else if (invitation) {
+        setSelectedGuestIds(
+          (invitation.guests ?? [])
+            .filter((g) => !g.isPlusOne)
+            .map((g) => g._id),
+        )
+        setSelectedSpecialIds(
+          (invitation.specialEvents ?? []).map((s) => s._id),
+        )
+      }
     }
-  }, [open, mode, invitation])
+  }
 
   function toggleGuest(id: Id<"guests">) {
     setSelectedGuestIds((prev) =>
@@ -147,7 +156,7 @@ export function InvitationForm({
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<InvitationFormData>({
@@ -159,7 +168,7 @@ export function InvitationForm({
     },
   })
 
-  const title = watch("title")
+  const title = useWatch({ control, name: "title" })
 
   useEffect(() => {
     if (mode === "edit" && invitation) {

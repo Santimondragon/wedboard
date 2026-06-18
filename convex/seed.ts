@@ -100,13 +100,13 @@ export const seedDemoEvent = internalMutation({
       seatsCount: 8,
       sortOrder: 3,
     });
-    const table4 = await ctx.db.insert("tables", {
+    await ctx.db.insert("tables", {
       eventId,
       name: "Mesa 4",
       seatsCount: 6,
       sortOrder: 4,
     });
-    const table5 = await ctx.db.insert("tables", {
+    await ctx.db.insert("tables", {
       eventId,
       name: "Mesa 5",
       seatsCount: 6,
@@ -249,7 +249,7 @@ export const seedDemoEvent = internalMutation({
       tableId: table1,
       seatNumber: 3,
     });
-    const g5 = await ctx.db.insert("guests", {
+    await ctx.db.insert("guests", {
       eventId,
       invitationId: inv2,
       firstName: "Pablo",
@@ -286,7 +286,7 @@ export const seedDemoEvent = internalMutation({
       tableId: table2,
       seatNumber: 1,
     });
-    const g8 = await ctx.db.insert("guests", {
+    await ctx.db.insert("guests", {
       eventId,
       invitationId: inv3,
       firstName: "Emma",
@@ -297,7 +297,7 @@ export const seedDemoEvent = internalMutation({
     });
 
     // Amigos del trabajo (pending)
-    const g9 = await ctx.db.insert("guests", {
+    await ctx.db.insert("guests", {
       eventId,
       invitationId: inv4,
       firstName: "Laura",
@@ -307,7 +307,7 @@ export const seedDemoEvent = internalMutation({
       allowsPlusOne: true,
       rsvpStatus: "pending",
     });
-    const g10 = await ctx.db.insert("guests", {
+    await ctx.db.insert("guests", {
       eventId,
       invitationId: inv4,
       firstName: "David",
@@ -321,7 +321,7 @@ export const seedDemoEvent = internalMutation({
     });
 
     // Compañeros de universidad
-    const g11 = await ctx.db.insert("guests", {
+    await ctx.db.insert("guests", {
       eventId,
       invitationId: inv5,
       firstName: "Sofía",
@@ -334,7 +334,7 @@ export const seedDemoEvent = internalMutation({
       tableId: table3,
       seatNumber: 0,
     });
-    const g12 = await ctx.db.insert("guests", {
+    await ctx.db.insert("guests", {
       eventId,
       invitationId: inv5,
       firstName: "Javier",
@@ -346,7 +346,7 @@ export const seedDemoEvent = internalMutation({
       tableId: table3,
       seatNumber: 1,
     });
-    const g13 = await ctx.db.insert("guests", {
+    await ctx.db.insert("guests", {
       eventId,
       invitationId: inv5,
       firstName: "Carmen",
@@ -354,7 +354,7 @@ export const seedDemoEvent = internalMutation({
       isPlusOne: false,
       rsvpStatus: "declined",
     });
-    const g14 = await ctx.db.insert("guests", {
+    await ctx.db.insert("guests", {
       eventId,
       invitationId: inv5,
       firstName: "Alejandro",
@@ -362,7 +362,7 @@ export const seedDemoEvent = internalMutation({
       isPlusOne: false,
       rsvpStatus: "pending",
     });
-    const g15 = await ctx.db.insert("guests", {
+    await ctx.db.insert("guests", {
       eventId,
       invitationId: inv5,
       firstName: "Isabel",

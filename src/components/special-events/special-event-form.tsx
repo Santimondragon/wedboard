@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation } from "convex/react"
 import { api } from "convex/_generated/api"
@@ -77,7 +77,7 @@ export function SpecialEventForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors, isSubmitting },
@@ -92,7 +92,7 @@ export function SpecialEventForm({
     },
   })
 
-  const isActive = watch("isActive")
+  const isActive = useWatch({ control, name: "isActive" })
 
   useEffect(() => {
     if (open && specialEvent) {

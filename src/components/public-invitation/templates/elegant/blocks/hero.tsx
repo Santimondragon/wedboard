@@ -6,7 +6,6 @@ import { ELEGANT_COPY } from "../default-copy"
 import {
   SealedPhoto,
   ElegantSection,
-  SealStamp,
   coupleNames,
   formatDate,
   getConfigImage,

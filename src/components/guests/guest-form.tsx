@@ -1,6 +1,6 @@
 "use client"
 
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { api } from "convex/_generated/api"
 import { Id } from "convex/_generated/dataModel"
@@ -26,7 +26,7 @@ export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) 
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors, isSubmitting },
@@ -37,7 +37,7 @@ export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) 
     },
   })
 
-  const allowsPlusOne = watch("allowsPlusOne")
+  const allowsPlusOne = useWatch({ control, name: "allowsPlusOne" })
 
   async function onSubmit(data: GuestFormData) {
     const result = await createGuest.run({

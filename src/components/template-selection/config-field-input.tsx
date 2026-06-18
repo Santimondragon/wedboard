@@ -168,7 +168,7 @@ function ImageFieldInput({
           aria-label={`Choose ${field.label}`}
         >
           {selected?.url ? (
-            // eslint-disable-next-line @next/next/no-img-element
+             
             <img
               src={selected.url}
               alt={selected.name}
@@ -344,7 +344,7 @@ function IllustrationPicker({
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded bg-zinc-50">
           {selected ? (
-            // eslint-disable-next-line @next/next/no-img-element
+             
             <img
               src={selected.src}
               alt={selected.label}
@@ -375,7 +375,7 @@ function IllustrationPicker({
                   option.value === value && "border-zinc-900 ring-1 ring-zinc-900"
                 )}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                { }
                 <img
                   src={option.src}
                   alt={option.label}

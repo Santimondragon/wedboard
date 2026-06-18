@@ -10,7 +10,6 @@ import {
 } from "@tanstack/react-table"
 import { Doc, Id } from "convex/_generated/dataModel"
 import { RsvpStatusBadge } from "@/components/guests/rsvp-status-badge"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -161,9 +160,12 @@ export function GuestTable({
         },
       }),
     ],
-    [onEditGuest, specialEvents, showMenu, showDrink],
+    [specialEvents, showMenu, showDrink],
   )
 
+  // TanStack Table's hook returns functions React Compiler can't memoize; the
+  // component opts out of compilation here intentionally.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: filtered,
     columns,

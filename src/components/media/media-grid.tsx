@@ -60,7 +60,7 @@ export function MediaGrid({ items }: MediaGridProps) {
           >
             <div className="aspect-square bg-zinc-100">
               {item.url && (
-                // eslint-disable-next-line @next/next/no-img-element
+                 
                 <img
                   src={item.url}
                   alt={item.name}
