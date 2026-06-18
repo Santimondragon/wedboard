@@ -210,7 +210,7 @@ Controls which invitations can RSVP to which special events.
 | invitationId | Id<"invitations"> |
 | specialEventId | Id<"specialEvents"> |
 
-Indexes: `by_invitationId`, `by_specialEventId`, `by_invitationId_and_specialEventId`
+Indexes: `by_eventId`, `by_invitationId`, `by_specialEventId`, `by_invitationId_and_specialEventId`
 
 ---
 
@@ -328,6 +328,7 @@ Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPub
 | `updateEvent` | mutation — accepts optional `slug` (validates format, reserved words, global uniqueness) |
 | `setInvitationTemplate` | mutation — sets `templateId`, `layoutVariants` (`{pending,accepted,declined}`), and/or legacy `layoutBlocks` (min role planner). The editor writes `layoutVariants` |
 | `archiveEvent` | mutation |
+| `deleteEvent` | mutation — owner-only, **permanent**. Cascades: deletes every row in all event-scoped tables (guests, invitations, specialEvents, guestSpecialEventRsvps, invitationSpecialEventAccess, menuOptions, drinkOptions, tables, eventMembers, guestMessages) plus media rows **and their storage blobs**, then the event itself |
 
 ### `convex/invitations.ts`
 | Function | Type | Notes |

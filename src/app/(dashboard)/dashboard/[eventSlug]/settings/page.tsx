@@ -38,6 +38,7 @@ export default function SettingsPage() {
   const event = useEvent()
   const eventId = event._id
   const updateEvent = useMutation(api.events.updateEvent)
+  const deleteEvent = useMutation(api.events.deleteEvent)
 
   const [name, setName] = useState("")
   const [slug, setSlug] = useState("")
@@ -51,6 +52,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [savingSlug, setSavingSlug] = useState(false)
   const [archiving, setArchiving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // Sync form fields from the loaded event during render (guarded by a
   // previous-value check) rather than in an effect — avoids the cascading
@@ -130,6 +132,18 @@ export default function SettingsPage() {
       toast.error("Failed to archive event")
     } finally {
       setArchiving(false)
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      await deleteEvent({ eventId })
+      toast.success("Event deleted")
+      router.replace("/dashboard")
+    } catch {
+      toast.error("Failed to delete event")
+      setDeleting(false)
     }
   }
 
@@ -308,7 +322,7 @@ export default function SettingsPage() {
           <Separator />
 
           <section className="space-y-4">
-            <h2 className="text-base font-medium text-zinc-900 text-rose-700">Danger Zone</h2>
+            <h2 className="text-base font-medium text-rose-700">Danger Zone</h2>
             <div className="rounded-md border border-rose-200 p-4 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Archive this event</p>
@@ -338,6 +352,45 @@ export default function SettingsPage() {
                       className="bg-rose-600 hover:bg-rose-700"
                     >
                       {archiving ? "Archiving..." : "Archive Event"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+
+            <div className="rounded-md border border-rose-200 p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Delete this event</p>
+                <p className="text-sm text-zinc-500">
+                  Permanently delete the event and all of its data — invitations,
+                  guests, special events, menus, tables, media, and messages. This
+                  cannot be undone.
+                </p>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" className="bg-rose-600 hover:bg-rose-700">
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Event</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to permanently delete &ldquo;{event?.name}&rdquo;?
+                      This will remove the event and all related invitations, guests,
+                      special events, menus, drinks, tables, media, and messages. This
+                      action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="bg-rose-600 hover:bg-rose-700"
+                    >
+                      {deleting ? "Deleting..." : "Delete Event"}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

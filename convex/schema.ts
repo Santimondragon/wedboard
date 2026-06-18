@@ -167,6 +167,7 @@ export default defineSchema({
     invitationId: v.id("invitations"),
     specialEventId: v.id("specialEvents"),
   })
+    .index("by_eventId", ["eventId"])
     .index("by_invitationId", ["invitationId"])
     .index("by_specialEventId", ["specialEventId"])
     .index("by_invitationId_and_specialEventId", [

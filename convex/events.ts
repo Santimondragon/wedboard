@@ -4,6 +4,7 @@ import { Doc } from "./_generated/dataModel";
 import { LAYOUT_BLOCKS_VALIDATOR } from "./schema";
 import { requireUser } from "./lib/auth";
 import { requireEventAccess, requireEventMember } from "./lib/permissions";
+import { cascadeDeleteEvent } from "./lib/events";
 import {
   generateSlug,
   generateUniqueSlug,
@@ -197,5 +198,16 @@ export const archiveEvent = mutation({
     const user = await requireUser(ctx);
     await requireEventMember(ctx, args.eventId, user._id, "owner");
     await ctx.db.patch(args.eventId, { status: "archived" });
+  },
+});
+
+// Permanently delete an event and every record that belongs to it across all
+// related tables. Owner-only and irreversible.
+export const deleteEvent = mutation({
+  args: { eventId: v.id("events") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    await requireEventMember(ctx, args.eventId, user._id, "owner");
+    await cascadeDeleteEvent(ctx, args.eventId);
   },
 });
