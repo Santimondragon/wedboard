@@ -221,6 +221,76 @@ export const updateGuest = mutation({
   },
 });
 
+/**
+ * Owner-side upsert of a guest's RSVP to a special event. Mirrors the public
+ * `submitPublicRsvp` special-event path but is gated by `requireEventEditor`
+ * so the planner can adjust statuses from the dashboard.
+ */
+export const setSpecialEventRsvp = mutation({
+  args: {
+    guestId: v.id("guests"),
+    specialEventId: v.id("specialEvents"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("attending"),
+      v.literal("declined")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const guest = await ctx.db.get(args.guestId);
+    if (!guest) throw new ConvexError("Guest not found");
+    await requireEventEditor(ctx, guest.eventId);
+
+    const specialEvent = await ctx.db.get(args.specialEventId);
+    if (!specialEvent || specialEvent.eventId !== guest.eventId) {
+      throw new ConvexError("Special event does not belong to this event");
+    }
+
+    const existing = await ctx.db
+      .query("guestSpecialEventRsvps")
+      .withIndex("by_guestId_and_specialEventId", (q) =>
+        q.eq("guestId", args.guestId).eq("specialEventId", args.specialEventId)
+      )
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, { status: args.status });
+    } else {
+      await ctx.db.insert("guestSpecialEventRsvps", {
+        eventId: guest.eventId,
+        guestId: args.guestId,
+        specialEventId: args.specialEventId,
+        status: args.status,
+      });
+    }
+  },
+});
+
+/**
+ * Owner-side removal of a guest's special-event RSVP row — i.e. setting the
+ * guest back to "not invited" for that special event from the dashboard.
+ */
+export const removeSpecialEventRsvp = mutation({
+  args: {
+    guestId: v.id("guests"),
+    specialEventId: v.id("specialEvents"),
+  },
+  handler: async (ctx, args) => {
+    const guest = await ctx.db.get(args.guestId);
+    if (!guest) throw new ConvexError("Guest not found");
+    await requireEventEditor(ctx, guest.eventId);
+
+    const existing = await ctx.db
+      .query("guestSpecialEventRsvps")
+      .withIndex("by_guestId_and_specialEventId", (q) =>
+        q.eq("guestId", args.guestId).eq("specialEventId", args.specialEventId)
+      )
+      .unique();
+
+    if (existing) await ctx.db.delete(existing._id);
+  },
+});
+
 export const deleteGuest = mutation({
   args: { id: v.id("guests") },
   handler: async (ctx, args) => {

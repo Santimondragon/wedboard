@@ -92,13 +92,18 @@ export default function GuestsPage() {
         "notInvited" | "pending" | "attending" | "declined"
       > = {}
       for (const se of specialEvents ?? []) {
-        const invited =
+        // Invited either because the guest's invitation has access, or because
+        // the owner explicitly added an RSVP row for this guest (see the guest
+        // details dialog → setSpecialEventRsvp).
+        const explicitStatus = specialRsvpByGuest?.[g._id]?.[se._id]
+        const invitedViaAccess =
           !!g.invitationId &&
           g.rsvpStatus !== "declined" &&
           (accessByEvent?.[se._id]?.includes(g.invitationId) ?? false)
-        specialStatuses[se._id] = invited
-          ? (specialRsvpByGuest?.[g._id]?.[se._id] ?? "pending")
-          : "notInvited"
+        specialStatuses[se._id] =
+          invitedViaAccess || explicitStatus
+            ? (explicitStatus ?? "pending")
+            : "notInvited"
       }
 
       return {
@@ -199,6 +204,7 @@ export default function GuestsPage() {
         onOpenChange={setSheetOpen}
         menuOptions={menuOptions ?? []}
         drinkOptions={drinkOptions ?? []}
+        specialEvents={specialEvents ?? []}
         plusOne={selectedPlusOne}
         hostName={selectedHostName}
       />

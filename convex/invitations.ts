@@ -3,6 +3,7 @@ import { query, mutation } from "./_generated/server";
 import { requireEventEditor } from "./lib/permissions";
 import { generateSlug, generateUniqueInvitationSlug } from "./lib/slug";
 import { resolvePublicEvent, resolvePublicInvitation } from "./lib/public";
+import { deletePlusOneCascade, findPlusOne } from "./lib/guests";
 import { Id } from "./_generated/dataModel";
 
 export const listByEvent = query({
@@ -49,11 +50,27 @@ export const getInvitationsPageData = query({
         .take(10),
     ]);
 
-    // Guest count per invitation (counts +1 records too — they're linked guests).
-    const guestCount: Record<string, number> = {};
+    // Guests per invitation — names + a +1 flag (counts +1 records too, since
+    // they're linked guests sharing the host's invitation).
+    const guestsByInvitation: Record<
+      string,
+      {
+        _id: Id<"guests">;
+        firstName: string;
+        lastName: string;
+        isPlusOne: boolean;
+        rsvpStatus: string;
+      }[]
+    > = {};
     for (const g of guests) {
       if (g.invitationId) {
-        guestCount[g.invitationId] = (guestCount[g.invitationId] ?? 0) + 1;
+        (guestsByInvitation[g.invitationId] ??= []).push({
+          _id: g._id,
+          firstName: g.firstName,
+          lastName: g.lastName,
+          isPlusOne: g.isPlusOne,
+          rsvpStatus: g.rsvpStatus,
+        });
       }
     }
 
@@ -77,11 +94,15 @@ export const getInvitationsPageData = query({
       })
     );
 
-    return invitations.map((inv) => ({
-      ...inv,
-      guestCount: guestCount[inv._id] ?? 0,
-      specialEvents: specialByInvitation[inv._id] ?? [],
-    }));
+    return invitations.map((inv) => {
+      const invGuests = guestsByInvitation[inv._id] ?? [];
+      return {
+        ...inv,
+        guestCount: invGuests.length,
+        guests: invGuests,
+        specialEvents: specialByInvitation[inv._id] ?? [],
+      };
+    });
   },
 });
 
@@ -204,8 +225,6 @@ export const getPublicInvitation = query({
         _id: invitation._id,
         title: invitation.title,
         slug: invitation.slug,
-        type: invitation.type,
-        maxGuests: invitation.maxGuests,
       },
       guests: guests.map((g) => ({
         _id: g._id,
@@ -227,12 +246,6 @@ export const createInvitation = mutation({
     eventId: v.id("events"),
     title: v.string(),
     slug: v.optional(v.string()),
-    type: v.union(
-      v.literal("single"),
-      v.literal("group"),
-      v.literal("plusOne")
-    ),
-    maxGuests: v.number(),
     notes: v.optional(v.string()),
     guestIds: v.optional(v.array(v.id("guests"))),
     specialEventIds: v.optional(v.array(v.id("specialEvents"))),
@@ -254,8 +267,6 @@ export const createInvitation = mutation({
       eventId: args.eventId,
       title: args.title,
       slug,
-      type: args.type,
-      maxGuests: args.maxGuests,
       isActive: true,
       notes: args.notes,
     });
@@ -300,23 +311,19 @@ export const updateInvitation = mutation({
     id: v.id("invitations"),
     title: v.optional(v.string()),
     slug: v.optional(v.string()),
-    type: v.optional(
-      v.union(
-        v.literal("single"),
-        v.literal("group"),
-        v.literal("plusOne")
-      )
-    ),
-    maxGuests: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
     notes: v.optional(v.string()),
+    // The desired set of directly-linked (non-+1) guests and accessible special
+    // invitations. Reconciled below — only while every linked guest is pending.
+    guestIds: v.optional(v.array(v.id("guests"))),
+    specialEventIds: v.optional(v.array(v.id("specialEvents"))),
   },
   handler: async (ctx, args) => {
     const invitation = await ctx.db.get(args.id);
     if (!invitation) throw new ConvexError("Invitation not found");
     await requireEventEditor(ctx, invitation.eventId);
 
-    const { id, slug, ...rest } = args;
+    const { id, slug, guestIds, specialEventIds, ...rest } = args;
 
     let finalSlug = slug;
     if (slug !== undefined) {
@@ -329,6 +336,71 @@ export const updateInvitation = mutation({
     }
 
     await ctx.db.patch(id, { ...rest, ...(finalSlug ? { slug: finalSlug } : {}) });
+
+    // Reconcile guests / special-invitation access. Composition is locked once
+    // any linked guest has responded — editing those is only allowed while all
+    // are still pending.
+    if (guestIds !== undefined || specialEventIds !== undefined) {
+      const linked = await ctx.db
+        .query("guests")
+        .withIndex("by_invitationId", (q) => q.eq("invitationId", id))
+        .take(500);
+
+      if (!linked.every((g) => g.rsvpStatus === "pending")) {
+        throw new ConvexError(
+          "Cannot edit guests or special invitations after a guest has responded"
+        );
+      }
+
+      if (guestIds !== undefined) {
+        const desired = new Set<string>(guestIds);
+        // Remove directly-linked (non-+1) guests no longer selected; their +1
+        // (if any) is torn down with them.
+        for (const g of linked) {
+          if (g.isPlusOne) continue;
+          if (!desired.has(g._id)) {
+            const plusOne = await findPlusOne(ctx, g._id);
+            if (plusOne) await deletePlusOneCascade(ctx, plusOne);
+            await ctx.db.patch(g._id, { invitationId: undefined });
+          }
+        }
+        // Add selected guests that are currently un-invited in this event.
+        for (const guestId of guestIds) {
+          const guest = await ctx.db.get(guestId);
+          if (
+            guest &&
+            guest.eventId === invitation.eventId &&
+            !guest.invitationId
+          ) {
+            await ctx.db.patch(guestId, { invitationId: id });
+          }
+        }
+      }
+
+      if (specialEventIds !== undefined) {
+        const current = await ctx.db
+          .query("invitationSpecialEventAccess")
+          .withIndex("by_invitationId", (q) => q.eq("invitationId", id))
+          .take(100);
+        const currentIds = new Set(current.map((r) => r.specialEventId));
+        const desired = new Set<string>(specialEventIds);
+
+        for (const row of current) {
+          if (!desired.has(row.specialEventId)) await ctx.db.delete(row._id);
+        }
+        for (const specialEventId of specialEventIds) {
+          if (currentIds.has(specialEventId)) continue;
+          const specialEvent = await ctx.db.get(specialEventId);
+          if (specialEvent && specialEvent.eventId === invitation.eventId) {
+            await ctx.db.insert("invitationSpecialEventAccess", {
+              eventId: invitation.eventId,
+              invitationId: id,
+              specialEventId,
+            });
+          }
+        }
+      }
+    }
   },
 });
 

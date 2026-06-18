@@ -9,7 +9,7 @@ import { useQuery } from "convex/react"
 import { api } from "convex/_generated/api"
 import { type Id } from "convex/_generated/dataModel"
 import { useToastMutation } from "@/hooks/use-toast-mutation"
-import { RefreshCw, UserPlus } from "lucide-react"
+import { RefreshCw, UserPlus, Lock } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -22,13 +22,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { invitationSchema, type InvitationFormData } from "@/lib/validations/invitation"
 
 function slugify(title: string): string {
@@ -38,13 +31,21 @@ function slugify(title: string): string {
     .replace(/^-|-$/g, "")
 }
 
+interface ExistingInvitationGuest {
+  _id: Id<"guests">
+  firstName: string
+  lastName: string
+  isPlusOne: boolean
+  rsvpStatus: string
+}
+
 interface ExistingInvitation {
   _id: Id<"invitations">
   title: string
   slug: string
-  type: string
-  maxGuests: number
   notes?: string
+  guests?: ExistingInvitationGuest[]
+  specialEvents?: { _id: Id<"specialEvents">; name: string }[]
 }
 
 interface InvitationFormProps {
@@ -76,25 +77,59 @@ export function InvitationForm({
     error: "Failed to regenerate slug",
   })
 
+  // Both modes need the un-invited pool (to add) and the event's special
+  // invitations (to grant access).
   const unassignedGuests = useQuery(
     api.guests.listUnassignedByEvent,
-    mode === "create" && open ? { eventId } : "skip",
+    open ? { eventId } : "skip",
   )
   const specialEvents = useQuery(
     api.specialEvents.listByEvent,
-    mode === "create" && open ? { eventId } : "skip",
+    open ? { eventId } : "skip",
   )
   const [selectedGuestIds, setSelectedGuestIds] = useState<Id<"guests">[]>([])
   const [selectedSpecialIds, setSelectedSpecialIds] = useState<
     Id<"specialEvents">[]
   >([])
 
+  // Guests/special invitations are locked once any linked guest has responded.
+  const currentGuests = invitation?.guests ?? []
+  const currentDirectGuests = currentGuests.filter((g) => !g.isPlusOne)
+  const composeLocked =
+    mode === "edit" && currentGuests.some((g) => g.rsvpStatus !== "pending")
+
+  // Candidate guests: directly-linked guests (so they can be removed) plus the
+  // un-invited pool (to add). In create mode there are no current guests yet.
+  const candidateGuests = [
+    ...(mode === "edit"
+      ? currentDirectGuests.map((g) => ({
+          _id: g._id,
+          firstName: g.firstName,
+          lastName: g.lastName,
+        }))
+      : []),
+    ...(unassignedGuests ?? []).map((g) => ({
+      _id: g._id,
+      firstName: g.firstName,
+      lastName: g.lastName,
+    })),
+  ]
+
+  // Initialize the selection sets from the invitation each time the dialog opens.
   useEffect(() => {
-    if (open && mode === "create") {
+    if (!open) return
+    if (mode === "create") {
       setSelectedGuestIds([])
       setSelectedSpecialIds([])
+    } else if (invitation) {
+      setSelectedGuestIds(
+        (invitation.guests ?? [])
+          .filter((g) => !g.isPlusOne)
+          .map((g) => g._id),
+      )
+      setSelectedSpecialIds((invitation.specialEvents ?? []).map((s) => s._id))
     }
-  }, [open, mode])
+  }, [open, mode, invitation])
 
   function toggleGuest(id: Id<"guests">) {
     setSelectedGuestIds((prev) =>
@@ -120,8 +155,6 @@ export function InvitationForm({
     defaultValues: {
       title: "",
       slug: "",
-      type: "single",
-      maxGuests: 1,
       notes: "",
     },
   })
@@ -133,16 +166,12 @@ export function InvitationForm({
       reset({
         title: invitation.title,
         slug: invitation.slug,
-        type: invitation.type as "single" | "group" | "plusOne",
-        maxGuests: invitation.maxGuests,
         notes: invitation.notes ?? "",
       })
     } else if (mode === "create") {
       reset({
         title: "",
         slug: "",
-        type: "single",
-        maxGuests: 1,
         notes: "",
       })
     }
@@ -172,8 +201,6 @@ export function InvitationForm({
         eventId,
         title: data.title,
         slug: data.slug,
-        type: data.type,
-        maxGuests: data.maxGuests,
         notes: data.notes,
         guestIds: selectedGuestIds,
         specialEventIds: selectedSpecialIds,
@@ -183,9 +210,11 @@ export function InvitationForm({
         id: invitation._id,
         title: data.title,
         slug: data.slug,
-        type: data.type,
-        maxGuests: data.maxGuests,
         notes: data.notes,
+        // Only send composition changes while still editable.
+        ...(composeLocked
+          ? {}
+          : { guestIds: selectedGuestIds, specialEventIds: selectedSpecialIds }),
       })
     }
     if (result?.ok) onOpenChange(false)
@@ -193,7 +222,7 @@ export function InvitationForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {mode === "create" ? "New Invitation" : "Edit Invitation"}
@@ -223,7 +252,7 @@ export function InvitationForm({
           </div>
         ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="title">Title *</Label>
             <Input id="title" {...register("title")} placeholder="Smith Family" />
             {errors.title && (
@@ -231,7 +260,7 @@ export function InvitationForm({
             )}
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="slug">Slug *</Label>
             <div className="flex gap-2">
               <Input
@@ -255,83 +284,7 @@ export function InvitationForm({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="type">Type *</Label>
-            <Select
-              defaultValue={invitation?.type ?? "single"}
-              onValueChange={(value) =>
-                setValue("type", value as "single" | "group" | "plusOne")
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="single">Single</SelectItem>
-                <SelectItem value="group">Group</SelectItem>
-                <SelectItem value="plusOne">Plus One</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="maxGuests">Max Guests *</Label>
-            <Input
-              id="maxGuests"
-              type="number"
-              min={1}
-              max={10}
-              {...register("maxGuests", { valueAsNumber: true })}
-            />
-            {errors.maxGuests && (
-              <p className="text-xs text-red-500">{errors.maxGuests.message}</p>
-            )}
-          </div>
-
-          {mode === "create" && (
-            <div className="space-y-2">
-              <Label>Special invitations</Label>
-              {specialEvents === undefined ? (
-                <p className="text-xs text-zinc-500">Loading…</p>
-              ) : specialEvents.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-3 text-center">
-                  <p className="text-sm text-zinc-500">
-                    No special invitations yet (optional).
-                  </p>
-                  <Button asChild variant="link" size="sm" className="h-auto p-0">
-                    <Link
-                      href={`/dashboard/${eventSlug}/special-events`}
-                      onClick={() => onOpenChange(false)}
-                    >
-                      Create a special invitation
-                    </Link>
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <p className="text-xs text-zinc-500">
-                    Choose which special invitations this group can see.
-                  </p>
-                  <div className="space-y-1 rounded-lg border p-2">
-                    {specialEvents.map((se) => (
-                      <label
-                        key={se._id}
-                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-zinc-50"
-                      >
-                        <Checkbox
-                          checked={selectedSpecialIds.includes(se._id)}
-                          onCheckedChange={() => toggleSpecial(se._id)}
-                        />
-                        <span className="text-sm text-zinc-800">{se.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="notes">Notes</Label>
             <Textarea
               id="notes"
@@ -341,30 +294,99 @@ export function InvitationForm({
             />
           </div>
 
-          {mode === "create" && unassignedGuests && unassignedGuests.length > 0 && (
-            <div className="space-y-2">
-              <Label>Guests</Label>
-              <p className="text-xs text-zinc-500">
-                Select the un-invited guests to include in this invitation.
-              </p>
-              <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2">
-                {unassignedGuests.map((guest) => (
-                  <label
-                    key={guest._id}
-                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-zinc-50"
-                  >
-                    <Checkbox
-                      checked={selectedGuestIds.includes(guest._id)}
-                      onCheckedChange={() => toggleGuest(guest._id)}
-                    />
-                    <span className="text-sm text-zinc-800">
-                      {guest.firstName} {guest.lastName}
-                    </span>
-                  </label>
-                ))}
-              </div>
+          {composeLocked && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+              <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Guests and special invitations are locked because a guest has
+                already responded.
+              </span>
             </div>
           )}
+
+          <div className="space-y-1.5">
+            <Label>Special invitations</Label>
+            {specialEvents === undefined ? (
+              <p className="text-xs text-zinc-500">Loading…</p>
+            ) : specialEvents.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-3 text-center">
+                <p className="text-sm text-zinc-500">
+                  No special invitations yet (optional).
+                </p>
+                <Button asChild variant="link" size="sm" className="h-auto p-0">
+                  <Link
+                    href={`/dashboard/${eventSlug}/special-events`}
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Create a special invitation
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-zinc-500">
+                  Choose which special invitations this group can see.
+                </p>
+                <div className="space-y-1 rounded-lg border p-2">
+                  {specialEvents.map((se) => (
+                    <label
+                      key={se._id}
+                      className={
+                        "flex items-center gap-2 rounded-md px-2 py-1.5 " +
+                        (composeLocked
+                          ? "cursor-not-allowed opacity-60"
+                          : "cursor-pointer hover:bg-zinc-50")
+                      }
+                    >
+                      <Checkbox
+                        checked={selectedSpecialIds.includes(se._id)}
+                        disabled={composeLocked}
+                        onCheckedChange={() => toggleSpecial(se._id)}
+                      />
+                      <span className="text-sm text-zinc-800">{se.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Guests</Label>
+            {candidateGuests.length === 0 ? (
+              <p className="text-xs text-zinc-500">
+                No guests available. Add guests to this event first.
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-zinc-500">
+                  Select the guests included in this invitation.
+                </p>
+                <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2">
+                  {candidateGuests.map((guest) => (
+                    <label
+                      key={guest._id}
+                      className={
+                        "flex items-center gap-2 rounded-md px-2 py-1.5 " +
+                        (composeLocked
+                          ? "cursor-not-allowed opacity-60"
+                          : "cursor-pointer hover:bg-zinc-50")
+                      }
+                    >
+                      <Checkbox
+                        checked={selectedGuestIds.includes(guest._id)}
+                        disabled={composeLocked}
+                        onCheckedChange={() => toggleGuest(guest._id)}
+                      />
+                      <span className="text-sm text-zinc-800">
+                        {guest.firstName} {guest.lastName}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

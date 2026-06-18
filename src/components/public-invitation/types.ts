@@ -18,8 +18,6 @@ export interface PublicInvitation {
   _id: string
   title: string
   slug: string
-  type: "single" | "group" | "plusOne"
-  maxGuests: number
 }
 
 export interface PublicGuest {

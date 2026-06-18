@@ -42,11 +42,6 @@ export const getOverviewStats = query({
       if (guest.tableId) tableAssignmentCount++;
     }
 
-    const guestCapacity = invitations.reduce(
-      (sum, inv) => sum + inv.maxGuests,
-      0
-    );
-
     return {
       totalInvitations,
       totalGuests,
@@ -56,7 +51,6 @@ export const getOverviewStats = query({
       allergyCount,
       menuCompletionCount,
       tableAssignmentCount,
-      guestCapacity,
     };
   },
 });

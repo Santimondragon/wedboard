@@ -5,17 +5,18 @@ import { api } from "convex/_generated/api"
 import { Doc, Id } from "convex/_generated/dataModel"
 import { useToastMutation } from "@/hooks/use-toast-mutation"
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { RsvpStatusBadge } from "@/components/guests/rsvp-status-badge"
+import type { SpecialEventStatus } from "@/components/guests/guest-table"
 import {
   Select,
   SelectContent,
@@ -36,7 +37,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Trash2 } from "lucide-react"
 
-type GuestWithInvitation = Doc<"guests"> & { invitationTitle?: string }
+type GuestWithInvitation = Doc<"guests"> & {
+  invitationTitle?: string
+  specialStatuses?: Record<string, SpecialEventStatus>
+}
 
 interface GuestDetailsSheetProps {
   guest: GuestWithInvitation | null
@@ -44,6 +48,8 @@ interface GuestDetailsSheetProps {
   onOpenChange: (open: boolean) => void
   menuOptions: Array<Doc<"menuOptions">>
   drinkOptions: Array<Doc<"drinkOptions">>
+  // Special events for the event, used to label the guest's RSVP statuses.
+  specialEvents?: { _id: string; name: string }[]
   // The +1 record linked to this guest (when it hosts one).
   plusOne?: Doc<"guests"> | null
   // The host's display name when this guest *is* a +1.
@@ -56,6 +62,7 @@ export function GuestDetailsSheet({
   onOpenChange,
   menuOptions,
   drinkOptions,
+  specialEvents = [],
   plusOne,
   hostName,
 }: GuestDetailsSheetProps) {
@@ -75,6 +82,17 @@ export function GuestDetailsSheet({
     success: "+1 removed",
     error: "Failed to remove +1",
   })
+  const setSpecialEventRsvp = useToastMutation(api.guests.setSpecialEventRsvp, {
+    success: "Special event RSVP updated",
+    error: "Failed to update special event RSVP",
+  })
+  const removeSpecialEventRsvp = useToastMutation(
+    api.guests.removeSpecialEventRsvp,
+    {
+      success: "Removed from special event",
+      error: "Failed to remove from special event",
+    },
+  )
 
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
@@ -82,7 +100,6 @@ export function GuestDetailsSheet({
   const [phone, setPhone] = useState("")
   const [rsvpStatus, setRsvpStatus] = useState<"pending" | "attending" | "declined">("pending")
   const [allergies, setAllergies] = useState("")
-  const [specialRequests, setSpecialRequests] = useState("")
   const [menuOptionId, setMenuOptionId] = useState<string | undefined>(undefined)
   const [drinkOptionId, setDrinkOptionId] = useState<string | undefined>(undefined)
   const [allowsPlusOne, setAllowsPlusOne] = useState(false)
@@ -102,7 +119,6 @@ export function GuestDetailsSheet({
       setPhone(guest.phone ?? "")
       setRsvpStatus((guest.rsvpStatus as "pending" | "attending" | "declined") ?? "pending")
       setAllergies(guest.allergies ?? "")
-      setSpecialRequests(guest.specialRequests ?? "")
       setMenuOptionId(guest.menuOptionId ?? undefined)
       setDrinkOptionId(guest.drinkOptionId ?? undefined)
       setAllowsPlusOne(guest.allowsPlusOne ?? false)
@@ -119,7 +135,6 @@ export function GuestDetailsSheet({
       phone: phone || undefined,
       rsvpStatus,
       allergies: allergies || undefined,
-      specialRequests: specialRequests || undefined,
       menuOptionId: menuOptionId as Id<"menuOptions"> | undefined,
       drinkOptionId: drinkOptionId as Id<"drinkOptions"> | undefined,
       allowsPlusOne,
@@ -134,17 +149,17 @@ export function GuestDetailsSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Guest Details</SheetTitle>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Guest Details</DialogTitle>
           {guest?.invitationTitle && (
             <p className="text-sm text-zinc-500">{guest.invitationTitle}</p>
           )}
-        </SheetHeader>
+        </DialogHeader>
 
         {guest && (
-          <div className="mt-6 space-y-4">
+          <div className="mt-2 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="firstName">First Name</Label>
@@ -184,21 +199,71 @@ export function GuestDetailsSheet({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label>RSVP Status</Label>
-              <Select
-                value={rsvpStatus}
-                onValueChange={(v) => setRsvpStatus(v as "pending" | "attending" | "declined")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="attending">Attending</SelectItem>
-                  <SelectItem value="declined">Declined</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* RSVPs — the main event status plus a row per special event the
+                guest is invited to (editable; saved immediately). */}
+            <div className="space-y-3 rounded-md border p-3">
+              <Label className="text-sm font-medium">RSVPs</Label>
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-zinc-700">Main event</span>
+                <Select
+                  value={rsvpStatus}
+                  onValueChange={(v) => setRsvpStatus(v as "pending" | "attending" | "declined")}
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="attending">Attending</SelectItem>
+                    <SelectItem value="declined">Declined</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Every special event — including ones the guest wasn't
+                  invited to (default "Not invited"). Picking a status adds
+                  them; picking "Not invited" removes their RSVP row. */}
+              {specialEvents.map((se) => (
+                <div
+                  key={se._id}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <span className="text-sm text-zinc-700">{se.name}</span>
+                  <Select
+                    value={guest.specialStatuses?.[se._id] ?? "notInvited"}
+                    disabled={
+                      setSpecialEventRsvp.pending ||
+                      removeSpecialEventRsvp.pending
+                    }
+                    onValueChange={(v) => {
+                      const specialEventId = se._id as Id<"specialEvents">
+                      if (v === "notInvited") {
+                        removeSpecialEventRsvp.run({
+                          guestId: guest._id,
+                          specialEventId,
+                        })
+                      } else {
+                        setSpecialEventRsvp.run({
+                          guestId: guest._id,
+                          specialEventId,
+                          status: v as "pending" | "attending" | "declined",
+                        })
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="notInvited">Not invited</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="attending">Attending</SelectItem>
+                      <SelectItem value="declined">Declined</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
             </div>
 
             {/* +1 management — a guest that IS a +1 shows its host; a host
@@ -314,16 +379,6 @@ export function GuestDetailsSheet({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="specialRequests">Special Requests</Label>
-              <Textarea
-                id="specialRequests"
-                value={specialRequests}
-                onChange={(e) => setSpecialRequests(e.target.value)}
-                rows={2}
-              />
-            </div>
-
             <div className="flex items-center justify-between pt-4 border-t">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -359,7 +414,7 @@ export function GuestDetailsSheet({
             </div>
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }

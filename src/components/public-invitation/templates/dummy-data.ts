@@ -16,8 +16,6 @@ export const DUMMY_INVITATION_DATA: PublicInvitationData = {
     _id: "preview-invitation",
     title: "The Carter Family",
     slug: "the-carter-family",
-    type: "group",
-    maxGuests: 4,
   },
   guests: [
     {

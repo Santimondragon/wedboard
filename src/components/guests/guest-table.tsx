@@ -27,7 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Pencil } from "lucide-react"
 
 export type SpecialEventStatus =
   | "notInvited"
@@ -160,19 +159,6 @@ export function GuestTable({
             </span>
           )
         },
-      }),
-      columnHelper.display({
-        id: "actions",
-        header: "",
-        cell: ({ row }) => (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onEditGuest(row.original._id)}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-        ),
       }),
     ],
     [onEditGuest, specialEvents, showMenu, showDrink],

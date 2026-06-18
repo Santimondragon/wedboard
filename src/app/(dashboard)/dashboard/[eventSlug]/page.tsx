@@ -58,11 +58,6 @@ export default function EventOverviewPage() {
       icon: Mail,
     },
     {
-      title: "Guest Capacity",
-      value: stats.guestCapacity,
-      icon: Users,
-    },
-    {
       title: "Total Guests",
       value: stats.totalGuests,
       icon: Users,

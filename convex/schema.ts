@@ -80,12 +80,18 @@ export default defineSchema({
     eventId: v.id("events"),
     title: v.string(),
     slug: v.string(),
-    type: v.union(
-      v.literal("single"),
-      v.literal("group"),
-      v.literal("plusOne")
+    // Deprecated: no longer surfaced or written. Kept optional for back-compat
+    // with existing docs.
+    type: v.optional(
+      v.union(
+        v.literal("single"),
+        v.literal("group"),
+        v.literal("plusOne")
+      )
     ),
-    maxGuests: v.number(),
+    // Deprecated: no longer surfaced or written. Kept optional for back-compat
+    // with existing docs.
+    maxGuests: v.optional(v.number()),
     // Deprecated: +1 is now a per-guest flag (`guests.allowsPlusOne`). Kept
     // optional for back-compat with existing docs; no longer read or written.
     allowPlusOne: v.optional(v.boolean()),

@@ -142,8 +142,6 @@ export const seedDemoEvent = internalMutation({
       eventId,
       title: "Familia García",
       slug: "familia-garcia",
-      type: "group",
-      maxGuests: 4,
       isActive: true,
     });
 
@@ -151,8 +149,6 @@ export const seedDemoEvent = internalMutation({
       eventId,
       title: "Familia López",
       slug: "familia-lopez",
-      type: "group",
-      maxGuests: 6,
       isActive: true,
     });
 
@@ -160,8 +156,6 @@ export const seedDemoEvent = internalMutation({
       eventId,
       title: "The Johnson Family",
       slug: "the-johnson-family",
-      type: "group",
-      maxGuests: 4,
       isActive: true,
     });
 
@@ -169,8 +163,6 @@ export const seedDemoEvent = internalMutation({
       eventId,
       title: "Amigos del trabajo",
       slug: "amigos-del-trabajo",
-      type: "group",
-      maxGuests: 2,
       isActive: true,
     });
 
@@ -178,8 +170,6 @@ export const seedDemoEvent = internalMutation({
       eventId,
       title: "Compañeros de universidad",
       slug: "companeros-de-universidad",
-      type: "group",
-      maxGuests: 4,
       isActive: true,
     });
 
