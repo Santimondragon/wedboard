@@ -1,23 +1,24 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useMutation } from "convex/react"
-import { ConvexError } from "convex/values"
-import { api } from "convex/_generated/api"
-import { toast } from "sonner"
-import { useEvent } from "@/components/dashboard/event-provider"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMutation } from "convex/react";
+import { ConvexError } from "convex/values";
+import { api } from "convex/_generated/api";
+import { toast } from "sonner";
+import { useEvent } from "@/components/dashboard/event-provider";
+import { CustomDomainSettings } from "@/components/dashboard/custom-domain-settings";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,80 +29,86 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
-  const router = useRouter()
-  const event = useEvent()
-  const eventId = event._id
-  const updateEvent = useMutation(api.events.updateEvent)
-  const deleteEvent = useMutation(api.events.deleteEvent)
+  const router = useRouter();
+  const event = useEvent();
+  const eventId = event._id;
+  const updateEvent = useMutation(api.events.updateEvent);
+  const deleteEvent = useMutation(api.events.deleteEvent);
 
-  const [name, setName] = useState("")
-  const [slug, setSlug] = useState("")
-  const [brideName, setBrideName] = useState("")
-  const [groomName, setGroomName] = useState("")
-  const [date, setDate] = useState("")
-  const [venueName, setVenueName] = useState("")
-  const [venueAddress, setVenueAddress] = useState("")
-  const [venueMapUrl, setVenueMapUrl] = useState("")
-  const [status, setStatus] = useState<"draft" | "active" | "archived">("draft")
-  const [saving, setSaving] = useState(false)
-  const [savingSlug, setSavingSlug] = useState(false)
-  const [archiving, setArchiving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [brideName, setBrideName] = useState("");
+  const [groomName, setGroomName] = useState("");
+  const [date, setDate] = useState("");
+  const [venueName, setVenueName] = useState("");
+  const [venueAddress, setVenueAddress] = useState("");
+  const [venueMapUrl, setVenueMapUrl] = useState("");
+  const [status, setStatus] = useState<"draft" | "active" | "archived">(
+    "draft",
+  );
+  const [saving, setSaving] = useState(false);
+  const [savingSlug, setSavingSlug] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Sync form fields from the loaded event during render (guarded by a
   // previous-value check) rather than in an effect — avoids the cascading
   // re-render that synchronous setState in useEffect triggers.
-  const [syncedEvent, setSyncedEvent] = useState(event)
+  const [syncedEvent, setSyncedEvent] = useState(event);
   if (event !== syncedEvent) {
-    setSyncedEvent(event)
+    setSyncedEvent(event);
     if (event) {
-      setName(event.name ?? "")
-      setSlug(event.slug ?? "")
-      setBrideName(event.brideName ?? "")
-      setGroomName(event.groomName ?? "")
-      setDate(event.date ? new Date(event.date).toISOString().split("T")[0] : "")
-      setVenueName(event.venueName ?? "")
-      setVenueAddress(event.venueAddress ?? "")
-      setVenueMapUrl(event.venueMapUrl ?? "")
-      setStatus((event.status as "draft" | "active" | "archived") ?? "draft")
+      setName(event.name ?? "");
+      setSlug(event.slug ?? "");
+      setBrideName(event.brideName ?? "");
+      setGroomName(event.groomName ?? "");
+      setDate(
+        event.date ? new Date(event.date).toISOString().split("T")[0] : "",
+      );
+      setVenueName(event.venueName ?? "");
+      setVenueAddress(event.venueAddress ?? "");
+      setVenueMapUrl(event.venueMapUrl ?? "");
+      setStatus((event.status as "draft" | "active" | "archived") ?? "draft");
     }
   }
 
   async function handleSaveSlug() {
     if (!/^[a-z0-9-]+$/.test(slug)) {
-      toast.error("Event key may only contain lowercase letters, numbers, and hyphens")
-      return
+      toast.error(
+        "Event key may only contain lowercase letters, numbers, and hyphens",
+      );
+      return;
     }
-    setSavingSlug(true)
+    setSavingSlug(true);
     try {
-      await updateEvent({ eventId, slug })
-      toast.success("Event key updated")
+      await updateEvent({ eventId, slug });
+      toast.success("Event key updated");
       // The slug is part of the URL — move to the new address.
-      router.replace(`/dashboard/${slug}/settings`)
+      router.replace(`/dashboard/${slug}/settings`);
     } catch (err) {
       toast.error(
         err instanceof ConvexError
           ? (err.data as string)
-          : "Failed to update event key"
-      )
+          : "Failed to update event key",
+      );
     } finally {
-      setSavingSlug(false)
+      setSavingSlug(false);
     }
   }
 
   async function handleSave() {
-    const trimmedMapUrl = venueMapUrl.trim()
+    const trimmedMapUrl = venueMapUrl.trim();
     if (trimmedMapUrl && !/^https?:\/\//i.test(trimmedMapUrl)) {
-      toast.error("Location link must start with http:// or https://")
-      return
+      toast.error("Location link must start with http:// or https://");
+      return;
     }
-    setSaving(true)
+    setSaving(true);
     try {
       await updateEvent({
         eventId,
@@ -113,41 +120,41 @@ export default function SettingsPage() {
         venueAddress: venueAddress || undefined,
         venueMapUrl: trimmedMapUrl || undefined,
         status,
-      })
-      toast.success("Settings saved")
+      });
+      toast.success("Settings saved");
     } catch {
-      toast.error("Failed to save settings")
+      toast.error("Failed to save settings");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   async function handleArchive() {
-    setArchiving(true)
+    setArchiving(true);
     try {
-      await updateEvent({ eventId, status: "archived" })
-      setStatus("archived")
-      toast.success("Event archived")
+      await updateEvent({ eventId, status: "archived" });
+      setStatus("archived");
+      toast.success("Event archived");
     } catch {
-      toast.error("Failed to archive event")
+      toast.error("Failed to archive event");
     } finally {
-      setArchiving(false)
+      setArchiving(false);
     }
   }
 
   async function handleDelete() {
-    setDeleting(true)
+    setDeleting(true);
     try {
-      await deleteEvent({ eventId })
-      toast.success("Event deleted")
-      router.replace("/dashboard")
+      await deleteEvent({ eventId });
+      toast.success("Event deleted");
+      router.replace("/dashboard");
     } catch {
-      toast.error("Failed to delete event")
-      setDeleting(false)
+      toast.error("Failed to delete event");
+      setDeleting(false);
     }
   }
 
-  const isLoading = event === undefined
+  const isLoading = event === undefined;
 
   return (
     <div className="p-6 max-w-2xl space-y-8">
@@ -232,7 +239,8 @@ export default function SettingsPage() {
                 placeholder="https://maps.google.com/?q=..."
               />
               <p className="text-xs text-zinc-400">
-                Guests tap &ldquo;View map&rdquo; on the invitation to open this link.
+                Guests tap &ldquo;View map&rdquo; on the invitation to open this
+                link.
               </p>
             </div>
 
@@ -240,7 +248,9 @@ export default function SettingsPage() {
               <Label>Status</Label>
               <Select
                 value={status}
-                onValueChange={(v) => setStatus(v as "draft" | "active" | "archived")}
+                onValueChange={(v) =>
+                  setStatus(v as "draft" | "active" | "archived")
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -263,8 +273,8 @@ export default function SettingsPage() {
           <section className="space-y-4">
             <h2 className="text-base font-medium text-zinc-900">Event Key</h2>
             <p className="text-sm text-zinc-500">
-              Your public invitation links use this key, like a handle. It must be
-              unique across all events.
+              Your public invitation links use this key, like a handle. It must
+              be unique across all events.
             </p>
             <div className="space-y-1.5">
               <Label htmlFor="slug">Key</Label>
@@ -279,7 +289,11 @@ export default function SettingsPage() {
                 /{slug || "your-event"}/invitations/...
               </p>
             </div>
-            <Button onClick={handleSaveSlug} disabled={savingSlug} variant="outline">
+            <Button
+              onClick={handleSaveSlug}
+              disabled={savingSlug}
+              variant="outline"
+            >
               {savingSlug ? "Saving..." : "Save Key"}
             </Button>
           </section>
@@ -289,25 +303,27 @@ export default function SettingsPage() {
           <section className="space-y-4 opacity-60 pointer-events-none select-none">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-medium text-zinc-900">Subdomain</h2>
-              <Badge variant="outline" className="text-xs">Coming soon</Badge>
+              <Badge variant="outline" className="text-xs">
+                Coming soon
+              </Badge>
             </div>
             <Input disabled placeholder="your-event" />
           </section>
 
           <Separator />
 
-          <section className="space-y-4 opacity-60 pointer-events-none select-none">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-medium text-zinc-900">Custom Domain</h2>
-              <Badge variant="outline" className="text-xs">Coming soon</Badge>
-            </div>
-            <Input disabled placeholder="wedding.yourdomain.com" />
-          </section>
+          <CustomDomainSettings
+            eventId={eventId}
+            customDomain={event.customDomain}
+            customDomainVerified={event.customDomainVerified}
+          />
 
           <Separator />
 
           <section className="space-y-4">
-            <h2 className="text-base font-medium text-zinc-900">Invitation Template</h2>
+            <h2 className="text-base font-medium text-zinc-900">
+              Invitation Template
+            </h2>
             <p className="text-sm text-zinc-500">
               Choose a design template and the sections shown on your public
               invitation page.
@@ -327,12 +343,17 @@ export default function SettingsPage() {
               <div>
                 <p className="text-sm font-medium">Archive this event</p>
                 <p className="text-sm text-zinc-500">
-                  The event will be marked as archived and hidden from active events.
+                  The event will be marked as archived and hidden from active
+                  events.
                 </p>
               </div>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-rose-600 border-rose-200 hover:bg-rose-50">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-rose-600 border-rose-200 hover:bg-rose-50"
+                  >
                     Archive
                   </Button>
                 </AlertDialogTrigger>
@@ -340,8 +361,9 @@ export default function SettingsPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Archive Event</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to archive &ldquo;{event?.name}&rdquo;? The event and its data will
-                      be preserved but it will be marked as archived.
+                      Are you sure you want to archive &ldquo;{event?.name}
+                      &rdquo;? The event and its data will be preserved but it
+                      will be marked as archived.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -362,9 +384,9 @@ export default function SettingsPage() {
               <div>
                 <p className="text-sm font-medium">Delete this event</p>
                 <p className="text-sm text-zinc-500">
-                  Permanently delete the event and all of its data — invitations,
-                  guests, special events, menus, tables, media, and messages. This
-                  cannot be undone.
+                  Permanently delete the event and all of its data —
+                  invitations, guests, special events, menus, tables, media, and
+                  messages. This cannot be undone.
                 </p>
               </div>
               <AlertDialog>
@@ -377,10 +399,11 @@ export default function SettingsPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete Event</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to permanently delete &ldquo;{event?.name}&rdquo;?
-                      This will remove the event and all related invitations, guests,
-                      special events, menus, drinks, tables, media, and messages. This
-                      action cannot be undone.
+                      Are you sure you want to permanently delete &ldquo;
+                      {event?.name}&rdquo;? This will remove the event and all
+                      related invitations, guests, special events, menus,
+                      drinks, tables, media, and messages. This action cannot be
+                      undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -400,5 +423,5 @@ export default function SettingsPage() {
         </>
       )}
     </div>
-  )
+  );
 }

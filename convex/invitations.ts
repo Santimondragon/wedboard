@@ -2,9 +2,14 @@ import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { requireEventEditor } from "./lib/permissions";
 import { generateSlug, generateUniqueInvitationSlug } from "./lib/slug";
-import { resolvePublicEvent, resolvePublicInvitation } from "./lib/public";
+import {
+  resolvePublicEvent,
+  resolvePublicEventByHost,
+  resolvePublicInvitation,
+} from "./lib/public";
 import { deletePlusOneCascade, findPlusOne } from "./lib/guests";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
+import { QueryCtx } from "./_generated/server";
 
 export const listByEvent = query({
   args: { eventId: v.id("events") },
@@ -74,7 +79,9 @@ export const getInvitationsPageData = query({
       }
     }
 
-    const specialEventName = new Map(specialEvents.map((se) => [se._id, se.name]));
+    const specialEventName = new Map(
+      specialEvents.map((se) => [se._id, se.name]),
+    );
 
     // Special invitations each invitation can see.
     const specialByInvitation: Record<
@@ -91,7 +98,7 @@ export const getInvitationsPageData = query({
           const name = specialEventName.get(r.specialEventId);
           return name ? [{ _id: r.specialEventId, name }] : [];
         });
-      })
+      }),
     );
 
     return invitations.map((inv) => {
@@ -106,6 +113,134 @@ export const getInvitationsPageData = query({
   },
 });
 
+// Full public payload for an already-resolved event: invitation, guests,
+// derived RSVP state, special events, state-resolved layout, and media URLs.
+// Shared by the by-slug and by-host (custom domain) public queries.
+async function buildPublicInvitationPayload(
+  ctx: QueryCtx,
+  event: Doc<"events">,
+  invitationSlug: string,
+) {
+  const invitation = await resolvePublicInvitation(ctx, event, invitationSlug);
+  if (!invitation) {
+    return null;
+  }
+
+  const guests = await ctx.db
+    .query("guests")
+    .withIndex("by_invitationId", (q) => q.eq("invitationId", invitation._id))
+    .take(100);
+
+  // Derive which layout variant to show from the guests' RSVP states:
+  // any attending → accepted; else any pending → pending; else declined.
+  // No guests → pending.
+  const rsvpState: "pending" | "accepted" | "declined" = guests.some(
+    (g) => g.rsvpStatus === "attending",
+  )
+    ? "accepted"
+    : guests.length === 0 || guests.some((g) => g.rsvpStatus === "pending")
+      ? "pending"
+      : "declined";
+
+  // Special events this invitation may RSVP to (via invitationSpecialEventAccess),
+  // each enriched with every guest's current per-event RSVP status. Powers the
+  // elegant `specialInvitation` block's confirm modal.
+  const accesses = await ctx.db
+    .query("invitationSpecialEventAccess")
+    .withIndex("by_invitationId", (q) => q.eq("invitationId", invitation._id))
+    .take(100);
+  const specialEventDocs = (
+    await Promise.all(accesses.map((a) => ctx.db.get(a.specialEventId)))
+  ).filter((se): se is NonNullable<typeof se> => se !== null && se.isActive);
+
+  // Each guest's special-event RSVP rows, fetched once and indexed by guest.
+  const rsvpRowsByGuest = await Promise.all(
+    guests.map((g) =>
+      ctx.db
+        .query("guestSpecialEventRsvps")
+        .withIndex("by_guestId", (q) => q.eq("guestId", g._id))
+        .take(100),
+    ),
+  );
+  const specialEvents = specialEventDocs.map((se) => {
+    const guestStatuses: Record<string, "pending" | "attending" | "declined"> =
+      {};
+    rsvpRowsByGuest.forEach((rows, i) => {
+      // Declined guests are off the special invitations entirely.
+      if (guests[i].rsvpStatus === "declined") return;
+      const row = rows.find((r) => r.specialEventId === se._id);
+      if (row) guestStatuses[guests[i]._id] = row.status;
+    });
+    return {
+      _id: se._id,
+      name: se.name,
+      description: se.description,
+      date: se.date,
+      location: se.location,
+      guestStatuses,
+    };
+  });
+
+  // Saved blocks for the resolved state. `layoutBlocks` is the legacy single
+  // layout, used as the accepted fallback. Undefined → the public page falls
+  // back to the selected template's default layout for this state.
+  const layoutBlocks =
+    event.layoutVariants?.[rsvpState] ??
+    (rsvpState === "accepted" ? event.layoutBlocks : undefined);
+
+  // Resolve media references in the layout config ("image" fields store a
+  // media id string) to signed URLs so the public page can render them.
+  const mediaUrls: Record<string, string> = {};
+  for (const block of layoutBlocks ?? []) {
+    for (const value of Object.values(
+      (block.config ?? {}) as Record<string, unknown>,
+    )) {
+      if (typeof value !== "string" || value in mediaUrls) continue;
+      const mediaId = ctx.db.normalizeId("media", value);
+      if (!mediaId) continue;
+      const media = await ctx.db.get(mediaId);
+      if (!media || media.eventId !== event._id) continue;
+      const url = await ctx.storage.getUrl(media.storageId);
+      if (url) mediaUrls[value] = url;
+    }
+  }
+
+  return {
+    event: {
+      name: event.name,
+      // The event key. On a custom domain the URL doesn't carry it, but the
+      // public RSVP/message mutations resolve by slug — the client sources
+      // it from here.
+      slug: event.slug,
+      brideName: event.brideName,
+      groomName: event.groomName,
+      date: event.date,
+      venueName: event.venueName,
+      venueAddress: event.venueAddress,
+      venueMapUrl: event.venueMapUrl,
+      templateId: event.templateId,
+      layoutBlocks,
+    },
+    rsvpState,
+    invitation: {
+      _id: invitation._id,
+      title: invitation.title,
+      slug: invitation.slug,
+    },
+    guests: guests.map((g) => ({
+      _id: g._id,
+      firstName: g.firstName,
+      lastName: g.lastName,
+      rsvpStatus: g.rsvpStatus,
+      allowsPlusOne: g.allowsPlusOne ?? false,
+      isPlusOne: g.isPlusOne,
+      plusOneOfGuestId: g.plusOneOfGuestId,
+    })),
+    specialEvents,
+    mediaUrls,
+  };
+}
+
 export const getPublicInvitation = query({
   args: { eventSlug: v.string(), invitationSlug: v.string() },
   handler: async (ctx, args) => {
@@ -113,131 +248,20 @@ export const getPublicInvitation = query({
     if (!event) {
       return null;
     }
+    return await buildPublicInvitationPayload(ctx, event, args.invitationSlug);
+  },
+});
 
-    const invitation = await resolvePublicInvitation(
-      ctx,
-      event,
-      args.invitationSlug
-    );
-    if (!invitation) {
+// Public — custom-domain variant: resolves the event from the request's Host
+// header instead of a URL slug. Same payload as getPublicInvitation.
+export const getPublicInvitationByHost = query({
+  args: { host: v.string(), invitationSlug: v.string() },
+  handler: async (ctx, args) => {
+    const event = await resolvePublicEventByHost(ctx, args.host);
+    if (!event) {
       return null;
     }
-
-    const guests = await ctx.db
-      .query("guests")
-      .withIndex("by_invitationId", (q) =>
-        q.eq("invitationId", invitation._id)
-      )
-      .take(100);
-
-    // Derive which layout variant to show from the guests' RSVP states:
-    // any attending → accepted; else any pending → pending; else declined.
-    // No guests → pending.
-    const rsvpState: "pending" | "accepted" | "declined" = guests.some(
-      (g) => g.rsvpStatus === "attending"
-    )
-      ? "accepted"
-      : guests.length === 0 || guests.some((g) => g.rsvpStatus === "pending")
-        ? "pending"
-        : "declined";
-
-    // Special events this invitation may RSVP to (via invitationSpecialEventAccess),
-    // each enriched with every guest's current per-event RSVP status. Powers the
-    // elegant `specialInvitation` block's confirm modal.
-    const accesses = await ctx.db
-      .query("invitationSpecialEventAccess")
-      .withIndex("by_invitationId", (q) => q.eq("invitationId", invitation._id))
-      .take(100);
-    const specialEventDocs = (
-      await Promise.all(accesses.map((a) => ctx.db.get(a.specialEventId)))
-    ).filter(
-      (se): se is NonNullable<typeof se> => se !== null && se.isActive
-    );
-
-    // Each guest's special-event RSVP rows, fetched once and indexed by guest.
-    const rsvpRowsByGuest = await Promise.all(
-      guests.map((g) =>
-        ctx.db
-          .query("guestSpecialEventRsvps")
-          .withIndex("by_guestId", (q) => q.eq("guestId", g._id))
-          .take(100)
-      )
-    );
-    const specialEvents = specialEventDocs.map((se) => {
-      const guestStatuses: Record<
-        string,
-        "pending" | "attending" | "declined"
-      > = {};
-      rsvpRowsByGuest.forEach((rows, i) => {
-        // Declined guests are off the special invitations entirely.
-        if (guests[i].rsvpStatus === "declined") return;
-        const row = rows.find((r) => r.specialEventId === se._id);
-        if (row) guestStatuses[guests[i]._id] = row.status;
-      });
-      return {
-        _id: se._id,
-        name: se.name,
-        description: se.description,
-        date: se.date,
-        location: se.location,
-        guestStatuses,
-      };
-    });
-
-    // Saved blocks for the resolved state. `layoutBlocks` is the legacy single
-    // layout, used as the accepted fallback. Undefined → the public page falls
-    // back to the selected template's default layout for this state.
-    const layoutBlocks =
-      event.layoutVariants?.[rsvpState] ??
-      (rsvpState === "accepted" ? event.layoutBlocks : undefined);
-
-    // Resolve media references in the layout config ("image" fields store a
-    // media id string) to signed URLs so the public page can render them.
-    const mediaUrls: Record<string, string> = {};
-    for (const block of layoutBlocks ?? []) {
-      for (const value of Object.values(
-        (block.config ?? {}) as Record<string, unknown>
-      )) {
-        if (typeof value !== "string" || value in mediaUrls) continue;
-        const mediaId = ctx.db.normalizeId("media", value);
-        if (!mediaId) continue;
-        const media = await ctx.db.get(mediaId);
-        if (!media || media.eventId !== event._id) continue;
-        const url = await ctx.storage.getUrl(media.storageId);
-        if (url) mediaUrls[value] = url;
-      }
-    }
-
-    return {
-      event: {
-        name: event.name,
-        brideName: event.brideName,
-        groomName: event.groomName,
-        date: event.date,
-        venueName: event.venueName,
-        venueAddress: event.venueAddress,
-        venueMapUrl: event.venueMapUrl,
-        templateId: event.templateId,
-        layoutBlocks,
-      },
-      rsvpState,
-      invitation: {
-        _id: invitation._id,
-        title: invitation.title,
-        slug: invitation.slug,
-      },
-      guests: guests.map((g) => ({
-        _id: g._id,
-        firstName: g.firstName,
-        lastName: g.lastName,
-        rsvpStatus: g.rsvpStatus,
-        allowsPlusOne: g.allowsPlusOne ?? false,
-        isPlusOne: g.isPlusOne,
-        plusOneOfGuestId: g.plusOneOfGuestId,
-      })),
-      specialEvents,
-      mediaUrls,
-    };
+    return await buildPublicInvitationPayload(ctx, event, args.invitationSlug);
   },
 });
 
@@ -260,7 +284,7 @@ export const createInvitation = mutation({
     const slug = await generateUniqueInvitationSlug(
       ctx,
       args.eventId,
-      baseSlug
+      baseSlug,
     );
 
     const invitationId = await ctx.db.insert("invitations", {
@@ -278,11 +302,7 @@ export const createInvitation = mutation({
     if (args.guestIds) {
       for (const guestId of args.guestIds) {
         const guest = await ctx.db.get(guestId);
-        if (
-          guest &&
-          guest.eventId === args.eventId &&
-          !guest.invitationId
-        ) {
+        if (guest && guest.eventId === args.eventId && !guest.invitationId) {
           await ctx.db.patch(guestId, { invitationId });
         }
       }
@@ -331,11 +351,14 @@ export const updateInvitation = mutation({
         ctx,
         invitation.eventId,
         generateSlug(slug),
-        id
+        id,
       );
     }
 
-    await ctx.db.patch(id, { ...rest, ...(finalSlug ? { slug: finalSlug } : {}) });
+    await ctx.db.patch(id, {
+      ...rest,
+      ...(finalSlug ? { slug: finalSlug } : {}),
+    });
 
     // Reconcile guests / special-invitation access. Composition is locked once
     // any linked guest has responded — editing those is only allowed while all
@@ -348,7 +371,7 @@ export const updateInvitation = mutation({
 
       if (!linked.every((g) => g.rsvpStatus === "pending")) {
         throw new ConvexError(
-          "Cannot edit guests or special invitations after a guest has responded"
+          "Cannot edit guests or special invitations after a guest has responded",
         );
       }
 
@@ -456,7 +479,7 @@ export const setSpecialEventAccess = mutation({
       .withIndex("by_invitationId_and_specialEventId", (q) =>
         q
           .eq("invitationId", args.invitationId)
-          .eq("specialEventId", args.specialEventId)
+          .eq("specialEventId", args.specialEventId),
       )
       .unique();
 
@@ -484,7 +507,7 @@ export const regenerateSlug = mutation({
       ctx,
       invitation.eventId,
       baseSlug,
-      args.id
+      args.id,
     );
     await ctx.db.patch(args.id, { slug: newSlug });
     return newSlug;

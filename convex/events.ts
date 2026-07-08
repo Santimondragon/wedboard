@@ -10,6 +10,7 @@ import {
   generateUniqueSlug,
   RESERVED_EVENT_SLUGS,
 } from "./lib/slug";
+import { normalizeCustomDomain, validateCustomDomain } from "./lib/domains";
 
 export const listMyEvents = query({
   args: {},
@@ -129,10 +130,8 @@ export const updateEvent = mutation({
     venueAddress: v.optional(v.string()),
     venueMapUrl: v.optional(v.string()),
     status: v.optional(
-      v.union(v.literal("draft"), v.literal("active"), v.literal("archived"))
+      v.union(v.literal("draft"), v.literal("active"), v.literal("archived")),
     ),
-    subdomain: v.optional(v.string()),
-    customDomain: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireUser(ctx);
@@ -180,7 +179,7 @@ export const setInvitationTemplate = mutation({
         pending: v.optional(LAYOUT_BLOCKS_VALIDATOR),
         accepted: v.optional(LAYOUT_BLOCKS_VALIDATOR),
         declined: v.optional(LAYOUT_BLOCKS_VALIDATOR),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -189,6 +188,65 @@ export const setInvitationTemplate = mutation({
 
     const { eventId, ...updates } = args;
     await ctx.db.patch(eventId, updates);
+  },
+});
+
+// Claims a custom domain for the event. Only writes the Convex side — the
+// Vercel attach happens in the /api/domains route handler, which calls this
+// first (transactional uniqueness) and rolls back via removeCustomDomain if
+// the Vercel attach fails.
+export const setCustomDomain = mutation({
+  args: { eventId: v.id("events"), domain: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    await requireEventMember(ctx, args.eventId, user._id, "planner");
+
+    const domain = normalizeCustomDomain(args.domain);
+    const error = validateCustomDomain(domain);
+    if (error) {
+      throw new ConvexError(error);
+    }
+
+    const existing = await ctx.db
+      .query("events")
+      .withIndex("by_customDomain", (q) => q.eq("customDomain", domain))
+      .unique();
+    if (existing && existing._id !== args.eventId) {
+      throw new ConvexError(
+        `"${domain}" is already connected to another event`,
+      );
+    }
+
+    await ctx.db.patch(args.eventId, {
+      customDomain: domain,
+      customDomainVerified: false,
+    });
+    return domain;
+  },
+});
+
+export const removeCustomDomain = mutation({
+  args: { eventId: v.id("events") },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    await requireEventMember(ctx, args.eventId, user._id, "planner");
+    await ctx.db.patch(args.eventId, {
+      customDomain: undefined,
+      customDomainVerified: undefined,
+    });
+  },
+});
+
+// Caches Vercel's verification state for the settings UI. Called by the
+// /api/domains/status route handler after checking the Vercel API.
+export const setCustomDomainVerified = mutation({
+  args: { eventId: v.id("events"), verified: v.boolean() },
+  handler: async (ctx, args) => {
+    const user = await requireUser(ctx);
+    await requireEventMember(ctx, args.eventId, user._id, "planner");
+    await ctx.db.patch(args.eventId, {
+      customDomainVerified: args.verified,
+    });
   },
 });
 

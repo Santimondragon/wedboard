@@ -9,7 +9,7 @@ export const LAYOUT_BLOCKS_VALIDATOR = v.array(
     id: v.string(),
     type: v.string(),
     config: v.optional(v.any()),
-  })
+  }),
 );
 
 export default defineSchema({
@@ -37,6 +37,10 @@ export default defineSchema({
     venueMapUrl: v.optional(v.string()),
     subdomain: v.optional(v.string()),
     customDomain: v.optional(v.string()),
+    // Cached Vercel verification state for the settings UI only — public
+    // routing never gates on it (an unverified domain simply never resolves
+    // DNS to us).
+    customDomainVerified: v.optional(v.boolean()),
     templateId: v.optional(v.string()),
     // Legacy single layout. Kept for back-compat; read as the "accepted"
     // variant fallback when `layoutVariants.accepted` is unset.
@@ -49,12 +53,12 @@ export default defineSchema({
         pending: v.optional(LAYOUT_BLOCKS_VALIDATOR),
         accepted: v.optional(LAYOUT_BLOCKS_VALIDATOR),
         declined: v.optional(LAYOUT_BLOCKS_VALIDATOR),
-      })
+      }),
     ),
     status: v.union(
       v.literal("draft"),
       v.literal("active"),
-      v.literal("archived")
+      v.literal("archived"),
     ),
   })
     .index("by_ownerUserId", ["ownerUserId"])
@@ -69,7 +73,7 @@ export default defineSchema({
       v.literal("owner"),
       v.literal("planner"),
       v.literal("editor"),
-      v.literal("viewer")
+      v.literal("viewer"),
     ),
   })
     .index("by_eventId", ["eventId"])
@@ -83,11 +87,7 @@ export default defineSchema({
     // Deprecated: no longer surfaced or written. Kept optional for back-compat
     // with existing docs.
     type: v.optional(
-      v.union(
-        v.literal("single"),
-        v.literal("group"),
-        v.literal("plusOne")
-      )
+      v.union(v.literal("single"), v.literal("group"), v.literal("plusOne")),
     ),
     // Deprecated: no longer surfaced or written. Kept optional for back-compat
     // with existing docs.
@@ -121,7 +121,7 @@ export default defineSchema({
     rsvpStatus: v.union(
       v.literal("pending"),
       v.literal("attending"),
-      v.literal("declined")
+      v.literal("declined"),
     ),
     allergies: v.optional(v.string()),
     specialRequests: v.optional(v.string()),
@@ -154,7 +154,7 @@ export default defineSchema({
     status: v.union(
       v.literal("pending"),
       v.literal("attending"),
-      v.literal("declined")
+      v.literal("declined"),
     ),
   })
     .index("by_eventId", ["eventId"])

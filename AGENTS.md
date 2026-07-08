@@ -20,17 +20,17 @@ Wedding and event management platform. A logged-in planner manages event boards 
 
 ## Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 App Router (`src/` dir, `@/*` alias) |
-| Backend / DB | Convex (`convex/` at root, `convex/*` alias) |
-| Auth | Clerk (`@clerk/nextjs` v7) + `ConvexProviderWithClerk` |
-| UI | shadcn/ui + Tailwind CSS v4 |
-| Forms | react-hook-form + zod + @hookform/resolvers |
-| Tables | @tanstack/react-table |
-| Toasts | sonner |
-| Dates | date-fns |
-| Package manager | pnpm |
+| Layer           | Technology                                             |
+| --------------- | ------------------------------------------------------ |
+| Framework       | Next.js 16 App Router (`src/` dir, `@/*` alias)        |
+| Backend / DB    | Convex (`convex/` at root, `convex/*` alias)           |
+| Auth            | Clerk (`@clerk/nextjs` v7) + `ConvexProviderWithClerk` |
+| UI              | shadcn/ui + Tailwind CSS v4                            |
+| Forms           | react-hook-form + zod + @hookform/resolvers            |
+| Tables          | @tanstack/react-table                                  |
+| Toasts          | sonner                                                 |
+| Dates           | date-fns                                               |
+| Package manager | pnpm                                                   |
 
 ## Running locally
 
@@ -44,16 +44,24 @@ pnpm dev:all
 Convex deployment: `brilliant-retriever-770.convex.cloud`
 
 Required env in `.env.local`:
+
 ```
 NEXT_PUBLIC_CONVEX_URL=https://brilliant-retriever-770.convex.cloud
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
 CLERK_SECRET_KEY=sk_...
 CLERK_FRONTEND_API_URL=https://sharing-akita-57.clerk.accounts.dev
+NEXT_PUBLIC_PRIMARY_DOMAIN=localhost:3000   # hosts ≠ this are treated as custom domains by middleware
+# Custom domains (Vercel Domains API, used by /api/domains):
+VERCEL_TOKEN=...        # vercel.com/account/tokens
+VERCEL_PROJECT_ID=...   # Project Settings → General
+VERCEL_TEAM_ID=...      # optional, only when the project is in a team
 ```
 
 Required Convex env (set once via CLI):
+
 ```bash
 npx convex env set CLERK_FRONTEND_API_URL "https://sharing-akita-57.clerk.accounts.dev"
+npx convex env set PRIMARY_DOMAIN "yourdomain.com"  # custom-domain validation; Convex can't read NEXT_PUBLIC_* vars
 ```
 
 ---
@@ -61,104 +69,110 @@ npx convex env set CLERK_FRONTEND_API_URL "https://sharing-akita-57.clerk.accoun
 ## Database Schema (`convex/schema.ts`)
 
 ### `users`
+
 Mirrors Clerk identity. Created/updated on every login via `upsertCurrentUser`.
 
-| Field | Type | Notes |
-|---|---|---|
-| clerkId | string | Clerk `subject` |
-| tokenIdentifier | string | Canonical identity key — always use this for lookups |
-| email | string | |
-| firstName | string? | |
-| lastName | string? | |
-| role | string | Default `"user"` |
+| Field           | Type    | Notes                                                |
+| --------------- | ------- | ---------------------------------------------------- |
+| clerkId         | string  | Clerk `subject`                                      |
+| tokenIdentifier | string  | Canonical identity key — always use this for lookups |
+| email           | string  |                                                      |
+| firstName       | string? |                                                      |
+| lastName        | string? |                                                      |
+| role            | string  | Default `"user"`                                     |
 
 Indexes: `by_clerkId`, `by_tokenIdentifier`
 
 ---
 
 ### `events`
+
 Top-level board. One event = one wedding/occasion.
 
-| Field | Type |
-|---|---|
-| name | string |
-| slug | string | Handle-style **event key**, globally unique, editable in settings. Used in public URLs. |
-| ownerUserId | Id<"users"> |
-| brideName | string? | Shown on the public invitation (hero) |
-| groomName | string? | Shown on the public invitation (hero) |
-| date | number? | Unix ms timestamp |
-| venueName | string? | |
-| venueAddress | string? | |
-| venueMapUrl | string? | Google Maps (or any maps) link; backs the location "Ver mapa" button |
-| subdomain | string? | Future |
-| customDomain | string? | Future |
-| templateId | string? | Public invitation template id (`"elegant"`); defaults to elegant when unset |
-| layoutBlocks | `{id,type,config?}[]`? | **Legacy** single layout. Kept for back-compat; read as the `accepted` variant fallback when `layoutVariants.accepted` is unset. Validator shared via `LAYOUT_BLOCKS_VALIDATOR` (exported from `schema.ts`) |
-| layoutVariants | `{pending?,accepted?,declined?}`? | Per-RSVP-state page-builder layouts (each a `{id,type,config?}[]`). The public page picks one from the invitation's guests' RSVP state (see `getPublicInvitation`). Each variant undefined = the selected template's default layout for that state |
-| status | `"draft" \| "active" \| "archived"` |
+| Field                | Type                                |
+| -------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| name                 | string                              |
+| slug                 | string                              | Handle-style **event key**, globally unique, editable in settings. Used in public URLs.                                                                                                                                                            |
+| ownerUserId          | Id<"users">                         |
+| brideName            | string?                             | Shown on the public invitation (hero)                                                                                                                                                                                                              |
+| groomName            | string?                             | Shown on the public invitation (hero)                                                                                                                                                                                                              |
+| date                 | number?                             | Unix ms timestamp                                                                                                                                                                                                                                  |
+| venueName            | string?                             |                                                                                                                                                                                                                                                    |
+| venueAddress         | string?                             |                                                                                                                                                                                                                                                    |
+| venueMapUrl          | string?                             | Google Maps (or any maps) link; backs the location "Ver mapa" button                                                                                                                                                                               |
+| subdomain            | string?                             | Future                                                                                                                                                                                                                                             |
+| customDomain         | string?                             | Owner's own domain serving the public invitations (normalized bare hostname, globally unique). Set/cleared only via `setCustomDomain`/`removeCustomDomain` (orchestrated with the Vercel attach/detach by `/api/domains`)                          |
+| customDomainVerified | boolean?                            | Cached Vercel verification state for the settings UI only — public routing never gates on it                                                                                                                                                       |
+| templateId           | string?                             | Public invitation template id (`"elegant"`); defaults to elegant when unset                                                                                                                                                                        |
+| layoutBlocks         | `{id,type,config?}[]`?              | **Legacy** single layout. Kept for back-compat; read as the `accepted` variant fallback when `layoutVariants.accepted` is unset. Validator shared via `LAYOUT_BLOCKS_VALIDATOR` (exported from `schema.ts`)                                        |
+| layoutVariants       | `{pending?,accepted?,declined?}`?   | Per-RSVP-state page-builder layouts (each a `{id,type,config?}[]`). The public page picks one from the invitation's guests' RSVP state (see `getPublicInvitation`). Each variant undefined = the selected template's default layout for that state |
+| status               | `"draft" \| "active" \| "archived"` |
 
 Indexes: `by_ownerUserId`, `by_slug`, `by_subdomain`, `by_customDomain`
 
 ---
 
 ### `eventMembers`
+
 Links users to events with roles. Supports future multi-planner setup.
 
-| Field | Type |
-|---|---|
-| eventId | Id<"events"> |
-| userId | Id<"users"> |
-| role | `"owner" \| "planner" \| "editor" \| "viewer"` |
+| Field   | Type                                           |
+| ------- | ---------------------------------------------- |
+| eventId | Id<"events">                                   |
+| userId  | Id<"users">                                    |
+| role    | `"owner" \| "planner" \| "editor" \| "viewer"` |
 
 Indexes: `by_eventId`, `by_userId`, `by_eventId_and_userId`
 
 ---
 
 ### `invitations`
+
 A shareable link representing a person, couple, family, or group.
 Public URL: `/{event-key}/invitations/{slug}`
 
-| Field | Type |
-|---|---|
-| eventId | Id<"events"> |
-| title | string | e.g. "The Smith Family" |
-| slug | string | URL-safe, unique per event |
-| type | `("single" \| "group" \| "plusOne")?` | **Deprecated** — no longer surfaced, read, or written. Kept optional for back-compat with existing docs |
-| maxGuests | number? | **Deprecated** — no longer surfaced, read, or written. Kept optional for back-compat with existing docs |
-| allowPlusOne | boolean? | **Deprecated** — +1 is now per-guest (`guests.allowsPlusOne`). Kept optional for back-compat; not read or written |
-| isActive | boolean |
-| notes | string? | Admin-only |
+| Field        | Type                                  |
+| ------------ | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| eventId      | Id<"events">                          |
+| title        | string                                | e.g. "The Smith Family"                                                                                           |
+| slug         | string                                | URL-safe, unique per event                                                                                        |
+| type         | `("single" \| "group" \| "plusOne")?` | **Deprecated** — no longer surfaced, read, or written. Kept optional for back-compat with existing docs           |
+| maxGuests    | number?                               | **Deprecated** — no longer surfaced, read, or written. Kept optional for back-compat with existing docs           |
+| allowPlusOne | boolean?                              | **Deprecated** — +1 is now per-guest (`guests.allowsPlusOne`). Kept optional for back-compat; not read or written |
+| isActive     | boolean                               |
+| notes        | string?                               | Admin-only                                                                                                        |
 
 Indexes: `by_eventId`, `by_slug`, `by_eventId_and_slug`
 
 ---
 
 ### `guests`
+
 Individual attendees. Belong to an event; optionally linked to an invitation.
 A guest with no `invitationId` is "un-invited" and can be selected when creating an invitation.
 A guest may host a **+1**: a separate, fully-manageable guest record (`isPlusOne: true`,
 `plusOneOfGuestId` → host) that is materialized when the host RSVPs attending **and** brings it,
 and torn down if the host declines or is deleted (see `convex/lib/guests.ts`).
 
-| Field | Type |
-|---|---|
-| eventId | Id<"events"> |
-| invitationId | Id<"invitations">? | Optional — un-invited guests have none |
-| firstName | string |
-| lastName | string |
-| email | string? |
-| phone | string? |
-| isPrimaryContact | boolean? | **Deprecated** — never surfaced; optional for back-compat |
-| isPlusOne | boolean | This record *is* a +1 (created from a host guest) |
-| allowsPlusOne | boolean? | Host guest is permitted to bring a +1 |
-| plusOneOfGuestId | Id<"guests">? | Set on a +1 record → its host; powers cascade delete |
-| rsvpStatus | `"pending" \| "attending" \| "declined"` |
-| allergies | string? |
-| specialRequests | string? |
-| menuOptionId | Id<"menuOptions">? |
-| drinkOptionId | Id<"drinkOptions">? |
-| tableId | Id<"tables">? |
-| seatNumber | number? | 0-based internally, 1-based in UI |
+| Field            | Type                                     |
+| ---------------- | ---------------------------------------- | --------------------------------------------------------- |
+| eventId          | Id<"events">                             |
+| invitationId     | Id<"invitations">?                       | Optional — un-invited guests have none                    |
+| firstName        | string                                   |
+| lastName         | string                                   |
+| email            | string?                                  |
+| phone            | string?                                  |
+| isPrimaryContact | boolean?                                 | **Deprecated** — never surfaced; optional for back-compat |
+| isPlusOne        | boolean                                  | This record _is_ a +1 (created from a host guest)         |
+| allowsPlusOne    | boolean?                                 | Host guest is permitted to bring a +1                     |
+| plusOneOfGuestId | Id<"guests">?                            | Set on a +1 record → its host; powers cascade delete      |
+| rsvpStatus       | `"pending" \| "attending" \| "declined"` |
+| allergies        | string?                                  |
+| specialRequests  | string?                                  |
+| menuOptionId     | Id<"menuOptions">?                       |
+| drinkOptionId    | Id<"drinkOptions">?                      |
+| tableId          | Id<"tables">?                            |
+| seatNumber       | number?                                  | 0-based internally, 1-based in UI                         |
 
 Indexes: `by_eventId`, `by_eventId_and_invitationId` (powers the un-invited guests query via `eq("invitationId", undefined)`), `by_invitationId`, `by_plusOneOf` (find a host's +1), `by_tableId`, `by_tableId_and_seatNumber`, `by_eventId_and_rsvpStatus`
 
@@ -172,42 +186,45 @@ Indexes: `by_eventId`, `by_eventId_and_invitationId` (powers the un-invited gues
 ---
 
 ### `specialEvents`
+
 Optional sub-events (rehearsal dinner, after-party, etc.).
 
-| Field | Type |
-|---|---|
-| eventId | Id<"events"> |
-| name | string |
-| description | string? |
-| date | number? |
-| location | string? |
-| isActive | boolean |
+| Field       | Type         |
+| ----------- | ------------ |
+| eventId     | Id<"events"> |
+| name        | string       |
+| description | string?      |
+| date        | number?      |
+| location    | string?      |
+| isActive    | boolean      |
 
 Index: `by_eventId`
 
 ---
 
 ### `guestSpecialEventRsvps`
+
 Per-guest RSVP for each special event.
 
-| Field | Type |
-|---|---|
-| eventId | Id<"events"> |
-| guestId | Id<"guests"> |
-| specialEventId | Id<"specialEvents"> |
-| status | `"pending" \| "attending" \| "declined"` |
+| Field          | Type                                     |
+| -------------- | ---------------------------------------- |
+| eventId        | Id<"events">                             |
+| guestId        | Id<"guests">                             |
+| specialEventId | Id<"specialEvents">                      |
+| status         | `"pending" \| "attending" \| "declined"` |
 
 Indexes: `by_eventId`, `by_guestId`, `by_specialEventId`, `by_guestId_and_specialEventId`
 
 ---
 
 ### `invitationSpecialEventAccess`
+
 Controls which invitations can RSVP to which special events.
 
-| Field | Type |
-|---|---|
-| eventId | Id<"events"> |
-| invitationId | Id<"invitations"> |
+| Field          | Type                |
+| -------------- | ------------------- |
+| eventId        | Id<"events">        |
+| invitationId   | Id<"invitations">   |
 | specialEventId | Id<"specialEvents"> |
 
 Indexes: `by_eventId`, `by_invitationId`, `by_specialEventId`, `by_invitationId_and_specialEventId`
@@ -215,21 +232,23 @@ Indexes: `by_eventId`, `by_invitationId`, `by_specialEventId`, `by_invitationId_
 ---
 
 ### `menuOptions`
+
 Food choices offered at the event.
 
-| Field | Type |
-|---|---|
-| eventId | Id<"events"> |
-| name | string |
-| description | string? |
-| isActive | boolean |
-| sortOrder | number |
+| Field       | Type         |
+| ----------- | ------------ |
+| eventId     | Id<"events"> |
+| name        | string       |
+| description | string?      |
+| isActive    | boolean      |
+| sortOrder   | number       |
 
 Index: `by_eventId`
 
 ---
 
 ### `drinkOptions`
+
 Drink packages / options. Same shape as menuOptions.
 
 Index: `by_eventId`
@@ -237,44 +256,47 @@ Index: `by_eventId`
 ---
 
 ### `media`
+
 Per-event image library (template photos, maps, etc.). Blobs live in Convex file storage; this table is the catalog. Only image mime types (jpeg/png/svg+xml/webp/gif), ≤ 5MB, max 50 per event (enforced in `media.register`).
 
-| Field | Type |
-|---|---|
-| eventId | Id<"events"> |
-| storageId | Id<"_storage"> |
-| name | string |
-| mimeType | string |
-| size | number |
+| Field     | Type            |
+| --------- | --------------- |
+| eventId   | Id<"events">    |
+| storageId | Id<"\_storage"> |
+| name      | string          |
+| mimeType  | string          |
+| size      | number          |
 
 Index: `by_eventId`
 
 ---
 
 ### `tables`
+
 Seating tables. Seat assignments live on `guests` (tableId + seatNumber).
 
-| Field | Type |
-|---|---|
-| eventId | Id<"events"> |
-| name | string |
-| seatsCount | number | 1–20 |
-| sortOrder | number |
+| Field      | Type         |
+| ---------- | ------------ | ---- |
+| eventId    | Id<"events"> |
+| name       | string       |
+| seatsCount | number       | 1–20 |
+| sortOrder  | number       |
 
 Index: `by_eventId`
 
 ---
 
 ### `guestMessages`
+
 Messages guests leave for the host (e.g. from the `declined` public layout, when they can't attend). Read by the planner in the dashboard.
 
-| Field | Type |
-|---|---|
-| eventId | Id<"events"> |
+| Field        | Type              |
+| ------------ | ----------------- | ------- |
+| eventId      | Id<"events">      |
 | invitationId | Id<"invitations"> |
-| name | string |
-| message | string |
-| createdAt | number | Unix ms |
+| name         | string            |
+| message      | string            |
+| createdAt    | number            | Unix ms |
 
 Indexes: `by_eventId`, `by_invitationId`
 
@@ -283,124 +305,155 @@ Indexes: `by_eventId`, `by_invitationId`
 ## Convex Modules
 
 ### `convex/lib/auth.ts`
+
 - `getAuthenticatedUser(ctx)` — calls `ctx.auth.getUserIdentity()`, throws `ConvexError("Unauthorized")` if null
 - `requireUser(ctx)` — calls getAuthenticatedUser, looks up user by `tokenIdentifier`, throws if not found
 
 ### `convex/lib/permissions.ts`
+
 - `requireEventAccess(ctx, eventId, userId)` — verifies eventMembers membership or ownership
 - `requireEventEditor(ctx, eventId)` — **the standard guard**: `requireUser` + `requireEventAccess` in one call, returns the user doc. Used by nearly all event-scoped functions
 - `requireEventMember(ctx, eventId, userId, minRole?)` — enforces role hierarchy
 
 ### `convex/lib/public.ts`
-- `resolvePublicEvent(ctx, eventSlug)` — public (unauthenticated) event lookup by slug; returns null for archived events (draft allowed for preview). Reuse for any future public resolver (e.g. custom-domain lookup)
+
+- `resolvePublicEvent(ctx, eventSlug)` — public (unauthenticated) event lookup by slug; returns null for archived events (draft allowed for preview)
+- `resolvePublicEventByHost(ctx, host)` — public event lookup by custom domain (normalized Host header, `by_customDomain`); same archived gating
 - `resolvePublicInvitation(ctx, event, invitationSlug)` — active invitation within a resolved public event
 
+### `convex/lib/domains.ts`
+
+Pure custom-domain helpers (unit-tested in `tests/domains.test.ts`):
+
+- `normalizeCustomDomain(input)` — lowercase; strips protocol/path/query/port/trailing dot
+- `validateCustomDomain(domain)` — returns a user-facing error or null: hostname regex, ASCII-only (IDN must be punycode), rejects `*.vercel.app` and the primary domain (Convex env `PRIMARY_DOMAIN`, fallback localhost) + its subdomains
+
 ### `convex/lib/options.ts`
+
 Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPublicOptions`, `listAdminOptions`, `createOption`, `updateOption`, `deleteOption`, plus `nextSortOrder(ctx, table, eventId)` (also used by `tables.createTable`).
 
 ### `convex/lib/guests.ts`
+
 +1 / decline cascade helpers shared by `guests.ts` mutations:
+
 - `findPlusOne(ctx, hostGuestId)` — the +1 record linked to a host (via `by_plusOneOf`), or null
 - `deletePlusOneCascade(ctx, plusOne)` — delete a +1 guest + its `guestSpecialEventRsvps`
 - `applyDeclineEffects(ctx, guest)` — on a guest becoming `declined`: delete its special-event RSVPs and its +1 (the guest itself stays linked to its invitation)
 
 ### `convex/lib/slug.ts`
+
 - `generateSlug(text)` — lowercases and hyphenates
 - `generateUniqueSlug(ctx, tableName, slug, existingId?)` — global uniqueness (used for event slugs); appends -2, -3 etc.
 - `generateUniqueInvitationSlug(ctx, eventId, slug, existingId?)` — uniqueness **scoped per event** via `by_eventId_and_slug`
 - `RESERVED_EVENT_SLUGS` — set of top-level route names an event key may not use
 
 ### `convex/users.ts`
-| Function | Type | Notes |
-|---|---|---|
-| `getCurrentUser` | query | Returns user doc or null |
-| `upsertCurrentUser` | mutation | Creates/updates user from Clerk JWT — called on every app load |
-| `ensureCurrentUser` | internalMutation | Same as upsert, internal use |
+
+| Function            | Type             | Notes                                                          |
+| ------------------- | ---------------- | -------------------------------------------------------------- |
+| `getCurrentUser`    | query            | Returns user doc or null                                       |
+| `upsertCurrentUser` | mutation         | Creates/updates user from Clerk JWT — called on every app load |
+| `ensureCurrentUser` | internalMutation | Same as upsert, internal use                                   |
 
 ### `convex/events.ts`
-| Function | Type |
-|---|---|
-| `listMyEvents` | query — events where user is owner or member (non-null) |
-| `getEventById` | query |
-| `getEventBySlug` | query — resolves an event by its slug (auth + access); used by dashboard routes |
-| `getEventSummary` | query — event + counts |
-| `createEvent` | mutation — creates eventMember with owner role; returns `{ eventId, slug }` |
-| `updateEvent` | mutation — accepts optional `slug` (validates format, reserved words, global uniqueness) |
-| `setInvitationTemplate` | mutation — sets `templateId`, `layoutVariants` (`{pending,accepted,declined}`), and/or legacy `layoutBlocks` (min role planner). The editor writes `layoutVariants` |
-| `archiveEvent` | mutation |
-| `deleteEvent` | mutation — owner-only, **permanent**. Cascades: deletes every row in all event-scoped tables (guests, invitations, specialEvents, guestSpecialEventRsvps, invitationSpecialEventAccess, menuOptions, drinkOptions, tables, eventMembers, guestMessages) plus media rows **and their storage blobs**, then the event itself |
+
+| Function                  | Type                                                                                                                                                                                                                                                                                                                               |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listMyEvents`            | query — events where user is owner or member (non-null)                                                                                                                                                                                                                                                                            |
+| `getEventById`            | query                                                                                                                                                                                                                                                                                                                              |
+| `getEventBySlug`          | query — resolves an event by its slug (auth + access); used by dashboard routes                                                                                                                                                                                                                                                    |
+| `getEventSummary`         | query — event + counts                                                                                                                                                                                                                                                                                                             |
+| `createEvent`             | mutation — creates eventMember with owner role; returns `{ eventId, slug }`                                                                                                                                                                                                                                                        |
+| `updateEvent`             | mutation — accepts optional `slug` (validates format, reserved words, global uniqueness). No longer accepts `customDomain`/`subdomain` — domains go through the dedicated mutations below                                                                                                                                          |
+| `setCustomDomain`         | mutation (min role planner) — normalizes + validates via `lib/domains.ts`, enforces global uniqueness (`by_customDomain`), patches `{customDomain, customDomainVerified: false}`, returns the normalized domain. Convex-only claim; the Vercel attach is orchestrated by `/api/domains` (claim first, roll back on Vercel failure) |
+| `removeCustomDomain`      | mutation (min role planner) — clears `customDomain` + `customDomainVerified`                                                                                                                                                                                                                                                       |
+| `setCustomDomainVerified` | mutation (min role planner) — caches the live Vercel verification state; called by `/api/domains/status`                                                                                                                                                                                                                           |
+| `setInvitationTemplate`   | mutation — sets `templateId`, `layoutVariants` (`{pending,accepted,declined}`), and/or legacy `layoutBlocks` (min role planner). The editor writes `layoutVariants`                                                                                                                                                                |
+| `archiveEvent`            | mutation                                                                                                                                                                                                                                                                                                                           |
+| `deleteEvent`             | mutation — owner-only, **permanent**. Cascades: deletes every row in all event-scoped tables (guests, invitations, specialEvents, guestSpecialEventRsvps, invitationSpecialEventAccess, menuOptions, drinkOptions, tables, eventMembers, guestMessages) plus media rows **and their storage blobs**, then the event itself         |
 
 ### `convex/invitations.ts`
-| Function | Type | Notes |
-|---|---|---|
-| `listByEvent` | query | Auth required |
-| `getById` | query | Auth required |
-| `getInvitationsPageData` | query | Auth required — invitations for the event each enriched with `guestCount`, `guests:[{_id,firstName,lastName,isPlusOne,rsvpStatus}]` (linked guests **incl. +1s**) and `specialEvents:[{_id,name}]` (its accessible special invitations). Powers the invitations dashboard table + the edit dialog's composition gate |
-| `getPublicInvitation` | query | **Public** — args `{eventSlug, invitationSlug}`; resolves via `lib/public.ts` (null for archived events / inactive invitations). Derives `rsvpState` (`pending`/`accepted`/`declined`) from the invitation's guests (any attending → accepted; else any pending or no guests → pending; else declined) and returns the **state-resolved** layout: `event.layoutBlocks` is set to `layoutVariants[state]` (accepted falls back to legacy `layoutBlocks`), or undefined to let the client use the template default for that state. Returns `{event (incl. brideName, groomName, venueMapUrl, templateId, layoutBlocks), rsvpState, invitation, guests:[{_id,firstName,lastName,rsvpStatus,allowsPlusOne,isPlusOne,plusOneOfGuestId}], specialEvents:[{_id,name,description,date,location,guestStatuses:{guestId→status}}] (accessible special events — via `invitationSpecialEventAccess` — each enriched with every **non-declined** guest's per-event RSVP status; powers the elegant `specialInvitation` confirm modal), mediaUrls}` (media resolved over the chosen layout only) |
-| `createInvitation` | mutation | Per-event-unique slug; optional `guestIds` (≤20) links selected un-invited guests; optional `specialEventIds` grants `invitationSpecialEventAccess` to the chosen special invitations |
-| `updateInvitation` | mutation | Patches title/slug/notes/isActive. Optional `guestIds` + `specialEventIds` **reconcile** the invitation's directly-linked (non-+1) guests and special-invitation access — but only while **every linked guest is still pending** (throws otherwise); removing a host also tears down its +1 |
-| `deleteInvitation` | mutation | **Unassigns** its guests (sets invitationId undefined), does not delete them |
-| `setSpecialEventAccess` | mutation | Adds/removes invitationSpecialEventAccess row; verifies the special event belongs to the same event |
-| `regenerateSlug` | mutation | |
+
+| Function                    | Type     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listByEvent`               | query    | Auth required                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `getById`                   | query    | Auth required                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `getInvitationsPageData`    | query    | Auth required — invitations for the event each enriched with `guestCount`, `guests:[{_id,firstName,lastName,isPlusOne,rsvpStatus}]` (linked guests **incl. +1s**) and `specialEvents:[{_id,name}]` (its accessible special invitations). Powers the invitations dashboard table + the edit dialog's composition gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `getPublicInvitation`       | query    | **Public** — args `{eventSlug, invitationSlug}`; resolves via `lib/public.ts` (null for archived events / inactive invitations). Derives `rsvpState` (`pending`/`accepted`/`declined`) from the invitation's guests (any attending → accepted; else any pending or no guests → pending; else declined) and returns the **state-resolved** layout: `event.layoutBlocks` is set to `layoutVariants[state]` (accepted falls back to legacy `layoutBlocks`), or undefined to let the client use the template default for that state. Returns `{event (incl. brideName, groomName, venueMapUrl, templateId, layoutBlocks), rsvpState, invitation, guests:[{_id,firstName,lastName,rsvpStatus,allowsPlusOne,isPlusOne,plusOneOfGuestId}], specialEvents:[{_id,name,description,date,location,guestStatuses:{guestId→status}}] (accessible special events — via `invitationSpecialEventAccess`— each enriched with every **non-declined** guest's per-event RSVP status; powers the elegant`specialInvitation` confirm modal), mediaUrls}` (media resolved over the chosen layout only). The returned `event` includes `slug` so custom-domain pages (no slug in the URL) can call the slug-based public mutations. Enrichment shared with the by-host variant via the local `buildPublicInvitationPayload` helper |
+| `getPublicInvitationByHost` | query    | **Public** — args `{host, invitationSlug}`; custom-domain variant of `getPublicInvitation` (resolves the event via `resolvePublicEventByHost`), identical payload                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `createInvitation`          | mutation | Per-event-unique slug; optional `guestIds` (≤20) links selected un-invited guests; optional `specialEventIds` grants `invitationSpecialEventAccess` to the chosen special invitations                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `updateInvitation`          | mutation | Patches title/slug/notes/isActive. Optional `guestIds` + `specialEventIds` **reconcile** the invitation's directly-linked (non-+1) guests and special-invitation access — but only while **every linked guest is still pending** (throws otherwise); removing a host also tears down its +1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `deleteInvitation`          | mutation | **Unassigns** its guests (sets invitationId undefined), does not delete them                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `setSpecialEventAccess`     | mutation | Adds/removes invitationSpecialEventAccess row; verifies the special event belongs to the same event                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `regenerateSlug`            | mutation |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ### `convex/guests.ts`
-| Function | Type | Notes |
-|---|---|---|
-| `listByEvent` | query | Auth required |
-| `listByInvitation` | query | Auth required |
-| `listUnassignedByEvent` | query | Auth required — event guests with no `invitationId` (uses `by_eventId_and_invitationId` with `eq(undefined)`) |
-| `getGuestsPageData` | query | Auth required — `{guests, invitations, menuOptions, drinkOptions, tables, specialEvents, accessByEvent (specialEventId→invitationId[]), specialRsvpByGuest (guestId→specialEventId→status)}` in one round trip; powers the guests dashboard page (incl. per-special-event + +1 columns) |
-| `getGuestById` | query | |
-| `createGuest` | mutation | Requires `eventId`; optional `invitationId` (creates un-invited guest if omitted); optional `allowsPlusOne` |
-| `updateGuest` | mutation | Optional `allowsPlusOne`. On transition to `declined` runs `applyDeclineEffects`; turning `allowsPlusOne` off removes the +1 |
-| `addPlusOne` | mutation | Auth — `{hostGuestId, firstName?, lastName?}`: creates (or returns) the +1 guest linked to a host that `allowsPlusOne`; placeholder name when blank |
-| `removePlusOne` | mutation | Auth — `{hostGuestId}` → `deletePlusOneCascade` |
-| `setSpecialEventRsvp` | mutation | Auth (`requireEventEditor`) — `{guestId, specialEventId, status}`; owner-side upsert into `guestSpecialEventRsvps` (verifies the special event belongs to the guest's event). Mirrors `submitPublicRsvp`'s special-event path; wired to the guest details dialog's per-special-event status selects. **Adds a guest to a special event regardless of invitation access** (the RSVP row, not `invitationSpecialEventAccess`) |
-| `removeSpecialEventRsvp` | mutation | Auth (`requireEventEditor`) — `{guestId, specialEventId}`; deletes the guest's `guestSpecialEventRsvps` row (sets them back to "not invited" for that special event from the dashboard) |
-| `deleteGuest` | mutation | Cascades to guestSpecialEventRsvps **and** the guest's +1 |
-| `bulkCreateGuestsForInvitation` | mutation | ≤20 guests per call; optional `allowsPlusOne` per guest |
-| `submitPublicRsvp` | mutation | **Public** — resolves via `{eventSlug, invitationSlug}`; patches whitelisted RSVP fields, validates menu/drink ownership + `invitationSpecialEventAccess`, bounds arrays/strings. Optional `plusOneUpdates:[{hostGuestId,attending,firstName?,lastName?}]` materialize/remove each host's +1 (only for attending hosts that `allowsPlusOne`). Declining guests run `applyDeclineEffects` and are skipped for special-event RSVPs. Wired to the elegant `rsvp` block's submit button |
+
+| Function                        | Type     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listByEvent`                   | query    | Auth required                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `listByInvitation`              | query    | Auth required                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `listUnassignedByEvent`         | query    | Auth required — event guests with no `invitationId` (uses `by_eventId_and_invitationId` with `eq(undefined)`)                                                                                                                                                                                                                                                                                                                                                                       |
+| `getGuestsPageData`             | query    | Auth required — `{guests, invitations, menuOptions, drinkOptions, tables, specialEvents, accessByEvent (specialEventId→invitationId[]), specialRsvpByGuest (guestId→specialEventId→status)}` in one round trip; powers the guests dashboard page (incl. per-special-event + +1 columns)                                                                                                                                                                                             |
+| `getGuestById`                  | query    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `createGuest`                   | mutation | Requires `eventId`; optional `invitationId` (creates un-invited guest if omitted); optional `allowsPlusOne`                                                                                                                                                                                                                                                                                                                                                                         |
+| `updateGuest`                   | mutation | Optional `allowsPlusOne`. On transition to `declined` runs `applyDeclineEffects`; turning `allowsPlusOne` off removes the +1                                                                                                                                                                                                                                                                                                                                                        |
+| `addPlusOne`                    | mutation | Auth — `{hostGuestId, firstName?, lastName?}`: creates (or returns) the +1 guest linked to a host that `allowsPlusOne`; placeholder name when blank                                                                                                                                                                                                                                                                                                                                 |
+| `removePlusOne`                 | mutation | Auth — `{hostGuestId}` → `deletePlusOneCascade`                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `setSpecialEventRsvp`           | mutation | Auth (`requireEventEditor`) — `{guestId, specialEventId, status}`; owner-side upsert into `guestSpecialEventRsvps` (verifies the special event belongs to the guest's event). Mirrors `submitPublicRsvp`'s special-event path; wired to the guest details dialog's per-special-event status selects. **Adds a guest to a special event regardless of invitation access** (the RSVP row, not `invitationSpecialEventAccess`)                                                         |
+| `removeSpecialEventRsvp`        | mutation | Auth (`requireEventEditor`) — `{guestId, specialEventId}`; deletes the guest's `guestSpecialEventRsvps` row (sets them back to "not invited" for that special event from the dashboard)                                                                                                                                                                                                                                                                                             |
+| `deleteGuest`                   | mutation | Cascades to guestSpecialEventRsvps **and** the guest's +1                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `bulkCreateGuestsForInvitation` | mutation | ≤20 guests per call; optional `allowsPlusOne` per guest                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `submitPublicRsvp`              | mutation | **Public** — resolves via `{eventSlug, invitationSlug}`; patches whitelisted RSVP fields, validates menu/drink ownership + `invitationSpecialEventAccess`, bounds arrays/strings. Optional `plusOneUpdates:[{hostGuestId,attending,firstName?,lastName?}]` materialize/remove each host's +1 (only for attending hosts that `allowsPlusOne`). Declining guests run `applyDeclineEffects` and are skipped for special-event RSVPs. Wired to the elegant `rsvp` block's submit button |
 
 ### `convex/specialEvents.ts`
+
 `listByEvent` (auth), `getSpecialEventsPageData` (auth — `{specialEvents, invitations, accessByEvent}` in one round trip; powers the special-events dashboard page, incl. the per-invitation assignment checkboxes), `listForInvitation` (**public**), `createSpecialEvent` (enforces **`MAX_SPECIAL_EVENTS` = 2** per event), `updateSpecialEvent`, `deleteSpecialEvent` (cascades access + RSVPs). Per-invitation visibility is set via `invitations.setSpecialEventAccess`.
 
 ### `convex/menu.ts`
+
 `listMenuOptionsByEvent` (**public**), `listMenuOptionsByEventAdmin` (auth), `getSelectionCounts` (auth — `{menuCounts, drinkCounts, menuUnassigned, drinkUnassigned, totalGuests}` so the menu page never ships the full guest list), `createMenuOption`, `updateMenuOption`, `deleteMenuOption`. Shared logic lives in `lib/options.ts`.
 
 ### `convex/drinks.ts`
+
 Same shape as `menu.ts` (thin wrappers over `lib/options.ts`).
 
 ### `convex/media.ts`
-| Function | Notes |
-|---|---|
-| `generateUploadUrl` | mutation (auth + event access) — Convex storage upload URL |
-| `register` | mutation — catalogs an uploaded blob; validates image mime whitelist, ≤5MB (against actual blob metadata), ≤50 per event |
-| `listByEvent` | query (auth) — media rows + resolved `url`, newest first |
-| `rename` | mutation |
-| `remove` | mutation — deletes the row **and** the storage blob |
+
+| Function            | Notes                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `generateUploadUrl` | mutation (auth + event access) — Convex storage upload URL                                                               |
+| `register`          | mutation — catalogs an uploaded blob; validates image mime whitelist, ≤5MB (against actual blob metadata), ≤50 per event |
+| `listByEvent`       | query (auth) — media rows + resolved `url`, newest first                                                                 |
+| `rename`            | mutation                                                                                                                 |
+| `remove`            | mutation — deletes the row **and** the storage blob                                                                      |
 
 ### `convex/tables.ts`
-| Function | Notes |
-|---|---|
-| `listTablesByEvent` | |
-| `getTablesAndGuests` | Returns `{tables, guestsByTable, unassignedGuests}` |
-| `createTable` | |
-| `updateTable` | |
-| `deleteTable` | Unassigns all guests first |
-| `updateTableSeats` | Unassigns guests outside new range |
-| `assignGuestToSeat` | Moves guest if already seated; bumps occupant if seat taken |
-| `unassignGuestFromSeat` | Sets tableId + seatNumber to undefined |
+
+| Function                | Notes                                                       |
+| ----------------------- | ----------------------------------------------------------- |
+| `listTablesByEvent`     |                                                             |
+| `getTablesAndGuests`    | Returns `{tables, guestsByTable, unassignedGuests}`         |
+| `createTable`           |                                                             |
+| `updateTable`           |                                                             |
+| `deleteTable`           | Unassigns all guests first                                  |
+| `updateTableSeats`      | Unassigns guests outside new range                          |
+| `assignGuestToSeat`     | Moves guest if already seated; bumps occupant if seat taken |
+| `unassignGuestFromSeat` | Sets tableId + seatNumber to undefined                      |
 
 ### `convex/messages.ts`
-| Function | Notes |
-|---|---|
-| `submitGuestMessage` | **Public** mutation — args `{eventSlug, invitationSlug, name, message}`; resolves via `lib/public.ts`, trims + validates (`message` non-empty ≤1000, `name` ≤200), caps at 20 messages per invitation, inserts a `guestMessages` row. Wired to the elegant `guestMessage` block |
-| `listMessagesByEvent` | query (auth via `requireEventEditor`) — `guestMessages` for the event, newest first, each enriched with `invitationTitle` |
+
+| Function              | Notes                                                                                                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submitGuestMessage`  | **Public** mutation — args `{eventSlug, invitationSlug, name, message}`; resolves via `lib/public.ts`, trims + validates (`message` non-empty ≤1000, `name` ≤200), caps at 20 messages per invitation, inserts a `guestMessages` row. Wired to the elegant `guestMessage` block |
+| `listMessagesByEvent` | query (auth via `requireEventEditor`) — `guestMessages` for the event, newest first, each enriched with `invitationTitle`                                                                                                                                                       |
 
 ### `convex/dashboard.ts`
+
 `getOverviewStats` — returns `{totalInvitations, totalGuests, attendingCount, declinedCount, pendingCount, allergyCount, menuCompletionCount, tableAssignmentCount}`
 
 ### `convex/seed.ts`
+
 `seedDemoEventForCurrentUser` (**public mutation**) — creates a full demo event (5 invitations, 15 guests, 2 special events, 3 menu options, 3 drink options, 6 tables) and returns the new `eventId`. Refuses once the user already owns 3+ events (spam guard).
 
 ---
@@ -422,12 +475,21 @@ Same shape as `menu.ts` (thin wrappers over `lib/options.ts`).
 /dashboard/[eventSlug]/messages       Guest messages left for the host (listMessagesByEvent)
 /dashboard/[eventSlug]/template       Template picker + per-RSVP-variant block page-builder (Pending/Accepted/Declined tabs; add/reorder/duplicate/remove/edit incl. list + image fields) + live preview (dummy data + real media)
 /dashboard/[eventSlug]/media          Per-event image library — upload (Convex storage), rename, delete
-/dashboard/[eventSlug]/settings       Event metadata + editable event key + archive
+/dashboard/[eventSlug]/settings       Event metadata + editable event key + custom-domain wizard + archive
 
 /[eventSlug]/invitations/[invitationSlug]   Public invitation page (guest names) — no auth required
+
+/api/domains                Route handler (POST connect / DELETE remove) — Clerk auth + Convex ownership via forwarded JWT, then Vercel Domains API
+/api/domains/status         Route handler (GET) — live Vercel verified/configured check (+ verify attempt), syncs customDomainVerified, returns DNS records
+
+/_domain/[host]/invitations/[invitationSlug]   Internal target of the middleware custom-domain rewrite (folder is `%5Fdomain` — plain `_domain` would be a private, non-routable App Router folder). Renders PublicInvitationPage by host
+/_domain/[host]/[[...rest]]                    Branded "Invitation Not Found" for the custom domain's root & unknown paths. Both 404 when hit directly on the primary domain
 ```
 
+Custom domains: middleware compares the request `Host` against `NEXT_PUBLIC_PRIMARY_DOMAIN` (plus localhost/`*.vercel.app`); non-primary hosts are rewritten to `/_domain/{host}{path}` **before any Clerk logic**, so `https://{customDomain}/invitations/{invitationSlug}` serves the invitation and nothing else. The owner connects a domain in Settings (guided wizard); `/api/domains` claims it in Convex first, then attaches it to the Vercel project (`src/lib/vercel-domains.ts`), rolling back the claim if the attach fails.
+
 Route groups:
+
 - `(auth)` — sign-in/sign-up (both `fallbackRedirectUrl="/dashboard"`), no dashboard shell
 - `(dashboard)` — minimal group layout (`UserSync` only). `/dashboard` renders its own minimal top bar; the per-event routes `/dashboard/[eventSlug]/*` are wrapped by `dashboard/[eventSlug]/layout.tsx` in `EventProvider` (resolves slug → event) + `DashboardShell` (sidebar + header)
 - `(marketing)` — landing, pricing
@@ -461,6 +523,7 @@ src/components/
     metric-card.tsx             Stat card with title/value/icon
     user-sync.tsx               Invisible — calls upsertCurrentUser on mount
     create-event-dialog.tsx     Form dialog to create an event; navigates to /dashboard/{slug}
+    custom-domain-settings.tsx  "use client" — guided custom-domain wizard on the settings page: none → connect (POST /api/domains) → pending-DNS (record table w/ copy buttons + TXT-challenge note, records re-fetched from /api/domains/status after reloads) → live (badge, visit link, remove behind AlertDialog)
 
   invitations/
     invitation-list.tsx         **Table** (column headings: Invitation/Guests/Special Invitations/Status/Actions) of invitations with edit/delete/copy-link; the Guests column lists each linked guest's name with a **+1** marker on +1 records (props from getInvitationsPageData)
@@ -497,7 +560,8 @@ src/components/
     add-table-dialog.tsx        Create table dialog
 
   public-invitation/
-    public-invitation-page.tsx  Loads {eventSlug, invitationSlug} via getPublicInvitation; handles loading/not-found, then renders InvitationTemplate with event.templateId + event.layoutBlocks
+    public-invitation-page.tsx  Loads the invitation via getPublicInvitation (eventSlug prop) or getPublicInvitationByHost (host prop — custom domains; the other query is "skip"ped); handles loading/not-found, then renders InvitationTemplate with event.templateId + event.layoutBlocks. On custom domains data.eventSlug is sourced from the payload's event.slug so public mutations keep working
+    invitation-not-found.tsx    Branded "Invitation Not Found" screen — shared by public-invitation-page and the /_domain catch-all
     types.ts                    Local PublicEvent/PublicInvitation/PublicGuest/PublicInvitationData (incl. mediaUrls) types for the template
     blocks.ts                   Page-builder model: BlockType union (incl. `guestMessage`), RsvpVariant (`pending`/`accepted`/`declined`) + RSVP_VARIANTS, LayoutBlock, ConfigField (input: text | textarea | list | image | toggle | select; list supports itemFields for structured rows; select resolves options via `optionsSource` for a dynamic source — currently `"specialEvents"` — or a static `options` list, e.g. the special-invitation `specialTemplateId` template picker), BLOCK_DEFS, BLOCK_PALETTE, createBlock(), defaultLayout(variant) (per-variant fallback order), resolveLayout(), getConfigString(), getConfigList()
     template-theme.tsx          "use client" — TemplateTheme tokens for elegant; TemplateThemeProvider + useTemplateTheme (consumed by the template frame/blocks)
@@ -554,39 +618,39 @@ src/hooks/
 >
 > - **`elegant`** is the **only official template** (default), implementing the Figma
 >   design (file `heSJxDYKECFLtzVd9F1LyJ`, frame `525:3`) under `templates/elegant/`: its own `Frame`
->   + a component per section, gold/serif styling via the `wedding-*` palette and
->   `font-script`/`font-elegant` (see globals.css + layout.tsx), and a preset Spanish layout (configs
->   seeded from `default-copy.ts`). **Spacing mirrors the Figma frame exactly**: 390px-wide white card
->   on `wedding-soft` (`ElegantFrame`); 24px horizontal padding on every block (`ElegantSection` base
->   `px-6`); and **each block owns its vertical padding + gap** (the frame has no global gap) per the
->   design's per-section values (e.g. hero `py-10`, location `pt-24 pb-6`, rsvp `px-10 py-12`, special
->   invite `px-16 py-40`, footer `py-10`). Palette/fonts already matched the design (gold `#c5a46d`,
->   ink `#3c3c3c`, soft `#ececec`, muted `#d9d9d9`; Fleur De Leah / Gowun Batang). Checkboxes are real
->   interactive controls (`CheckRow` — `checkbox` for food multi-select, `radio` for stay); the food
->   controls are not yet wired to `submitPublicRsvp`. The `rsvp` block **is** wired: it renders one
->   attending/declining radio group per **named guest** (+1 records are not shown as their own rows).
->   Each host that `allowsPlusOne` gets a +1 sub-question (a "bring a +1" checkbox + optional name input)
->   shown once the host is marked attending. Submit calls `submitPublicRsvp` with `guestUpdates` (named
->   guests) + `plusOneUpdates` (per host), which materializes the +1 as a real linked guest. Submission needs `data.eventSlug` +
->   `data.invitationSlug` (injected by `public-invitation-page`); they're absent in the editor preview,
->   so the button is disabled there. Image slots render the configured media image or a placeholder.
->   The `guestMessage` block (shown on the `declined` layout) is likewise wired — a name + message form
->   that calls `messages.submitGuestMessage`; messages surface at `/dashboard/[eventSlug]/messages`.
->   The `specialInvitation` block **is** wired too: special invitations are first-class mini sub-events
->   (table `specialEvents`, ≤2 per event) managed at `/dashboard/[eventSlug]/special-events`, where the
->   owner sets name/description/date/location and assigns **which invitations** can see each (per-invitation
->   `invitationSpecialEventAccess`). In the Template Editor the block selects which special event to show
->   (`specialEventId`) and a display template (`specialTemplateId`); its card content is sourced from the
->   linked special event (not authored in the block). On the public page the card button opens a themed modal
->   showing the event details (date/time and location prefixed with calendar / map-pin icons) + a per-guest
->   attending/declining radio group, submitting via `submitPublicRsvp.specialEventRsvps` (`guestUpdates: []`);
->   responses persist **only** to `guestSpecialEventRsvps` (no aggregate invitation/guest status yet). The
->   card button label is authorable two ways: `confirmLabel` (default "Confirmar asistencia") before
->   responding, and `detailsLabel` (default "Ver detalles") once **every** named guest already has a stored
->   status for that special event — then the button is a read-only "view details" affordance opening the same
->   modal with their saved choices. Because the block only renders for invitations granted access, it
->   **renders nothing on the live page when unassigned**; the editor preview shows the sample sub-event with
->   the button disabled.
+>   - a component per section, gold/serif styling via the `wedding-*` palette and
+>     `font-script`/`font-elegant` (see globals.css + layout.tsx), and a preset Spanish layout (configs
+>     seeded from `default-copy.ts`). **Spacing mirrors the Figma frame exactly**: 390px-wide white card
+>     on `wedding-soft` (`ElegantFrame`); 24px horizontal padding on every block (`ElegantSection` base
+>     `px-6`); and **each block owns its vertical padding + gap** (the frame has no global gap) per the
+>     design's per-section values (e.g. hero `py-10`, location `pt-24 pb-6`, rsvp `px-10 py-12`, special
+>     invite `px-16 py-40`, footer `py-10`). Palette/fonts already matched the design (gold `#c5a46d`,
+>     ink `#3c3c3c`, soft `#ececec`, muted `#d9d9d9`; Fleur De Leah / Gowun Batang). Checkboxes are real
+>     interactive controls (`CheckRow` — `checkbox` for food multi-select, `radio` for stay); the food
+>     controls are not yet wired to `submitPublicRsvp`. The `rsvp` block **is** wired: it renders one
+>     attending/declining radio group per **named guest** (+1 records are not shown as their own rows).
+>     Each host that `allowsPlusOne` gets a +1 sub-question (a "bring a +1" checkbox + optional name input)
+>     shown once the host is marked attending. Submit calls `submitPublicRsvp` with `guestUpdates` (named
+>     guests) + `plusOneUpdates` (per host), which materializes the +1 as a real linked guest. Submission needs `data.eventSlug` +
+>     `data.invitationSlug` (injected by `public-invitation-page`); they're absent in the editor preview,
+>     so the button is disabled there. Image slots render the configured media image or a placeholder.
+>     The `guestMessage` block (shown on the `declined` layout) is likewise wired — a name + message form
+>     that calls `messages.submitGuestMessage`; messages surface at `/dashboard/[eventSlug]/messages`.
+>     The `specialInvitation` block **is** wired too: special invitations are first-class mini sub-events
+>     (table `specialEvents`, ≤2 per event) managed at `/dashboard/[eventSlug]/special-events`, where the
+>     owner sets name/description/date/location and assigns **which invitations** can see each (per-invitation
+>     `invitationSpecialEventAccess`). In the Template Editor the block selects which special event to show
+>     (`specialEventId`) and a display template (`specialTemplateId`); its card content is sourced from the
+>     linked special event (not authored in the block). On the public page the card button opens a themed modal
+>     showing the event details (date/time and location prefixed with calendar / map-pin icons) + a per-guest
+>     attending/declining radio group, submitting via `submitPublicRsvp.specialEventRsvps` (`guestUpdates: []`);
+>     responses persist **only** to `guestSpecialEventRsvps` (no aggregate invitation/guest status yet). The
+>     card button label is authorable two ways: `confirmLabel` (default "Confirmar asistencia") before
+>     responding, and `detailsLabel` (default "Ver detalles") once **every** named guest already has a stored
+>     status for that special event — then the button is a read-only "view details" affordance opening the same
+>     modal with their saved choices. Because the block only renders for invitations granted access, it
+>     **renders nothing on the live page when unassigned**; the editor preview shows the sample sub-event with
+>     the button disabled.
 > - Add more templates by giving each its own `Frame`/`blocks` (and optional `defaultLayouts`) in its
 >   `TemplateDef`; a template implements the markup for every block type it intends to render.
 
@@ -594,22 +658,24 @@ src/hooks/
 
 ## Auth Flow
 
-1. Middleware (`src/middleware.ts`) protects every non-public route: if there's no `userId` it **redirects to `/`** (not `/sign-in`). The marketing landing links to sign-in.
+1. Middleware (`src/middleware.ts`) first checks the request `Host`: custom-domain hosts are rewritten to `/_domain/{host}{path}` and **never touch Clerk**; on the primary host, direct `/_domain` paths 404. Then it protects every non-public route: if there's no `userId` it **redirects to `/`** (not `/sign-in`). The marketing landing links to sign-in.
 2. After sign-in/sign-up, Clerk redirects to `/dashboard` (via `fallbackRedirectUrl`). `/dashboard` shows the events list — it does **not** auto-redirect into a single event. Clerk issues a JWT with `aud: "convex"` (requires Clerk Convex integration activated at `dashboard.clerk.com/apps/setup/convex`)
 3. `ConvexProviderWithClerk` attaches the Clerk JWT to every Convex request
 4. `convex/auth.config.ts` validates the JWT against `CLERK_FRONTEND_API_URL`
 5. The `(dashboard)/layout.tsx` gates its subtree on Convex auth state via `<AuthLoading>` / `<Authenticated>` / `<Unauthenticated>` (from `convex/react`). This is required: it ensures no query/mutation (`UserSync`, `listMyEvents`, `getEventBySlug`, …) runs before the Clerk token is attached to the Convex client — otherwise `requireUser` throws `Unauthorized` on a hard refresh. `<Unauthenticated>` client-redirects to `/` (`RedirectToHome`).
 6. `UserSync` (inside `<Authenticated>`) calls `upsertCurrentUser` on mount → creates/updates the `users` table row
 7. All protected Convex functions call `requireUser(ctx)` which reads `ctx.auth.getUserIdentity()` and looks up by `tokenIdentifier`
-8. Public routes (`/[eventSlug]/invitations/[invitationSlug]`, matched in middleware as `/:eventSlug/invitations/:invitationSlug`) skip auth entirely — Convex functions for those use no auth checks
+8. Public routes (`/[eventSlug]/invitations/[invitationSlug]`, `/_domain/*` rewrites, `/api/(.*)`) skip Clerk middleware auth — public Convex functions use no auth checks; the `/api/domains*` handlers do their own `auth()` check and forward the Clerk JWT (`getToken({template:"convex"})`) to Convex via `fetchQuery`/`fetchMutation`, so event ownership is still enforced by `requireEventMember`
 
-## Future: Custom Domains (design only — not implemented)
+## Custom Domains
 
-`events.subdomain` / `events.customDomain` (+ indexes) already exist. The agreed design:
-- Middleware reads the `Host` header; non-primary hosts rewrite `https://customdomain.com/invitations/{slug}` → internal route `/_domain/[host]/invitations/[invitationSlug]` which resolves the event server-side.
-- New public query `events.getEventByDomain({host})`: exact `by_customDomain` match, else extract the subdomain for `by_subdomain` (wildcard `*.<root>` configured once in Vercel). Must reuse the archived-event gating in `convex/lib/public.ts`.
-- Settings page gains a "Custom domain" field → Next.js route handler calling the Vercel Domains API (`POST /v10/projects/{id}/domains` with `VERCEL_TOKEN`), surfacing DNS verification records + a status poll.
-- Media URLs are absolute Convex URLs, so they are domain-independent.
+Implemented for **custom domains only** (`events.subdomain` + `by_subdomain` remain future). Flow:
+
+- Owner connects a domain in Settings (`custom-domain-settings.tsx`) → `POST /api/domains` claims it in Convex (`setCustomDomain`: normalize/validate/unique) **then** attaches it to the Vercel project (`src/lib/vercel-domains.ts`, `POST /v10/projects/{id}/domains`); on Vercel failure the Convex claim is rolled back. Requires `VERCEL_TOKEN`/`VERCEL_PROJECT_ID` (+ optional `VERCEL_TEAM_ID`) env.
+- The wizard shows the DNS records to add at the registrar (A `76.76.21.21` for apex / CNAME `cname.vercel-dns.com` for subdomains, plus Vercel TXT ownership challenges when the domain is held by another Vercel account — built by `buildDnsInstructions` from live Vercel responses). "Check status" hits `GET /api/domains/status`, which attempts a verify, computes `live = verified && !misconfigured`, and syncs `customDomainVerified`.
+- Middleware rewrites non-primary hosts to `/_domain/{host}{path}`; `getPublicInvitationByHost` resolves the event via `resolvePublicEventByHost` (archived events 404). The custom domain's root/unknown paths render the branded `invitation-not-found.tsx`. Routing never gates on `customDomainVerified`.
+- Removing (`DELETE /api/domains`) detaches from Vercel (404 tolerated) then clears the Convex fields. Media URLs are absolute Convex URLs, so they are domain-independent.
+- Local testing: set `customDomain` on an event, then `curl -H "Host: mywedding.test" http://localhost:3000/invitations/{slug}` (or add the host to `/etc/hosts`).
 
 ## Documentation Rule
 
@@ -641,15 +707,15 @@ Since AGENTS.md is a copy of CLAUDE.md, both must be kept in sync. Update one, t
 
 ## Zod Validations (`src/lib/validations/`)
 
-| File | Schema | Key rules |
-|---|---|---|
-| `event.ts` | `eventSchema` | name min 2 chars, optional `slug` (`/^[a-z0-9-]+$/`, min 2), date optional string, optional brideName/groomName, optional `venueMapUrl` (valid URL or empty) |
-| `invitation.ts` | `invitationSchema` | title min 2, slug: `/^[a-z0-9-]+$/`, optional notes (no `type`, no `maxGuests`, no `allowPlusOne`) |
-| `guest.ts` | `guestSchema` | firstName/lastName required, email optional, `allowsPlusOne` boolean |
-| `menu.ts` | `menuOptionSchema` | name required, isActive boolean |
-| `table.ts` | `tableSchema` | name required, seatsCount 1–20 |
-| `special-event.ts` | `specialEventSchema` | name required, optional description/location, optional `date` (datetime-local string → `new Date(str).getTime()`), isActive boolean |
-| `public-rsvp.ts` | `publicRsvpSchema` | array of guest updates + optional `plusOneUpdates` + optional special event RSVPs |
-| `guest-message.ts` | `guestMessageSchema` | optional name ≤200, message required 1–1000 chars |
+| File               | Schema               | Key rules                                                                                                                                                    |
+| ------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `event.ts`         | `eventSchema`        | name min 2 chars, optional `slug` (`/^[a-z0-9-]+$/`, min 2), date optional string, optional brideName/groomName, optional `venueMapUrl` (valid URL or empty) |
+| `invitation.ts`    | `invitationSchema`   | title min 2, slug: `/^[a-z0-9-]+$/`, optional notes (no `type`, no `maxGuests`, no `allowPlusOne`)                                                           |
+| `guest.ts`         | `guestSchema`        | firstName/lastName required, email optional, `allowsPlusOne` boolean                                                                                         |
+| `menu.ts`          | `menuOptionSchema`   | name required, isActive boolean                                                                                                                              |
+| `table.ts`         | `tableSchema`        | name required, seatsCount 1–20                                                                                                                               |
+| `special-event.ts` | `specialEventSchema` | name required, optional description/location, optional `date` (datetime-local string → `new Date(str).getTime()`), isActive boolean                          |
+| `public-rsvp.ts`   | `publicRsvpSchema`   | array of guest updates + optional `plusOneUpdates` + optional special event RSVPs                                                                            |
+| `guest-message.ts` | `guestMessageSchema` | optional name ≤200, message required 1–1000 chars                                                                                                            |
 
 > **Note:** Do not use `.default()` on Zod booleans — it causes Resolver type mismatches with react-hook-form. Use `defaultValues` in `useForm` instead.
