@@ -1,25 +1,29 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Check, Copy } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useState } from "react";
+import { Check, Copy } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface CopyInvitationLinkButtonProps {
-  eventSlug: string
-  slug: string
+  eventSlug: string;
+  slug: string;
+  customDomain?: string;
 }
 
 export function CopyInvitationLinkButton({
   eventSlug,
   slug,
+  customDomain,
 }: CopyInvitationLinkButtonProps) {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
-    const url = `${window.location.origin}/${eventSlug}/invitations/${slug}`
-    await navigator.clipboard.writeText(url)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    const url = customDomain
+      ? `${window.location.protocol}//${customDomain}/invitations/${slug}`
+      : `${window.location.origin}/${eventSlug}/invitations/${slug}`;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -31,5 +35,5 @@ export function CopyInvitationLinkButton({
       )}
       {copied ? "Copied" : "Copy Link"}
     </Button>
-  )
+  );
 }

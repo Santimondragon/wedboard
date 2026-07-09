@@ -551,9 +551,9 @@ src/components/
     custom-domain-settings.tsx  "use client" — guided custom-domain wizard on the settings page: none → connect (POST /api/domains) → pending-DNS (record table w/ copy buttons + TXT-challenge note, records re-fetched from /api/domains/status after reloads) → live (badge, visit link, remove behind AlertDialog)
 
   invitations/
-    invitation-list.tsx         **Table** (column headings: Invitation/Guests/Special Invitations/Status/Actions) of invitations with edit/delete/copy-link; the Guests column lists each linked guest's name with a **+1** marker on +1 records (props from getInvitationsPageData)
+    invitation-list.tsx         **Table** (column headings: Invitation/Guests/Special Invitations/Status/Actions) of invitations with edit/delete/copy-link; the Guests column lists each linked guest's name with a **+1** marker on +1 records (props from getInvitationsPageData). Takes an optional `customDomain` prop (the event's verified custom domain, if any) forwarded to `CopyInvitationLinkButton`
     invitation-form.tsx         Create/edit dialog (styled like the guest dialog — scrollable, `space-y-1.5` fields); no Max Guests / Type fields (removed). **Both modes** manage the linked **guests** (checklist of the invitation's guests + un-invited pool) and the **special-invitations** checklist; on save these go to `createInvitation`/`updateInvitation` as `guestIds`/`specialEventIds`. In edit mode the composition controls **lock** (disabled + amber notice) once any linked guest has responded (server enforces the same). No +1 switch (moved to guests)
-    copy-invitation-link-button.tsx  Copies /{eventSlug}/invitations/{slug} to clipboard
+    copy-invitation-link-button.tsx  Copies the public invitation link to clipboard — `https://{customDomain}/invitations/{slug}` when the event has a verified custom domain (`customDomain` prop), else `{origin}/{eventSlug}/invitations/{slug}`
 
   guests/
     guest-table.tsx             TanStack Table — search + RSVP filter; Menu/Drink columns shown only when those options exist; a **+1 column** (host → its +1 name / "Allowed"; +1 record → "↳ +1 de <host>") and **one column per special invitation** (Not invited / pending / accepted / declined)

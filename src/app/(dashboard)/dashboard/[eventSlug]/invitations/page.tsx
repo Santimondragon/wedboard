@@ -1,22 +1,24 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useQuery } from "convex/react"
-import { api } from "convex/_generated/api"
-import { Mail } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
-import { EmptyState } from "@/components/app/empty-state"
-import { InvitationList } from "@/components/invitations/invitation-list"
-import { InvitationForm } from "@/components/invitations/invitation-form"
-import { useEvent } from "@/components/dashboard/event-provider"
+import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "convex/_generated/api";
+import { Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/app/empty-state";
+import { InvitationList } from "@/components/invitations/invitation-list";
+import { InvitationForm } from "@/components/invitations/invitation-form";
+import { useEvent } from "@/components/dashboard/event-provider";
 
 export default function InvitationsPage() {
-  const event = useEvent()
-  const eventId = event._id
-  const [createOpen, setCreateOpen] = useState(false)
+  const event = useEvent();
+  const eventId = event._id;
+  const [createOpen, setCreateOpen] = useState(false);
 
-  const invitations = useQuery(api.invitations.getInvitationsPageData, { eventId })
+  const invitations = useQuery(api.invitations.getInvitationsPageData, {
+    eventId,
+  });
 
   if (invitations === undefined) {
     return (
@@ -25,7 +27,7 @@ export default function InvitationsPage() {
           <Skeleton key={i} className="h-16 rounded-lg" />
         ))}
       </div>
-    )
+    );
   }
 
   return (
@@ -33,7 +35,8 @@ export default function InvitationsPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-zinc-900">
-            {invitations.length} {invitations.length === 1 ? "invitation" : "invitations"}
+            {invitations.length}{" "}
+            {invitations.length === 1 ? "invitation" : "invitations"}
           </h2>
           <Button onClick={() => setCreateOpen(true)} size="sm">
             New Invitation
@@ -54,6 +57,9 @@ export default function InvitationsPage() {
           <InvitationList
             eventId={eventId}
             eventSlug={event.slug}
+            customDomain={
+              event.customDomainVerified ? event.customDomain : undefined
+            }
             invitations={invitations}
           />
         )}
@@ -66,5 +72,5 @@ export default function InvitationsPage() {
         onOpenChange={setCreateOpen}
       />
     </>
-  )
+  );
 }
