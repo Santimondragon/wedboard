@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as _debug from "../_debug.js";
+import type * as admin from "../admin.js";
 import type * as dashboard from "../dashboard.js";
 import type * as drinks from "../drinks.js";
 import type * as events from "../events.js";
@@ -36,6 +38,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  _debug: typeof _debug;
+  admin: typeof admin;
   dashboard: typeof dashboard;
   drinks: typeof drinks;
   events: typeof events;

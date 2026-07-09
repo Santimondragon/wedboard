@@ -1,9 +1,19 @@
 import { ConvexError } from "convex/values";
-import {
-  query,
-  mutation,
-  internalMutation,
-} from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
+
+/**
+ * Whether an email should be granted the global superadmin role. Driven by the
+ * `SUPERADMIN_EMAILS` Convex env var (comma-separated, case-insensitive) so no
+ * manual internal mutation is needed to promote a user.
+ */
+function isSuperadminEmail(email: string): boolean {
+  const raw = process.env.SUPERADMIN_EMAILS ?? "";
+  const allowed = raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e !== "");
+  return email !== "" && allowed.includes(email.toLowerCase());
+}
 
 export const getCurrentUser = query({
   args: {},
@@ -15,7 +25,7 @@ export const getCurrentUser = query({
     return await ctx.db
       .query("users")
       .withIndex("by_tokenIdentifier", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
   },
@@ -32,19 +42,25 @@ export const upsertCurrentUser = mutation({
     const existing = await ctx.db
       .query("users")
       .withIndex("by_tokenIdentifier", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
 
     const nameParts = (identity.name ?? "").split(" ");
     const firstName = nameParts[0] ?? undefined;
     const lastName = nameParts.slice(1).join(" ") || undefined;
+    const email = identity.email ?? existing?.email ?? "";
+    const promote = isSuperadminEmail(email);
 
     if (existing) {
       await ctx.db.patch(existing._id, {
-        email: identity.email ?? existing.email,
+        email,
         firstName,
         lastName,
+        // Promote-only: never strip an already-granted role.
+        ...(promote && existing.role !== "superadmin"
+          ? { role: "superadmin" }
+          : {}),
       });
       return existing._id;
     }
@@ -52,10 +68,10 @@ export const upsertCurrentUser = mutation({
     const userId = await ctx.db.insert("users", {
       clerkId: identity.subject,
       tokenIdentifier: identity.tokenIdentifier,
-      email: identity.email ?? "",
+      email,
       firstName,
       lastName,
-      role: "user",
+      role: promote ? "superadmin" : "user",
     });
 
     return userId;
@@ -73,19 +89,25 @@ export const ensureCurrentUser = internalMutation({
     const existing = await ctx.db
       .query("users")
       .withIndex("by_tokenIdentifier", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
 
     const nameParts = (identity.name ?? "").split(" ");
     const firstName = nameParts[0] ?? undefined;
     const lastName = nameParts.slice(1).join(" ") || undefined;
+    const email = identity.email ?? existing?.email ?? "";
+    const promote = isSuperadminEmail(email);
 
     if (existing) {
       await ctx.db.patch(existing._id, {
-        email: identity.email ?? existing.email,
+        email,
         firstName,
         lastName,
+        // Promote-only: never strip an already-granted role.
+        ...(promote && existing.role !== "superadmin"
+          ? { role: "superadmin" }
+          : {}),
       });
       return existing._id;
     }
@@ -93,10 +115,10 @@ export const ensureCurrentUser = internalMutation({
     const userId = await ctx.db.insert("users", {
       clerkId: identity.subject,
       tokenIdentifier: identity.tokenIdentifier,
-      email: identity.email ?? "",
+      email,
       firstName,
       lastName,
-      role: "user",
+      role: promote ? "superadmin" : "user",
     });
 
     return userId;

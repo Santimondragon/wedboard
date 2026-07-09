@@ -8,6 +8,7 @@ import { Id } from "../_generated/dataModel";
 export const RESERVED_EVENT_SLUGS = new Set([
   "events",
   "dashboard",
+  "admin",
   "pricing",
   "sign-in",
   "sign-up",
@@ -32,7 +33,7 @@ export async function generateUniqueSlug(
   ctx: QueryCtx | MutationCtx,
   tableName: "invitations" | "events",
   slug: string,
-  existingId?: Id<"invitations"> | Id<"events">
+  existingId?: Id<"invitations"> | Id<"events">,
 ): Promise<string> {
   let candidate = slug;
   let counter = 2;
@@ -61,7 +62,7 @@ export async function generateUniqueInvitationSlug(
   ctx: QueryCtx | MutationCtx,
   eventId: Id<"events">,
   slug: string,
-  existingId?: Id<"invitations">
+  existingId?: Id<"invitations">,
 ): Promise<string> {
   let candidate = slug;
   let counter = 2;
@@ -70,7 +71,7 @@ export async function generateUniqueInvitationSlug(
     const existing = await ctx.db
       .query("invitations")
       .withIndex("by_eventId_and_slug", (q) =>
-        q.eq("eventId", eventId).eq("slug", candidate)
+        q.eq("eventId", eventId).eq("slug", candidate),
       )
       .unique();
 

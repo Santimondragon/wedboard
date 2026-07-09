@@ -13,11 +13,16 @@ const ROLE_HIERARCHY: Record<string, number> = {
 export async function requireEventAccess(
   ctx: QueryCtx | MutationCtx,
   eventId: Id<"events">,
-  userId: Id<"users">
+  userId: Id<"users">,
 ): Promise<void> {
   const event = await ctx.db.get(eventId);
   if (!event) {
     throw new ConvexError("Event not found");
+  }
+  // Global superadmins have full access to every event.
+  const user = await ctx.db.get(userId);
+  if (user?.role === "superadmin") {
+    return;
   }
   if (event.ownerUserId === userId) {
     return;
@@ -25,7 +30,7 @@ export async function requireEventAccess(
   const member = await ctx.db
     .query("eventMembers")
     .withIndex("by_eventId_and_userId", (q) =>
-      q.eq("eventId", eventId).eq("userId", userId)
+      q.eq("eventId", eventId).eq("userId", userId),
     )
     .unique();
   if (!member) {
@@ -40,10 +45,24 @@ export async function requireEventAccess(
  */
 export async function requireEventEditor(
   ctx: QueryCtx | MutationCtx,
-  eventId: Id<"events">
+  eventId: Id<"events">,
 ): Promise<Doc<"users">> {
   const user = await requireUser(ctx);
   await requireEventAccess(ctx, eventId, user._id);
+  return user;
+}
+
+/**
+ * Guard for global-admin-only functions. Authenticates the caller and verifies
+ * the `superadmin` role. Returns the user doc.
+ */
+export async function requireSuperadmin(
+  ctx: QueryCtx | MutationCtx,
+): Promise<Doc<"users">> {
+  const user = await requireUser(ctx);
+  if (user.role !== "superadmin") {
+    throw new ConvexError("Unauthorized");
+  }
   return user;
 }
 
@@ -51,11 +70,17 @@ export async function requireEventMember(
   ctx: QueryCtx | MutationCtx,
   eventId: Id<"events">,
   userId: Id<"users">,
-  minRole?: "owner" | "planner" | "editor" | "viewer"
+  minRole?: "owner" | "planner" | "editor" | "viewer",
 ): Promise<void> {
   const event = await ctx.db.get(eventId);
   if (!event) {
     throw new ConvexError("Event not found");
+  }
+
+  // Global superadmins bypass the per-event role hierarchy entirely.
+  const user = await ctx.db.get(userId);
+  if (user?.role === "superadmin") {
+    return;
   }
 
   let userRole: string | undefined;
@@ -66,7 +91,7 @@ export async function requireEventMember(
     const member = await ctx.db
       .query("eventMembers")
       .withIndex("by_eventId_and_userId", (q) =>
-        q.eq("eventId", eventId).eq("userId", userId)
+        q.eq("eventId", eventId).eq("userId", userId),
       )
       .unique();
     if (!member) {

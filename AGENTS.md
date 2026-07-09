@@ -62,6 +62,7 @@ Required Convex env (set once via CLI):
 ```bash
 npx convex env set CLERK_FRONTEND_API_URL "https://sharing-akita-57.clerk.accounts.dev"
 npx convex env set PRIMARY_DOMAIN "yourdomain.com"  # custom-domain validation; Convex can't read NEXT_PUBLIC_* vars
+npx convex env set SUPERADMIN_EMAILS "you@example.com"  # comma-separated; these users are auto-promoted to role "superadmin" on login
 ```
 
 ---
@@ -72,14 +73,14 @@ npx convex env set PRIMARY_DOMAIN "yourdomain.com"  # custom-domain validation; 
 
 Mirrors Clerk identity. Created/updated on every login via `upsertCurrentUser`.
 
-| Field           | Type    | Notes                                                |
-| --------------- | ------- | ---------------------------------------------------- |
-| clerkId         | string  | Clerk `subject`                                      |
-| tokenIdentifier | string  | Canonical identity key — always use this for lookups |
-| email           | string  |                                                      |
-| firstName       | string? |                                                      |
-| lastName        | string? |                                                      |
-| role            | string  | Default `"user"`                                     |
+| Field           | Type    | Notes                                                                                                                                                                                                                                                             |
+| --------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| clerkId         | string  | Clerk `subject`                                                                                                                                                                                                                                                   |
+| tokenIdentifier | string  | Canonical identity key — always use this for lookups                                                                                                                                                                                                              |
+| email           | string  |                                                                                                                                                                                                                                                                   |
+| firstName       | string? |                                                                                                                                                                                                                                                                   |
+| lastName        | string? |                                                                                                                                                                                                                                                                   |
+| role            | string  | `"user"` (default) or `"superadmin"`. Auto-promoted for emails in the `SUPERADMIN_EMAILS` Convex env var (checked in `upsertCurrentUser`/`ensureCurrentUser`, promote-only). Superadmins bypass all event access checks and land on the global `/admin` dashboard |
 
 Indexes: `by_clerkId`, `by_tokenIdentifier`
 
@@ -314,6 +315,7 @@ Indexes: `by_eventId`, `by_invitationId`
 - `requireEventAccess(ctx, eventId, userId)` — verifies eventMembers membership or ownership
 - `requireEventEditor(ctx, eventId)` — **the standard guard**: `requireUser` + `requireEventAccess` in one call, returns the user doc. Used by nearly all event-scoped functions
 - `requireEventMember(ctx, eventId, userId, minRole?)` — enforces role hierarchy
+- **Superadmin bypass**: `requireEventAccess` and `requireEventMember` both early-return when the caller's `users.role === "superadmin"`, so every event-scoped query/mutation works for a superadmin. `requireSuperadmin(ctx)` — `requireUser` + throws `ConvexError("Unauthorized")` unless role is `"superadmin"`; guards `convex/admin.ts`
 
 ### `convex/lib/public.ts`
 
@@ -349,11 +351,11 @@ Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPub
 
 ### `convex/users.ts`
 
-| Function            | Type             | Notes                                                          |
-| ------------------- | ---------------- | -------------------------------------------------------------- |
-| `getCurrentUser`    | query            | Returns user doc or null                                       |
-| `upsertCurrentUser` | mutation         | Creates/updates user from Clerk JWT — called on every app load |
-| `ensureCurrentUser` | internalMutation | Same as upsert, internal use                                   |
+| Function            | Type             | Notes                                                                                                                                                                               |
+| ------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getCurrentUser`    | query            | Returns user doc or null                                                                                                                                                            |
+| `upsertCurrentUser` | mutation         | Creates/updates user from Clerk JWT — called on every app load. Auto-promotes to `role: "superadmin"` when the email is in `SUPERADMIN_EMAILS` (insert + patch paths, promote-only) |
+| `ensureCurrentUser` | internalMutation | Same as upsert, internal use                                                                                                                                                        |
 
 ### `convex/events.ts`
 
@@ -452,6 +454,15 @@ Same shape as `menu.ts` (thin wrappers over `lib/options.ts`).
 
 `getOverviewStats` — returns `{totalInvitations, totalGuests, attendingCount, declinedCount, pendingCount, allergyCount, menuCompletionCount, tableAssignmentCount}`
 
+---
+
+### `convex/admin.ts`
+
+Superadmin-only global queries (guarded by `requireSuperadmin`):
+
+- `listAllEvents` — every event (`take(200)`) enriched with owner name/email and guest/invitation counts (`by_eventId.take(1000).length`, the `getOverviewStats` counting pattern) + `hasCustomDomain`/`customDomain`. Powers the `/admin` events table
+- `listAllUsers` — every user (`take(500)`): `{_id, email, firstName, lastName, role, createdAt}`. Powers the `/admin` users table
+
 ### `convex/seed.ts`
 
 `seedDemoEventForCurrentUser` (**public mutation**) — creates a full demo event (5 invitations, 15 guests, 2 special events, 3 menu options, 3 drink options, 6 tables) and returns the new `eventId`. Refuses once the user already owns 3+ events (spam guard).
@@ -465,7 +476,8 @@ Same shape as `menu.ts` (thin wrappers over `lib/options.ts`).
 /sign-in, /sign-up              Clerk hosted auth components
 /pricing                        Placeholder
 
-/dashboard                            Lists all events — minimal chrome (logo + user menu), NO event sidebar. No auto-redirect.
+/dashboard                            Lists all events — minimal chrome (logo + user menu), NO event sidebar. No auto-redirect, EXCEPT superadmins are client-redirected to /admin.
+/admin                                Superadmin-only global dashboard (in the (dashboard) route group) — tables of ALL events (owner, guest/invitation counts, custom-domain flag, status, open link) and ALL users. Non-superadmins are client-redirected to /dashboard; queries enforce requireSuperadmin server-side.
 /dashboard/[eventSlug]                Overview — 8 metric cards
 /dashboard/[eventSlug]/invitations    Invitation CRUD + copy public link
 /dashboard/[eventSlug]/special-events Special invitations (mini sub-events) CRUD, ≤2 per event, + per-invitation visibility assignment
@@ -517,7 +529,7 @@ src/components/
   dashboard/
     event-provider.tsx          Resolves [eventSlug]→event via getEventBySlug; exposes useEvent(); handles loading/not-found. Wraps only event routes.
     dashboard-shell.tsx         Sidebar + Header + scrollable main (rendered only inside the event layout)
-    dashboard-sidebar.tsx       Nav links (built from eventSlug), event-switcher, user info
+    dashboard-sidebar.tsx       Nav links (built from eventSlug), event-switcher, user info. The "Wedboard" logo is a home Link — /admin for superadmins, /dashboard otherwise
     dashboard-header.tsx        Page title (from path section), event name (useEvent), status badge, UserButton
     event-switcher.tsx          Dropdown to switch events (by slug → /dashboard/{slug}) or create new
     metric-card.tsx             Stat card with title/value/icon
