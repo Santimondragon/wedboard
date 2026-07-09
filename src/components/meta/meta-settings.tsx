@@ -36,18 +36,20 @@ export function MetaSettings() {
     error: "Failed to save sharing settings",
   });
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [imageId, setImageId] = useState<Id<"media"> | undefined>(undefined);
+  const [title, setTitle] = useState(event.meta?.title ?? "");
+  const [description, setDescription] = useState(event.meta?.description ?? "");
+  const [imageId, setImageId] = useState<Id<"media"> | undefined>(
+    event.meta?.imageId,
+  );
   const [faviconId, setFaviconId] = useState<Id<"media"> | undefined>(
-    undefined,
+    event.meta?.faviconId,
   );
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
   // Sync form fields from the loaded event during render (same pattern as the
   // settings page) rather than in an effect.
-  const [syncedEvent, setSyncedEvent] = useState(event);
+  const [syncedEvent, setSyncedEvent] = useState<typeof event | null>(null);
   if (event !== syncedEvent) {
     setSyncedEvent(event);
     setTitle(event.meta?.title ?? "");
