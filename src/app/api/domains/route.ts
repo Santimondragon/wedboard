@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getConvexToken } from "@/lib/convex-token";
 import { ConvexError } from "convex/values";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "convex/_generated/api";
@@ -16,12 +16,6 @@ import {
 // Ownership is enforced by Convex: every fetchQuery/fetchMutation forwards the
 // caller's Clerk JWT and the Convex functions run requireEventMember. These
 // handlers only add what Convex cannot do — calling the Vercel API.
-
-async function getConvexToken(): Promise<string | null> {
-  const { userId, getToken } = await auth();
-  if (!userId) return null;
-  return await getToken({ template: "convex" });
-}
 
 function errorResponse(err: unknown): NextResponse {
   if (err instanceof ConvexError) {

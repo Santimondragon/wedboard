@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { getConvexToken } from "@/lib/convex-token";
 import { ConvexError } from "convex/values";
 import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { api } from "convex/_generated/api";
@@ -16,11 +16,10 @@ import {
 // (attempting a verify when pending), syncs the cached flag in Convex, and
 // returns the DNS records so the wizard can re-render them after a reload.
 export async function GET(request: NextRequest) {
-  const { userId, getToken } = await auth();
-  if (!userId) {
+  const token = await getConvexToken();
+  if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const token = await getToken({ template: "convex" });
 
   const eventId = request.nextUrl.searchParams.get(
     "eventId",
