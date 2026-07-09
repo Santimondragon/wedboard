@@ -90,24 +90,25 @@ Indexes: `by_clerkId`, `by_tokenIdentifier`
 
 Top-level board. One event = one wedding/occasion.
 
-| Field                | Type                                |
-| -------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| name                 | string                              |
-| slug                 | string                              | Handle-style **event key**, globally unique, editable in settings. Used in public URLs.                                                                                                                                                            |
-| ownerUserId          | Id<"users">                         |
-| brideName            | string?                             | Shown on the public invitation (hero)                                                                                                                                                                                                              |
-| groomName            | string?                             | Shown on the public invitation (hero)                                                                                                                                                                                                              |
-| date                 | number?                             | Unix ms timestamp                                                                                                                                                                                                                                  |
-| venueName            | string?                             |                                                                                                                                                                                                                                                    |
-| venueAddress         | string?                             |                                                                                                                                                                                                                                                    |
-| venueMapUrl          | string?                             | Google Maps (or any maps) link; backs the location "Ver mapa" button                                                                                                                                                                               |
-| subdomain            | string?                             | Future                                                                                                                                                                                                                                             |
-| customDomain         | string?                             | Owner's own domain serving the public invitations (normalized bare hostname, globally unique). Set/cleared only via `setCustomDomain`/`removeCustomDomain` (orchestrated with the Vercel attach/detach by `/api/domains`)                          |
-| customDomainVerified | boolean?                            | Cached Vercel verification state for the settings UI only — public routing never gates on it                                                                                                                                                       |
-| templateId           | string?                             | Public invitation template id (`"elegant"`); defaults to elegant when unset                                                                                                                                                                        |
-| layoutBlocks         | `{id,type,config?}[]`?              | **Legacy** single layout. Kept for back-compat; read as the `accepted` variant fallback when `layoutVariants.accepted` is unset. Validator shared via `LAYOUT_BLOCKS_VALIDATOR` (exported from `schema.ts`)                                        |
-| layoutVariants       | `{pending?,accepted?,declined?}`?   | Per-RSVP-state page-builder layouts (each a `{id,type,config?}[]`). The public page picks one from the invitation's guests' RSVP state (see `getPublicInvitation`). Each variant undefined = the selected template's default layout for that state |
-| status               | `"draft" \| "active" \| "archived"` |
+| Field                | Type                                         |
+| -------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| name                 | string                                       |
+| slug                 | string                                       | Handle-style **event key**, globally unique, editable in settings. Used in public URLs.                                                                                                                                                                                                                                                                     |
+| ownerUserId          | Id<"users">                                  |
+| brideName            | string?                                      | Shown on the public invitation (hero)                                                                                                                                                                                                                                                                                                                       |
+| groomName            | string?                                      | Shown on the public invitation (hero)                                                                                                                                                                                                                                                                                                                       |
+| date                 | number?                                      | Unix ms timestamp                                                                                                                                                                                                                                                                                                                                           |
+| venueName            | string?                                      |                                                                                                                                                                                                                                                                                                                                                             |
+| venueAddress         | string?                                      |                                                                                                                                                                                                                                                                                                                                                             |
+| venueMapUrl          | string?                                      | Google Maps (or any maps) link; backs the location "Ver mapa" button                                                                                                                                                                                                                                                                                        |
+| subdomain            | string?                                      | Future                                                                                                                                                                                                                                                                                                                                                      |
+| customDomain         | string?                                      | Owner's own domain serving the public invitations (normalized bare hostname, globally unique). Set/cleared only via `setCustomDomain`/`removeCustomDomain` (orchestrated with the Vercel attach/detach by `/api/domains`)                                                                                                                                   |
+| customDomainVerified | boolean?                                     | Cached Vercel verification state for the settings UI only — public routing never gates on it                                                                                                                                                                                                                                                                |
+| templateId           | string?                                      | Public invitation template id (`"elegant"`); defaults to elegant when unset                                                                                                                                                                                                                                                                                 |
+| layoutBlocks         | `{id,type,config?}[]`?                       | **Legacy** single layout. Kept for back-compat; read as the `accepted` variant fallback when `layoutVariants.accepted` is unset. Validator shared via `LAYOUT_BLOCKS_VALIDATOR` (exported from `schema.ts`)                                                                                                                                                 |
+| layoutVariants       | `{pending?,accepted?,declined?}`?            | Per-RSVP-state page-builder layouts (each a `{id,type,config?}[]`). The public page picks one from the invitation's guests' RSVP state (see `getPublicInvitation`). Each variant undefined = the selected template's default layout for that state                                                                                                          |
+| meta                 | `{title?,description?,imageId?,faviconId?}`? | Social sharing / SEO metadata for the public invitation pages. `title`/`description` are templates that may contain `{variables}` (see `convex/lib/meta.ts`); `imageId` is the OG/social-card image, `faviconId` an .ico/.svg/.png — both `Id<"media">`. Unset fields fall back to defaults derived from event data. Written only by `meta.updateEventMeta` |
+| status               | `"draft" \| "active" \| "archived"`          |
 
 Indexes: `by_ownerUserId`, `by_slug`, `by_subdomain`, `by_customDomain`
 
@@ -258,7 +259,7 @@ Index: `by_eventId`
 
 ### `media`
 
-Per-event image library (template photos, maps, etc.). Blobs live in Convex file storage; this table is the catalog. Only image mime types (jpeg/png/svg+xml/webp/gif), ≤ 5MB, max 50 per event (enforced in `media.register`).
+Per-event image library (template photos, maps, etc.). Blobs live in Convex file storage; this table is the catalog. Only image mime types (jpeg/png/svg+xml/webp/gif, plus x-icon/vnd.microsoft.icon for favicons), ≤ 5MB, max 50 per event (enforced in `media.register`).
 
 | Field     | Type            |
 | --------- | --------------- |
@@ -329,6 +330,10 @@ Pure custom-domain helpers (unit-tested in `tests/domains.test.ts`):
 
 - `normalizeCustomDomain(input)` — lowercase; strips protocol/path/query/port/trailing dot
 - `validateCustomDomain(domain)` — returns a user-facing error or null: hostname regex, ASCII-only (IDN must be punycode), rejects `*.vercel.app` and the primary domain (Convex env `PRIMARY_DOMAIN`, fallback localhost) + its subdomains
+
+### `convex/lib/meta.ts`
+
+Pure helpers for public-invitation social metadata (no Convex imports — also consumed by the dashboard Meta page via the `convex/*` alias): `META_VARIABLES` (`invitation-title`, `guest-name`, `guest-names`, `event-name`, `bride-name`, `groom-name`, `couple-names`), `resolveMetaTemplate(template, values)` (replaces `{variables}`, leaves unknown tokens), `buildMetaVariables(...)`, `DEFAULT_META_TITLE`/`DEFAULT_META_DESCRIPTION`, `META_TITLE_MAX` (120) / `META_DESCRIPTION_MAX` (300), `FAVICON_MIME_TYPES` (ico/svg/png).
 
 ### `convex/lib/options.ts`
 
@@ -463,6 +468,13 @@ Superadmin-only global queries (guarded by `requireSuperadmin`):
 - `listAllEvents` — every event (`take(200)`) enriched with owner name/email and guest/invitation counts (`by_eventId.take(1000).length`, the `getOverviewStats` counting pattern) + `hasCustomDomain`/`customDomain`. Powers the `/admin` events table
 - `listAllUsers` — every user (`take(500)`): `{_id, email, firstName, lastName, role, createdAt}`. Powers the `/admin` users table
 
+### `convex/meta.ts`
+
+| Function                  | Type     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getPublicInvitationMeta` | query    | **Public** — args `{eventSlug?, host?, invitationSlug}` (slug for the primary domain, host for custom domains). Resolves the event/invitation via `lib/public.ts`, builds the variable values from the invitation's non-+1 guests, and returns `{title, description, imageUrl, faviconUrl, faviconMimeType}` with `event.meta` templates resolved (defaults when unset), or null. Consumed by `generateMetadata` on both public routes |
+| `updateEventMeta`         | mutation | Min role planner — replaces `events.meta` wholesale. Trims + enforces max lengths, verifies `imageId`/`faviconId` belong to the event's media library, and that the favicon is ico/svg/png                                                                                                                                                                                                                                             |
+
 ### `convex/seed.ts`
 
 `seedDemoEventForCurrentUser` (**public mutation**) — creates a full demo event (5 invitations, 15 guests, 2 special events, 3 menu options, 3 drink options, 6 tables) and returns the new `eventId`. Refuses once the user already owns 3+ events (spam guard).
@@ -487,14 +499,15 @@ Superadmin-only global queries (guarded by `requireSuperadmin`):
 /dashboard/[eventSlug]/messages       Guest messages left for the host (listMessagesByEvent)
 /dashboard/[eventSlug]/template       Template picker + per-RSVP-variant block page-builder (Pending/Accepted/Declined tabs; add/reorder/duplicate/remove/edit incl. list + image fields) + live preview (dummy data + real media)
 /dashboard/[eventSlug]/media          Per-event image library — upload (Convex storage), rename, delete
+/dashboard/[eventSlug]/meta           Meta & Sharing — social-card title/description templates (with {variables}), OG image picker, favicon upload, live social-card preview
 /dashboard/[eventSlug]/settings       Event metadata + editable event key + custom-domain wizard + archive
 
-/[eventSlug]/invitations/[invitationSlug]   Public invitation page (guest names) — no auth required
+/[eventSlug]/invitations/[invitationSlug]   Public invitation page (guest names) — no auth required. Exports generateMetadata (fetchQuery meta.getPublicInvitationMeta → src/lib/invitation-metadata.ts buildInvitationMetadata: title/description/OG/Twitter/favicon)
 
 /api/domains                Route handler (POST connect / DELETE remove) — Clerk auth + Convex ownership via forwarded JWT, then Vercel Domains API
 /api/domains/status         Route handler (GET) — live Vercel verified/configured check (+ verify attempt), syncs customDomainVerified, returns DNS records
 
-/_domain/[host]/invitations/[invitationSlug]   Internal target of the middleware custom-domain rewrite (folder is `%5Fdomain` — plain `_domain` would be a private, non-routable App Router folder). Renders PublicInvitationPage by host
+/_domain/[host]/invitations/[invitationSlug]   Internal target of the middleware custom-domain rewrite (folder is `%5Fdomain` — plain `_domain` would be a private, non-routable App Router folder). Renders PublicInvitationPage by host; same generateMetadata as the primary route (by host)
 /_domain/[host]/[[...rest]]                    Branded "Invitation Not Found" for the custom domain's root & unknown paths. Both 404 when hit directly on the primary domain
 ```
 
@@ -557,6 +570,10 @@ src/components/
     media-grid.tsx              Thumbnail grid with inline rename + delete (exports MediaItem type)
     upload-button.tsx           File input → Convex upload URL → media.register (client-side type/size checks)
     media-picker-dialog.tsx     Pick (or upload) one image from the event library — used by the template editor's image fields
+
+  meta/
+    meta-settings.tsx           "use client" — the Meta & Sharing page: title/description template inputs with clickable {variable} badges + char counters, social-image picker (MediaPickerDialog), favicon uploader, and a live social-card preview resolved against the event's first invitation; saves via meta.updateEventMeta
+    favicon-upload-button.tsx   Uploads an .ico/.svg/.png into the media library (extension fallback for browsers reporting empty .ico mime)
 
   messages/
     message-list.tsx            List of host messages (name, invitation title, relative date, body) — exports GuestMessageItem type

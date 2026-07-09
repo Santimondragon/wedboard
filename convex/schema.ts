@@ -55,6 +55,19 @@ export default defineSchema({
         declined: v.optional(LAYOUT_BLOCKS_VALIDATOR),
       }),
     ),
+    // Social sharing / SEO metadata for the public invitation pages. Title and
+    // description are templates that may contain {variables} (see
+    // convex/lib/meta.ts); image is the OG/social card image, favicon an
+    // .ico/.svg/.png from the media library. Unset fields fall back to
+    // defaults derived from the event data.
+    meta: v.optional(
+      v.object({
+        title: v.optional(v.string()),
+        description: v.optional(v.string()),
+        imageId: v.optional(v.id("media")),
+        faviconId: v.optional(v.id("media")),
+      }),
+    ),
     status: v.union(
       v.literal("draft"),
       v.literal("active"),

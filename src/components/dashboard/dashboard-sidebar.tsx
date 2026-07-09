@@ -15,6 +15,7 @@ import {
   Image as ImageIcon,
   MessageSquare,
   Sparkles,
+  Share2,
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
   { label: "Messages", icon: MessageSquare, segment: "messages" },
   { label: "Invitation Template", icon: Palette, segment: "template" },
   { label: "Media", icon: ImageIcon, segment: "media" },
+  { label: "Meta & Sharing", icon: Share2, segment: "meta" },
   { label: "Settings", icon: Settings, segment: "settings" },
 ];
 

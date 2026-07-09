@@ -8,6 +8,9 @@ export const ALLOWED_IMAGE_MIME_TYPES = [
   "image/svg+xml",
   "image/webp",
   "image/gif",
+  // .ico favicons (both mime spellings browsers report).
+  "image/x-icon",
+  "image/vnd.microsoft.icon",
 ];
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -66,7 +69,7 @@ export const register = mutation({
       .take(MAX_MEDIA_PER_EVENT);
     if (existing.length >= MAX_MEDIA_PER_EVENT) {
       throw new ConvexError(
-        `Media library is full (max ${MAX_MEDIA_PER_EVENT} images)`
+        `Media library is full (max ${MAX_MEDIA_PER_EVENT} images)`,
       );
     }
 
@@ -96,7 +99,7 @@ export const listByEvent = query({
       items.map(async (item) => ({
         ...item,
         url: await ctx.storage.getUrl(item.storageId),
-      }))
+      })),
     );
   },
 });
