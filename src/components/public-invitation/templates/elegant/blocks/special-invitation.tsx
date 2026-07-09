@@ -1,46 +1,52 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
-import { getConfigString } from "../../../blocks"
-import type { BlockComponentProps } from "../../types"
-import { ELEGANT_COPY } from "../default-copy"
-import { ASSET_BASE, ElegantSection, WeddingButton, getConfigImage } from "./primitives"
+import { useMemo, useState } from "react";
+import { getConfigString } from "../../../blocks";
+import type { BlockComponentProps } from "../../types";
+import { ELEGANT_COPY } from "../default-copy";
 import {
+  ASSET_BASE,
+  ElegantSection,
+  WeddingButton,
+  getConfigImage,
+} from "./primitives";
+import {
+  SpecialEventDetails,
   SpecialInvitationDialog,
   type SpecialCardProps,
-} from "./special-invitation-dialog"
-import { WithImageSpecialCard } from "./special-invitation-with-image"
+} from "./special-invitation-dialog";
+import { WithImageSpecialCard } from "./special-invitation-with-image";
 
 export function ElegantSpecialInvitation({ block, data }: BlockComponentProps) {
   const confirmLabel =
-    getConfigString(block, "confirmLabel") ?? ELEGANT_COPY.dinnerConfirmLabel
+    getConfigString(block, "confirmLabel") ?? ELEGANT_COPY.dinnerConfirmLabel;
   const detailsLabel =
-    getConfigString(block, "detailsLabel") ?? ELEGANT_COPY.dinnerDetailsLabel
-  const templateId = getConfigString(block, "specialTemplateId") ?? "elegant"
-  const image = getConfigImage(data, block, "image")
+    getConfigString(block, "detailsLabel") ?? ELEGANT_COPY.dinnerDetailsLabel;
+  const templateId = getConfigString(block, "specialTemplateId") ?? "elegant";
+  const image = getConfigImage(data, block, "image");
 
   // Bind the block to one of the invitation's accessible special events: the
   // explicitly configured one, otherwise the sole accessible one.
-  const configuredId = getConfigString(block, "specialEventId")
+  const configuredId = getConfigString(block, "specialEventId");
   const bound = useMemo(() => {
-    const accessible = data.specialEvents ?? []
+    const accessible = data.specialEvents ?? [];
     return (
       accessible.find((se) => se._id === configuredId) ??
       (accessible.length === 1 ? accessible[0] : undefined)
-    )
-  }, [data.specialEvents, configuredId])
+    );
+  }, [data.specialEvents, configuredId]);
 
   // Slugs are injected on the live public page, absent in the editor preview.
-  const isPreview = !(data.eventSlug && data.invitationSlug)
+  const isPreview = !(data.eventSlug && data.invitationSlug);
 
   // Per-invitation assignment is the source of truth: getPublicInvitation only
   // returns special events this invitation has access to. So if nothing is bound
   // on the live page, this invitation isn't assigned it — render nothing.
-  if (!bound && !isPreview) return null
+  if (!bound && !isPreview) return null;
 
   // Guests who declined the main event are off the special invitations.
-  const eligibleGuests = data.guests.filter((g) => g.rsvpStatus !== "declined")
-  const canConfirm = Boolean(bound) && !isPreview && eligibleGuests.length > 0
+  const eligibleGuests = data.guests.filter((g) => g.rsvpStatus !== "declined");
+  const canConfirm = Boolean(bound) && !isPreview && eligibleGuests.length > 0;
 
   // Once every eligible guest has already responded to this special event, the
   // button switches from "confirm" to a read-only "view details" affordance —
@@ -49,12 +55,12 @@ export function ElegantSpecialInvitation({ block, data }: BlockComponentProps) {
     !!bound &&
     eligibleGuests.length > 0 &&
     eligibleGuests.every((g) => {
-      const status = bound.guestStatuses[g._id]
-      return status === "attending" || status === "declined"
-    })
-  const buttonLabel = hasResponded ? detailsLabel : confirmLabel
+      const status = bound.guestStatuses[g._id];
+      return status === "attending" || status === "declined";
+    });
+  const buttonLabel = hasResponded ? detailsLabel : confirmLabel;
 
-  const Card = SPECIAL_TEMPLATES[templateId] ?? SPECIAL_TEMPLATES.elegant
+  const Card = SPECIAL_TEMPLATES[templateId] ?? SPECIAL_TEMPLATES.elegant;
 
   return (
     <Card
@@ -68,7 +74,7 @@ export function ElegantSpecialInvitation({ block, data }: BlockComponentProps) {
       eventSlug={data.eventSlug}
       invitationSlug={data.invitationSlug}
     />
-  )
+  );
 }
 
 /**
@@ -76,10 +82,13 @@ export function ElegantSpecialInvitation({ block, data }: BlockComponentProps) {
  * another `id → component` entry and listing it in the block's
  * `specialTemplateId` options (see BLOCK_DEFS.specialInvitation in blocks.ts).
  */
-const SPECIAL_TEMPLATES: Record<string, (props: SpecialCardProps) => React.ReactNode> = {
+const SPECIAL_TEMPLATES: Record<
+  string,
+  (props: SpecialCardProps) => React.ReactNode
+> = {
   elegant: (props) => <ElegantSpecialCard {...props} />,
   "with-image": (props) => <WithImageSpecialCard {...props} />,
-}
+};
 
 function ElegantSpecialCard({
   name,
@@ -91,7 +100,7 @@ function ElegantSpecialCard({
   eventSlug,
   invitationSlug,
 }: SpecialCardProps) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false);
 
   return (
     <>
@@ -115,6 +124,7 @@ function ElegantSpecialCard({
           <p className="font-elegant text-lg font-bold leading-relaxed text-wedding-ink">
             {description}
           </p>
+          <SpecialEventDetails specialEvent={specialEvent} />
           <WeddingButton onClick={() => setOpen(true)} disabled={!canConfirm}>
             {buttonLabel}
           </WeddingButton>
@@ -132,5 +142,5 @@ function ElegantSpecialCard({
         />
       )}
     </>
-  )
+  );
 }

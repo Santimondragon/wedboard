@@ -1,11 +1,12 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { ElegantSection, FullWidthPhoto, WeddingButton } from "./primitives"
+import { useState } from "react";
+import { ElegantSection, FullWidthPhoto, WeddingButton } from "./primitives";
 import {
+  SpecialEventDetails,
   SpecialInvitationDialog,
   type SpecialCardProps,
-} from "./special-invitation-dialog"
+} from "./special-invitation-dialog";
 
 /**
  * "With image" special-invitation display template: a full-width 16/10 photo
@@ -23,7 +24,7 @@ export function WithImageSpecialCard({
   eventSlug,
   invitationSlug,
 }: SpecialCardProps) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false);
 
   return (
     <>
@@ -35,6 +36,7 @@ export function WithImageSpecialCard({
         <p className="whitespace-pre-line font-elegant text-[16px] leading-relaxed text-wedding-ink">
           {description}
         </p>
+        <SpecialEventDetails specialEvent={specialEvent} />
         <WeddingButton onClick={() => setOpen(true)} disabled={!canConfirm}>
           {buttonLabel}
         </WeddingButton>
@@ -51,5 +53,5 @@ export function WithImageSpecialCard({
         />
       )}
     </>
-  )
+  );
 }
