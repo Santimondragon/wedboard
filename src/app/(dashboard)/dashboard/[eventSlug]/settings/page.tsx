@@ -60,7 +60,7 @@ export default function SettingsPage() {
   // Sync form fields from the loaded event during render (guarded by a
   // previous-value check) rather than in an effect — avoids the cascading
   // re-render that synchronous setState in useEffect triggers.
-  const [syncedEvent, setSyncedEvent] = useState(event);
+  const [syncedEvent, setSyncedEvent] = useState<typeof event | null>(null);
   if (event !== syncedEvent) {
     setSyncedEvent(event);
     if (event) {
