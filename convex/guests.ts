@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { requireEventEditor } from "./lib/permissions";
+import { logActivity } from "./lib/activity";
 import { resolvePublicEvent, resolvePublicInvitation } from "./lib/public";
 import {
   applyDeclineEffects,
@@ -31,7 +32,7 @@ export const listByInvitation = query({
     return await ctx.db
       .query("guests")
       .withIndex("by_invitationId", (q) =>
-        q.eq("invitationId", args.invitationId)
+        q.eq("invitationId", args.invitationId),
       )
       .take(100);
   },
@@ -47,7 +48,7 @@ export const listUnassignedByEvent = query({
     return await ctx.db
       .query("guests")
       .withIndex("by_eventId_and_invitationId", (q) =>
-        q.eq("eventId", args.eventId).eq("invitationId", undefined)
+        q.eq("eventId", args.eventId).eq("invitationId", undefined),
       )
       .take(200);
   },
@@ -60,33 +61,39 @@ export const getGuestsPageData = query({
   handler: async (ctx, args) => {
     await requireEventEditor(ctx, args.eventId);
 
-    const [guests, invitations, menuOptions, drinkOptions, tables, specialEvents] =
-      await Promise.all([
-        ctx.db
-          .query("guests")
-          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-          .take(1000),
-        ctx.db
-          .query("invitations")
-          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-          .take(500),
-        ctx.db
-          .query("menuOptions")
-          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-          .take(100),
-        ctx.db
-          .query("drinkOptions")
-          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-          .take(100),
-        ctx.db
-          .query("tables")
-          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-          .take(200),
-        ctx.db
-          .query("specialEvents")
-          .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
-          .take(10),
-      ]);
+    const [
+      guests,
+      invitations,
+      menuOptions,
+      drinkOptions,
+      tables,
+      specialEvents,
+    ] = await Promise.all([
+      ctx.db
+        .query("guests")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(1000),
+      ctx.db
+        .query("invitations")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(500),
+      ctx.db
+        .query("menuOptions")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(100),
+      ctx.db
+        .query("drinkOptions")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(100),
+      ctx.db
+        .query("tables")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(200),
+      ctx.db
+        .query("specialEvents")
+        .withIndex("by_eventId", (q) => q.eq("eventId", args.eventId))
+        .take(10),
+    ]);
 
     // Which invitations can see each special event (powers the per-event
     // "not invited" vs RSVP status columns). At most a couple special events,
@@ -96,12 +103,10 @@ export const getGuestsPageData = query({
       specialEvents.map(async (se) => {
         const rows = await ctx.db
           .query("invitationSpecialEventAccess")
-          .withIndex("by_specialEventId", (q) =>
-            q.eq("specialEventId", se._id)
-          )
+          .withIndex("by_specialEventId", (q) => q.eq("specialEventId", se._id))
           .take(500);
         accessByEvent[se._id] = rows.map((r) => r.invitationId);
-      })
+      }),
     );
 
     // Every guest's per-special-event RSVP status, indexed guestId→eventId→status.
@@ -151,7 +156,7 @@ export const createGuest = mutation({
     allowsPlusOne: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    await requireEventEditor(ctx, args.eventId);
+    const user = await requireEventEditor(ctx, args.eventId);
 
     if (args.invitationId) {
       const invitation = await ctx.db.get(args.invitationId);
@@ -160,7 +165,7 @@ export const createGuest = mutation({
       }
     }
 
-    return await ctx.db.insert("guests", {
+    const guestId = await ctx.db.insert("guests", {
       eventId: args.eventId,
       invitationId: args.invitationId,
       firstName: args.firstName,
@@ -171,6 +176,14 @@ export const createGuest = mutation({
       allowsPlusOne: args.allowsPlusOne ?? false,
       rsvpStatus: "pending",
     });
+    await logActivity(ctx, {
+      eventId: args.eventId,
+      actor: user,
+      action: "create",
+      entity: "guest",
+      entityName: `${args.firstName} ${args.lastName}`.trim(),
+    });
+    return guestId;
   },
 });
 
@@ -185,8 +198,8 @@ export const updateGuest = mutation({
       v.union(
         v.literal("pending"),
         v.literal("attending"),
-        v.literal("declined")
-      )
+        v.literal("declined"),
+      ),
     ),
     allergies: v.optional(v.string()),
     specialRequests: v.optional(v.string()),
@@ -199,17 +212,23 @@ export const updateGuest = mutation({
   handler: async (ctx, args) => {
     const guest = await ctx.db.get(args.id);
     if (!guest) throw new ConvexError("Guest not found");
-    await requireEventEditor(ctx, guest.eventId);
+    const user = await requireEventEditor(ctx, guest.eventId);
 
     const { id, ...updates } = args;
     await ctx.db.patch(id, updates);
+    await logActivity(ctx, {
+      eventId: guest.eventId,
+      actor: user,
+      action: "update",
+      entity: "guest",
+      entityName: `${updates.firstName ?? guest.firstName} ${
+        updates.lastName ?? guest.lastName
+      }`.trim(),
+    });
 
     // A guest who declines is pulled out of every special invitation, and
     // loses their +1 (if any). The guest stays linked to its invitation.
-    if (
-      updates.rsvpStatus === "declined" &&
-      guest.rsvpStatus !== "declined"
-    ) {
+    if (updates.rsvpStatus === "declined" && guest.rsvpStatus !== "declined") {
       await applyDeclineEffects(ctx, { ...guest, ...updates });
     }
 
@@ -233,7 +252,7 @@ export const setSpecialEventRsvp = mutation({
     status: v.union(
       v.literal("pending"),
       v.literal("attending"),
-      v.literal("declined")
+      v.literal("declined"),
     ),
   },
   handler: async (ctx, args) => {
@@ -249,7 +268,7 @@ export const setSpecialEventRsvp = mutation({
     const existing = await ctx.db
       .query("guestSpecialEventRsvps")
       .withIndex("by_guestId_and_specialEventId", (q) =>
-        q.eq("guestId", args.guestId).eq("specialEventId", args.specialEventId)
+        q.eq("guestId", args.guestId).eq("specialEventId", args.specialEventId),
       )
       .unique();
 
@@ -283,7 +302,7 @@ export const removeSpecialEventRsvp = mutation({
     const existing = await ctx.db
       .query("guestSpecialEventRsvps")
       .withIndex("by_guestId_and_specialEventId", (q) =>
-        q.eq("guestId", args.guestId).eq("specialEventId", args.specialEventId)
+        q.eq("guestId", args.guestId).eq("specialEventId", args.specialEventId),
       )
       .unique();
 
@@ -296,7 +315,7 @@ export const deleteGuest = mutation({
   handler: async (ctx, args) => {
     const guest = await ctx.db.get(args.id);
     if (!guest) throw new ConvexError("Guest not found");
-    await requireEventEditor(ctx, guest.eventId);
+    const user = await requireEventEditor(ctx, guest.eventId);
 
     // Delete special event RSVPs for this guest
     const rsvps = await ctx.db
@@ -312,6 +331,13 @@ export const deleteGuest = mutation({
     if (plusOne) await deletePlusOneCascade(ctx, plusOne);
 
     await ctx.db.delete(args.id);
+    await logActivity(ctx, {
+      eventId: guest.eventId,
+      actor: user,
+      action: "delete",
+      entity: "guest",
+      entityName: `${guest.firstName} ${guest.lastName}`.trim(),
+    });
   },
 });
 
@@ -328,7 +354,7 @@ export const addPlusOne = mutation({
   handler: async (ctx, args) => {
     const host = await ctx.db.get(args.hostGuestId);
     if (!host) throw new ConvexError("Guest not found");
-    await requireEventEditor(ctx, host.eventId);
+    const user = await requireEventEditor(ctx, host.eventId);
 
     if (host.isPlusOne) {
       throw new ConvexError("A +1 cannot have its own +1");
@@ -343,7 +369,7 @@ export const addPlusOne = mutation({
     const firstName = args.firstName?.trim() || "Acompañante";
     const lastName = args.lastName?.trim() || `de ${host.firstName}`.trim();
 
-    return await ctx.db.insert("guests", {
+    const plusOneId = await ctx.db.insert("guests", {
       eventId: host.eventId,
       invitationId: host.invitationId,
       firstName,
@@ -353,6 +379,14 @@ export const addPlusOne = mutation({
       plusOneOfGuestId: host._id,
       rsvpStatus: "pending",
     });
+    await logActivity(ctx, {
+      eventId: host.eventId,
+      actor: user,
+      action: "create",
+      entity: "guest",
+      entityName: `${firstName} ${lastName}`.trim(),
+    });
+    return plusOneId;
   },
 });
 
@@ -364,10 +398,20 @@ export const removePlusOne = mutation({
   handler: async (ctx, args) => {
     const host = await ctx.db.get(args.hostGuestId);
     if (!host) throw new ConvexError("Guest not found");
-    await requireEventEditor(ctx, host.eventId);
+    const user = await requireEventEditor(ctx, host.eventId);
 
     const plusOne = await findPlusOne(ctx, host._id);
-    if (plusOne) await deletePlusOneCascade(ctx, plusOne);
+    if (plusOne) {
+      const name = `${plusOne.firstName} ${plusOne.lastName}`.trim();
+      await deletePlusOneCascade(ctx, plusOne);
+      await logActivity(ctx, {
+        eventId: host.eventId,
+        actor: user,
+        action: "delete",
+        entity: "guest",
+        entityName: name,
+      });
+    }
   },
 });
 
@@ -379,7 +423,7 @@ export const bulkCreateGuestsForInvitation = mutation({
         firstName: v.string(),
         lastName: v.string(),
         allowsPlusOne: v.optional(v.boolean()),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -388,7 +432,7 @@ export const bulkCreateGuestsForInvitation = mutation({
     }
     const invitation = await ctx.db.get(args.invitationId);
     if (!invitation) throw new ConvexError("Invitation not found");
-    await requireEventEditor(ctx, invitation.eventId);
+    const user = await requireEventEditor(ctx, invitation.eventId);
 
     const ids = [];
     for (const g of args.guests) {
@@ -402,6 +446,18 @@ export const bulkCreateGuestsForInvitation = mutation({
         rsvpStatus: "pending",
       });
       ids.push(id);
+    }
+    if (ids.length > 0) {
+      await logActivity(ctx, {
+        eventId: invitation.eventId,
+        actor: user,
+        action: "create",
+        entity: "guest",
+        entityName:
+          ids.length === 1
+            ? `${args.guests[0].firstName} ${args.guests[0].lastName}`.trim()
+            : `${ids.length} guests`,
+      });
     }
     return ids;
   },
@@ -417,13 +473,13 @@ export const submitPublicRsvp = mutation({
         rsvpStatus: v.union(
           v.literal("pending"),
           v.literal("attending"),
-          v.literal("declined")
+          v.literal("declined"),
         ),
         menuOptionId: v.optional(v.id("menuOptions")),
         drinkOptionId: v.optional(v.id("drinkOptions")),
         allergies: v.optional(v.string()),
         specialRequests: v.optional(v.string()),
-      })
+      }),
     ),
     plusOneUpdates: v.optional(
       v.array(
@@ -432,8 +488,8 @@ export const submitPublicRsvp = mutation({
           attending: v.boolean(),
           firstName: v.optional(v.string()),
           lastName: v.optional(v.string()),
-        })
-      )
+        }),
+      ),
     ),
     specialEventRsvps: v.optional(
       v.array(
@@ -443,10 +499,10 @@ export const submitPublicRsvp = mutation({
           status: v.union(
             v.literal("pending"),
             v.literal("attending"),
-            v.literal("declined")
+            v.literal("declined"),
           ),
-        })
-      )
+        }),
+      ),
     ),
   },
   handler: async (ctx, args) => {
@@ -469,7 +525,7 @@ export const submitPublicRsvp = mutation({
     const invitation = await resolvePublicInvitation(
       ctx,
       event,
-      args.invitationSlug
+      args.invitationSlug,
     );
     if (!invitation) {
       throw new ConvexError("Invitation not found or not active");
@@ -478,9 +534,7 @@ export const submitPublicRsvp = mutation({
     // Get all guests for this invitation
     const invitationGuests = await ctx.db
       .query("guests")
-      .withIndex("by_invitationId", (q) =>
-        q.eq("invitationId", invitation._id)
-      )
+      .withIndex("by_invitationId", (q) => q.eq("invitationId", invitation._id))
       .take(100);
 
     const guestById = new Map(invitationGuests.map((g) => [g._id, g]));
@@ -549,8 +603,7 @@ export const submitPublicRsvp = mutation({
 
       if (pu.attending && host.allowsPlusOne && hostAttending) {
         const firstName = pu.firstName?.trim() || "Acompañante";
-        const lastName =
-          pu.lastName?.trim() || `de ${host.firstName}`.trim();
+        const lastName = pu.lastName?.trim() || `de ${host.firstName}`.trim();
         if (existing) {
           await ctx.db.patch(existing._id, {
             firstName,
@@ -592,9 +645,7 @@ export const submitPublicRsvp = mutation({
           specialEvent.eventId !== event._id ||
           !specialEvent.isActive
         ) {
-          throw new ConvexError(
-            "Special event does not belong to this event"
-          );
+          throw new ConvexError("Special event does not belong to this event");
         }
 
         // The invitation must have been granted access to this special event.
@@ -603,12 +654,12 @@ export const submitPublicRsvp = mutation({
           .withIndex("by_invitationId_and_specialEventId", (q) =>
             q
               .eq("invitationId", invitation._id)
-              .eq("specialEventId", rsvp.specialEventId)
+              .eq("specialEventId", rsvp.specialEventId),
           )
           .unique();
         if (!access) {
           throw new ConvexError(
-            "Invitation does not have access to this special event"
+            "Invitation does not have access to this special event",
           );
         }
 
@@ -617,7 +668,7 @@ export const submitPublicRsvp = mutation({
           .withIndex("by_guestId_and_specialEventId", (q) =>
             q
               .eq("guestId", rsvp.guestId)
-              .eq("specialEventId", rsvp.specialEventId)
+              .eq("specialEventId", rsvp.specialEventId),
           )
           .unique();
 

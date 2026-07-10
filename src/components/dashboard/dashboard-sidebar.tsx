@@ -9,11 +9,13 @@ import {
   LayoutDashboard,
   Mail,
   Users,
+  Users2,
   UtensilsCrossed,
   LayoutGrid,
   Palette,
   Image as ImageIcon,
   MessageSquare,
+  History,
   Sparkles,
   Share2,
   Settings,
@@ -21,19 +23,58 @@ import {
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/app/logo";
 import { EventSwitcher } from "@/components/dashboard/event-switcher";
+import { useEventRole } from "@/components/dashboard/event-provider";
+import { hasMinRole, type EventRole } from "@/lib/roles";
 
-const NAV_ITEMS = [
-  { label: "Overview", icon: LayoutDashboard, segment: "" },
-  { label: "Invitations", icon: Mail, segment: "invitations" },
-  { label: "Special Events", icon: Sparkles, segment: "special-events" },
-  { label: "Guests", icon: Users, segment: "guests" },
-  { label: "Menu & Drinks", icon: UtensilsCrossed, segment: "menu" },
-  { label: "Tables", icon: LayoutGrid, segment: "tables" },
-  { label: "Messages", icon: MessageSquare, segment: "messages" },
-  { label: "Invitation Template", icon: Palette, segment: "template" },
-  { label: "Media", icon: ImageIcon, segment: "media" },
-  { label: "Meta & Sharing", icon: Share2, segment: "meta" },
-  { label: "Settings", icon: Settings, segment: "settings" },
+const NAV_ITEMS: {
+  label: string;
+  icon: typeof LayoutDashboard;
+  segment: string;
+  minRole: EventRole;
+}[] = [
+  { label: "Overview", icon: LayoutDashboard, segment: "", minRole: "editor" },
+  {
+    label: "Invitations",
+    icon: Mail,
+    segment: "invitations",
+    minRole: "editor",
+  },
+  {
+    label: "Special Events",
+    icon: Sparkles,
+    segment: "special-events",
+    minRole: "editor",
+  },
+  { label: "Guests", icon: Users, segment: "guests", minRole: "editor" },
+  {
+    label: "Menu & Drinks",
+    icon: UtensilsCrossed,
+    segment: "menu",
+    minRole: "editor",
+  },
+  { label: "Tables", icon: LayoutGrid, segment: "tables", minRole: "editor" },
+  {
+    label: "Messages",
+    icon: MessageSquare,
+    segment: "messages",
+    minRole: "editor",
+  },
+  { label: "Activity", icon: History, segment: "activity", minRole: "editor" },
+  {
+    label: "Invitation Template",
+    icon: Palette,
+    segment: "template",
+    minRole: "editor",
+  },
+  { label: "Media", icon: ImageIcon, segment: "media", minRole: "editor" },
+  { label: "Meta & Sharing", icon: Share2, segment: "meta", minRole: "editor" },
+  { label: "Members", icon: Users2, segment: "members", minRole: "planner" },
+  {
+    label: "Settings",
+    icon: Settings,
+    segment: "settings",
+    minRole: "planner",
+  },
 ];
 
 export function DashboardSidebar() {
@@ -41,6 +82,7 @@ export function DashboardSidebar() {
   const pathname = usePathname();
   const { user } = useUser();
   const currentUser = useQuery(api.users.getCurrentUser);
+  const role = useEventRole();
   const eventSlug = params?.eventSlug as string | undefined;
   // Superadmins go "home" to the global admin dashboard, everyone else to /dashboard.
   const homeHref = currentUser?.role === "superadmin" ? "/admin" : "/dashboard";
@@ -71,21 +113,23 @@ export function DashboardSidebar() {
       </div>
 
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map(({ label, icon: Icon, segment }) => (
-          <Link
-            key={segment}
-            href={getHref(segment)}
-            className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-              isActive(segment)
-                ? "bg-zinc-200 dark:bg-zinc-800 font-medium text-zinc-900"
-                : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
-            )}
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            {label}
-          </Link>
-        ))}
+        {NAV_ITEMS.filter((item) => hasMinRole(role, item.minRole)).map(
+          ({ label, icon: Icon, segment }) => (
+            <Link
+              key={segment}
+              href={getHref(segment)}
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                isActive(segment)
+                  ? "bg-zinc-200 dark:bg-zinc-800 font-medium text-zinc-900"
+                  : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900",
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+            </Link>
+          ),
+        )}
       </nav>
 
       <div className="px-4 py-4 border-t border-zinc-200 flex items-center gap-3">

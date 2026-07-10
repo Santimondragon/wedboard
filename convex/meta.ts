@@ -1,8 +1,8 @@
 import { ConvexError, v } from "convex/values";
 import { query, mutation, QueryCtx } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
-import { requireUser } from "./lib/auth";
-import { requireEventMember } from "./lib/permissions";
+import { requireEventEditor } from "./lib/permissions";
+import { logActivity } from "./lib/activity";
 import {
   resolvePublicEvent,
   resolvePublicEventByHost,
@@ -94,7 +94,7 @@ export const getPublicInvitationMeta = query({
   },
 });
 
-/** Replaces the event's social metadata (min role planner). */
+/** Replaces the event's social metadata (min role editor — content-adjacent). */
 export const updateEventMeta = mutation({
   args: {
     eventId: v.id("events"),
@@ -104,8 +104,7 @@ export const updateEventMeta = mutation({
     faviconId: v.optional(v.id("media")),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventMember(ctx, args.eventId, user._id, "planner");
+    const user = await requireEventEditor(ctx, args.eventId, "editor");
 
     const title = args.title?.trim();
     const description = args.description?.trim();
@@ -141,6 +140,12 @@ export const updateEventMeta = mutation({
         imageId: args.imageId,
         faviconId: args.faviconId,
       },
+    });
+    await logActivity(ctx, {
+      eventId: args.eventId,
+      actor: user,
+      action: "update",
+      entity: "meta",
     });
   },
 });

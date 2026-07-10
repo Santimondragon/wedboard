@@ -6,9 +6,9 @@ import { EventStatusBadge } from "@/components/dashboard/event-status-badge";
 import { useEvent } from "@/components/dashboard/event-provider";
 
 const PAGE_TITLES: Record<string, string> = {
-  invitations: "Invitations",
-  "special-events": "Special Events",
   guests: "Guests",
+  "special-events": "Special Events",
+  invitations: "Invitations",
   menu: "Menu & Drinks",
   tables: "Tables",
   template: "Invitation Template",

@@ -3,6 +3,8 @@ import { QueryCtx, MutationCtx } from "../_generated/server";
 import { Doc, Id } from "../_generated/dataModel";
 import { requireUser } from "./auth";
 
+export type EventRole = "owner" | "planner" | "editor" | "viewer";
+
 const ROLE_HIERARCHY: Record<string, number> = {
   owner: 4,
   planner: 3,
@@ -40,16 +42,50 @@ export async function requireEventAccess(
 
 /**
  * The standard guard for event-scoped functions: authenticates the caller and
- * verifies event access in one call. Replaces the repeated
- * requireUser + requireEventAccess pair.
+ * verifies the caller holds at least `minRole` on the event (default
+ * `"editor"`). Content queries/mutations use the default so viewers are
+ * read-blocked and editors can manage content; pass `"viewer"` for
+ * member-readable data and `"planner"` for privileged operations.
+ * Returns the caller's user doc.
  */
 export async function requireEventEditor(
   ctx: QueryCtx | MutationCtx,
   eventId: Id<"events">,
+  minRole: EventRole = "editor",
 ): Promise<Doc<"users">> {
   const user = await requireUser(ctx);
-  await requireEventAccess(ctx, eventId, user._id);
+  await requireEventMember(ctx, eventId, user._id, minRole);
   return user;
+}
+
+/**
+ * Resolves the caller's effective role on an event, or null when they have no
+ * access. Superadmins and the event owner both resolve to `"owner"`. Used to
+ * surface the caller's role to the client (see events.getEventBySlug).
+ */
+export async function getEventRole(
+  ctx: QueryCtx | MutationCtx,
+  eventId: Id<"events">,
+  userId: Id<"users">,
+): Promise<EventRole | null> {
+  const user = await ctx.db.get(userId);
+  if (user?.role === "superadmin") {
+    return "owner";
+  }
+  const event = await ctx.db.get(eventId);
+  if (!event) {
+    return null;
+  }
+  if (event.ownerUserId === userId) {
+    return "owner";
+  }
+  const member = await ctx.db
+    .query("eventMembers")
+    .withIndex("by_eventId_and_userId", (q) =>
+      q.eq("eventId", eventId).eq("userId", userId),
+    )
+    .unique();
+  return (member?.role as EventRole | undefined) ?? null;
 }
 
 /**

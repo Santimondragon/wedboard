@@ -82,7 +82,7 @@ Mirrors Clerk identity. Created/updated on every login via `upsertCurrentUser`.
 | lastName        | string? |                                                                                                                                                                                                                                                                   |
 | role            | string  | `"user"` (default) or `"superadmin"`. Auto-promoted for emails in the `SUPERADMIN_EMAILS` Convex env var (checked in `upsertCurrentUser`/`ensureCurrentUser`, promote-only). Superadmins bypass all event access checks and land on the global `/admin` dashboard |
 
-Indexes: `by_clerkId`, `by_tokenIdentifier`
+Indexes: `by_clerkId`, `by_tokenIdentifier`, `by_email` (`by_email` backs adding a shared member by email in `members.addMember`)
 
 ---
 
@@ -116,13 +116,15 @@ Indexes: `by_ownerUserId`, `by_slug`, `by_subdomain`, `by_customDomain`
 
 ### `eventMembers`
 
-Links users to events with roles. Supports future multi-planner setup.
+Links users to events with roles. Backs **event sharing** (managed at `/dashboard/[eventSlug]/members`). The owner's row (`role: "owner"`) is created at `createEvent`; additional members are added via `members.addMember`.
 
 | Field   | Type                                           |
 | ------- | ---------------------------------------------- |
 | eventId | Id<"events">                                   |
 | userId  | Id<"users">                                    |
 | role    | `"owner" \| "planner" \| "editor" \| "viewer"` |
+
+**Role semantics** (enforced by `requireEventEditor`/`requireEventMember`; superadmins bypass): `owner` = full access (only role that can delete the event and manage the owner); `planner` = **"Co-owner"** in the UI — everything except deleting the event and touching the owner row; `editor` = content only (guests, invitations, special events, menu, drinks, tables, media, **template, meta**), no settings/domain/sharing/archive/delete; `viewer` = read-only (in schema; **not surfaced** in the Members UI, which offers only Co-owner/Editor). `requireEventEditor` defaults to a `minRole` of `"editor"`, so viewers are read-blocked from content queries/mutations.
 
 Indexes: `by_eventId`, `by_userId`, `by_eventId_and_userId`
 
@@ -304,6 +306,23 @@ Indexes: `by_eventId`, `by_invitationId`
 
 ---
 
+### `activityLogs`
+
+Append-only audit trail of dashboard actions on an event, shown on the Activity page (`/dashboard/[eventSlug]/activity`). Written via `logActivity` (`convex/lib/activity.ts`) from the relevant mutations; read via `activity.listByEvent`. Timestamps come from `_creationTime`.
+
+| Field       | Type                                                                | Notes                                                          |
+| ----------- | ------------------------------------------------------------------- | -------------------------------------------------------------- |
+| eventId     | Id<"events">                                                        |                                                                |
+| actorUserId | Id<"users">                                                         |                                                                |
+| actorName   | string                                                              | Denormalized "First Last" (or email) so the list needs no join |
+| action      | `"create" \| "update" \| "delete"`                                  |                                                                |
+| entity      | `"guest" \| "invitation" \| "specialEvent" \| "template" \| "meta"` | template/meta only ever use `action: "update"`                 |
+| entityName  | string?                                                             | Guest/invitation/special-event name (absent for template/meta) |
+
+Index: `by_eventId`. Logged actions: guest create/update/delete (+ addPlusOne/removePlusOne, bulk-create as one aggregate entry), invitation create/update/delete, specialEvent create/update/delete, `events.setInvitationTemplate` (template/update), `meta.updateEventMeta` (meta/update). **Not** logged: public `submitPublicRsvp`/`submitGuestMessage`, per-guest special-RSVP toggles, seat assignments. No retention cap.
+
+---
+
 ## Convex Modules
 
 ### `convex/lib/auth.ts`
@@ -313,10 +332,15 @@ Indexes: `by_eventId`, `by_invitationId`
 
 ### `convex/lib/permissions.ts`
 
-- `requireEventAccess(ctx, eventId, userId)` — verifies eventMembers membership or ownership
-- `requireEventEditor(ctx, eventId)` — **the standard guard**: `requireUser` + `requireEventAccess` in one call, returns the user doc. Used by nearly all event-scoped functions
-- `requireEventMember(ctx, eventId, userId, minRole?)` — enforces role hierarchy
+- `requireEventAccess(ctx, eventId, userId)` — verifies eventMembers membership or ownership (any role)
+- `requireEventEditor(ctx, eventId, minRole = "editor")` — **the standard guard**: `requireUser` + `requireEventMember` in one call, returns the user doc. Default `minRole` is `"editor"` (content queries/mutations); pass `"viewer"` for member-readable data (`members.listMembers`, `activity.listByEvent`) and `"planner"` for privileged ops. Used by nearly all event-scoped functions
+- `requireEventMember(ctx, eventId, userId, minRole?)` — enforces role hierarchy (`owner:4, planner:3, editor:2, viewer:1`)
+- `getEventRole(ctx, eventId, userId)` — resolves the caller's effective `EventRole` (superadmin + owner → `"owner"`), or null. Used by `events.getEventBySlug` (returns `{...event, myRole}`) and `members` guards
 - **Superadmin bypass**: `requireEventAccess` and `requireEventMember` both early-return when the caller's `users.role === "superadmin"`, so every event-scoped query/mutation works for a superadmin. `requireSuperadmin(ctx)` — `requireUser` + throws `ConvexError("Unauthorized")` unless role is `"superadmin"`; guards `convex/admin.ts`
+
+### `convex/lib/activity.ts`
+
+- `logActivity(ctx, {eventId, actor, action, entity, entityName?})` — inserts an `activityLogs` row; `actorName` derived from the actor user doc ("First Last" || email). Called from dashboard mutations after the write.
 
 ### `convex/lib/public.ts`
 
@@ -364,20 +388,20 @@ Shared logic behind `menu.ts` and `drinks.ts` (they are thin wrappers): `listPub
 
 ### `convex/events.ts`
 
-| Function                  | Type                                                                                                                                                                                                                                                                                                                               |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `listMyEvents`            | query — events where user is owner or member (non-null)                                                                                                                                                                                                                                                                            |
-| `getEventById`            | query                                                                                                                                                                                                                                                                                                                              |
-| `getEventBySlug`          | query — resolves an event by its slug (auth + access); used by dashboard routes                                                                                                                                                                                                                                                    |
-| `getEventSummary`         | query — event + counts                                                                                                                                                                                                                                                                                                             |
-| `createEvent`             | mutation — creates eventMember with owner role; returns `{ eventId, slug }`                                                                                                                                                                                                                                                        |
-| `updateEvent`             | mutation — accepts optional `slug` (validates format, reserved words, global uniqueness). No longer accepts `customDomain`/`subdomain` — domains go through the dedicated mutations below                                                                                                                                          |
-| `setCustomDomain`         | mutation (min role planner) — normalizes + validates via `lib/domains.ts`, enforces global uniqueness (`by_customDomain`), patches `{customDomain, customDomainVerified: false}`, returns the normalized domain. Convex-only claim; the Vercel attach is orchestrated by `/api/domains` (claim first, roll back on Vercel failure) |
-| `removeCustomDomain`      | mutation (min role planner) — clears `customDomain` + `customDomainVerified`                                                                                                                                                                                                                                                       |
-| `setCustomDomainVerified` | mutation (min role planner) — caches the live Vercel verification state; called by `/api/domains/status`                                                                                                                                                                                                                           |
-| `setInvitationTemplate`   | mutation — sets `templateId`, `layoutVariants` (`{pending,accepted,declined}`), and/or legacy `layoutBlocks` (min role planner). The editor writes `layoutVariants`                                                                                                                                                                |
-| `archiveEvent`            | mutation                                                                                                                                                                                                                                                                                                                           |
-| `deleteEvent`             | mutation — owner-only, **permanent**. Cascades: deletes every row in all event-scoped tables (guests, invitations, specialEvents, guestSpecialEventRsvps, invitationSpecialEventAccess, menuOptions, drinkOptions, tables, eventMembers, guestMessages) plus media rows **and their storage blobs**, then the event itself         |
+| Function                  | Type                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listMyEvents`            | query — events where user is owner or member (non-null)                                                                                                                                                                                                                                                                                      |
+| `getEventById`            | query                                                                                                                                                                                                                                                                                                                                        |
+| `getEventBySlug`          | query — resolves an event by its slug (auth + access); used by dashboard routes. Returns `{...event, myRole}` (the caller's `EventRole` via `getEventRole`) so the client can gate UI                                                                                                                                                        |
+| `getEventSummary`         | query — event + counts                                                                                                                                                                                                                                                                                                                       |
+| `createEvent`             | mutation — creates eventMember with owner role; returns `{ eventId, slug }`                                                                                                                                                                                                                                                                  |
+| `updateEvent`             | mutation — accepts optional `slug` (validates format, reserved words, global uniqueness). No longer accepts `customDomain`/`subdomain` — domains go through the dedicated mutations below                                                                                                                                                    |
+| `setCustomDomain`         | mutation (min role planner) — normalizes + validates via `lib/domains.ts`, enforces global uniqueness (`by_customDomain`), patches `{customDomain, customDomainVerified: false}`, returns the normalized domain. Convex-only claim; the Vercel attach is orchestrated by `/api/domains` (claim first, roll back on Vercel failure)           |
+| `removeCustomDomain`      | mutation (min role planner) — clears `customDomain` + `customDomainVerified`                                                                                                                                                                                                                                                                 |
+| `setCustomDomainVerified` | mutation (min role planner) — caches the live Vercel verification state; called by `/api/domains/status`                                                                                                                                                                                                                                     |
+| `setInvitationTemplate`   | mutation (min role **editor** — template is content-adjacent) — sets `templateId`, `layoutVariants` (`{pending,accepted,declined}`), and/or legacy `layoutBlocks`. The editor writes `layoutVariants`. Logs a `template`/`update` activity entry                                                                                             |
+| `archiveEvent`            | mutation (owner)                                                                                                                                                                                                                                                                                                                             |
+| `deleteEvent`             | mutation — owner-only, **permanent**. Cascades: deletes every row in all event-scoped tables (guests, invitations, specialEvents, guestSpecialEventRsvps, invitationSpecialEventAccess, menuOptions, drinkOptions, tables, eventMembers, guestMessages, **activityLogs**) plus media rows **and their storage blobs**, then the event itself |
 
 ### `convex/invitations.ts`
 
@@ -473,7 +497,22 @@ Superadmin-only global queries (guarded by `requireSuperadmin`):
 | Function                  | Type     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `getPublicInvitationMeta` | query    | **Public** — args `{eventSlug?, host?, invitationSlug}` (slug for the primary domain, host for custom domains). Resolves the event/invitation via `lib/public.ts`, builds the variable values from the invitation's non-+1 guests, and returns `{title, description, imageUrl, faviconUrl, faviconMimeType}` with `event.meta` templates resolved (defaults when unset), or null. Consumed by `generateMetadata` on both public routes |
-| `updateEventMeta`         | mutation | Min role planner — replaces `events.meta` wholesale. Trims + enforces max lengths, verifies `imageId`/`faviconId` belong to the event's media library, and that the favicon is ico/svg/png                                                                                                                                                                                                                                             |
+| `updateEventMeta`         | mutation | Min role **editor** (content-adjacent) — replaces `events.meta` wholesale. Trims + enforces max lengths, verifies `imageId`/`faviconId` belong to the event's media library, and that the favicon is ico/svg/png. Logs a `meta`/`update` activity entry                                                                                                                                                                                |
+
+### `convex/members.ts`
+
+Event sharing (guards via `requireEventEditor`). `listMembers` is readable by any member (`minRole "viewer"`); the mutations require **planner** (co-owner) and add extra owner-only rules.
+
+| Function           | Type     | Notes                                                                                                                                                                                                                      |
+| ------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listMembers`      | query    | `eventMembers` for the event (incl. the owner row), enriched with each user's name/email + `isSelf`, sorted owner→viewer                                                                                                   |
+| `addMember`        | mutation | Args `{eventId, email, role: planner\|editor\|viewer}`. Looks up an **existing** account by `users.by_email` (throws if none — "ask them to sign up first"); rejects the owner / an already-linked member; inserts the row |
+| `updateMemberRole` | mutation | Never touches the owner row or the caller's own row; **only the owner** may promote to / demote from `planner`                                                                                                             |
+| `removeMember`     | mutation | Same safety rules; **only the owner** may remove a `planner`                                                                                                                                                               |
+
+### `convex/activity.ts`
+
+`listByEvent` — query (any member, `requireEventEditor(..., "viewer")`) — `activityLogs` for the event, `by_eventId` `.order("desc").take(200)`. Powers the Activity page. Writes happen via `logActivity` (`lib/activity.ts`) from guest/invitation/specialEvent/template/meta mutations.
 
 ### `convex/seed.ts`
 
@@ -497,10 +536,12 @@ Superadmin-only global queries (guarded by `requireSuperadmin`):
 /dashboard/[eventSlug]/menu           Food & drink option management
 /dashboard/[eventSlug]/tables         Drag-free seat assignment grid
 /dashboard/[eventSlug]/messages       Guest messages left for the host (listMessagesByEvent)
+/dashboard/[eventSlug]/activity       Activity log of dashboard changes (activity.listByEvent), newest first
 /dashboard/[eventSlug]/template       Template picker + per-RSVP-variant block page-builder (Pending/Accepted/Declined tabs; add/reorder/duplicate/remove/edit incl. list + image fields) + live preview (dummy data + real media)
 /dashboard/[eventSlug]/media          Per-event image library — upload (Convex storage), rename, delete
 /dashboard/[eventSlug]/meta           Meta & Sharing — social-card title/description templates (with {variables}), OG image picker, favicon upload, live social-card preview
-/dashboard/[eventSlug]/settings       Event metadata + editable event key + custom-domain wizard + archive
+/dashboard/[eventSlug]/members        Event sharing — member list + add-by-email + role select + remove (planner+; Danger-Zone-style guards). In-page guard redirects editors
+/dashboard/[eventSlug]/settings       Event metadata + editable event key + custom-domain wizard + archive/delete. Planner+ only (editors see an access notice); Delete card owner-only
 
 /[eventSlug]/invitations/[invitationSlug]   Public invitation page (guest names) — no auth required. Exports generateMetadata (fetchQuery meta.getPublicInvitationMeta → src/lib/invitation-metadata.ts buildInvitationMetadata: title/description/OG/Twitter/favicon)
 
@@ -540,9 +581,9 @@ src/components/
     copy-button.tsx             Clipboard copy with checkmark feedback
 
   dashboard/
-    event-provider.tsx          Resolves [eventSlug]→event via getEventBySlug; exposes useEvent(); handles loading/not-found. Wraps only event routes.
+    event-provider.tsx          Resolves [eventSlug]→event via getEventBySlug (payload = `{...event, myRole}`); exposes useEvent() (typed `EventWithRole`) + `useEventRole()`; handles loading/not-found. Wraps only event routes.
     dashboard-shell.tsx         Sidebar + Header + scrollable main (rendered only inside the event layout)
-    dashboard-sidebar.tsx       Nav links (built from eventSlug), event-switcher, user info. The "Wedboard" logo is a home Link — /admin for superadmins, /dashboard otherwise
+    dashboard-sidebar.tsx       Nav links (built from eventSlug), event-switcher, user info. `NAV_ITEMS` each carry a `minRole` and are **filtered by the caller's event role** (`useEventRole()` + `hasMinRole`): content links = editor, Members + Settings = planner. The "Wedboard" logo is a home Link — /admin for superadmins, /dashboard otherwise
     dashboard-header.tsx        Page title (from path section), event name (useEvent), status badge, UserButton
     event-switcher.tsx          Dropdown to switch events (by slug → /dashboard/{slug}) or create new
     metric-card.tsx             Stat card with title/value/icon
@@ -578,6 +619,13 @@ src/components/
   messages/
     message-list.tsx            List of host messages (name, invitation title, relative date, body) — exports GuestMessageItem type
 
+  activity/
+    activity-list.tsx           List of activity-log rows ("{actor} {created|modified|removed} {entity} {name}" + relative time) — exports ActivityLogItem type
+
+  members/
+    member-list.tsx             Member rows (name/email, role Select or static Owner/co-owner Badge, remove behind AlertDialog); role edits via members.updateMemberRole, removal via members.removeMember (owner-only for co-owners). Exports MemberItem type
+    add-member-dialog.tsx       Add-by-email + role Select (Co-owner offered only to the owner) → members.addMember
+
   special-events/
     special-event-list.tsx      Rows: name, date/time, location, description, active toggle, edit/delete (+ "visible to N invitations" count)
     special-event-form.tsx      Create/edit dialog (name, description, datetime-local date, location, active) + per-invitation visibility checkboxes (edit mode; toggles invitations.setSpecialEventAccess). Powered by getSpecialEventsPageData.
@@ -612,6 +660,9 @@ src/components/
 
 src/hooks/
   use-toast-mutation.ts         useToastMutation(ref, {success?, error}) — wraps useMutation with the try/catch + sonner toast convention; returns {run, pending}; run never throws, returns {ok, value} | {ok:false}
+
+src/lib/
+  roles.ts                      EventRole / AssignableRole types, ROLE_RANK, hasMinRole(role, min), ROLE_LABELS (planner → "Co-owner"). Client mirror of the Convex role hierarchy — used to gate sidebar nav, settings, and the members UI
 ```
 
 > **Public template (page builder):** the public invitation is a **page builder** — an ordered list
@@ -732,6 +783,8 @@ Since AGENTS.md is a copy of CLAUDE.md, both must be kept in sync. Update one, t
 - **No `.filter()`**: always use `.withIndex()`.
 - **Mutations always toast**: use `useToastMutation` (`src/hooks/use-toast-mutation.ts`) instead of hand-rolled try/catch — it wraps `useMutation` with the success/error sonner toasts and a `pending` flag; `run()` returns `{ok, value}` for branching.
 - **Convex auth guard**: event-scoped functions call `requireEventEditor(ctx, eventId)` (or load the doc first, then guard on `doc.eventId`); public slug-based functions resolve via `convex/lib/public.ts` so archived-event gating stays centralized.
+- **Event roles**: `requireEventEditor` now takes a `minRole` (default `"editor"`) — content (guests/invitations/special events/menu/tables/media/**template/meta**) is editor+, privileged ops (settings/domain/members management) are planner+ ("Co-owner"), archive/delete are owner-only. Read-only member data uses `"viewer"`. Surface the caller's role to the client via `getEventBySlug`'s `myRole`; gate UI with `hasMinRole` (`src/lib/roles.ts`). Server guards are the source of truth — UI gating is convenience only.
+- **Activity logging**: dashboard mutations that create/update/delete a guest, invitation, or special event — plus `setInvitationTemplate` and `updateEventMeta` — call `logActivity(ctx, {...})` (`convex/lib/activity.ts`) **after** the write, reusing the user doc returned by `requireEventEditor`. Public and per-toggle mutations are intentionally not logged.
 - **Client components**: any file using Convex hooks, Clerk hooks, or browser APIs needs `"use client"` at the top.
 
 ## Zod Validations (`src/lib/validations/`)

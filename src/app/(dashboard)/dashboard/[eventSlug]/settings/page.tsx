@@ -8,6 +8,7 @@ import { ConvexError } from "convex/values";
 import { api } from "convex/_generated/api";
 import { toast } from "sonner";
 import { useEvent } from "@/components/dashboard/event-provider";
+import { hasMinRole } from "@/lib/roles";
 import { CustomDomainSettings } from "@/components/dashboard/custom-domain-settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,8 @@ export default function SettingsPage() {
   const router = useRouter();
   const event = useEvent();
   const eventId = event._id;
+  const canManage = hasMinRole(event.myRole, "planner");
+  const isOwner = event.myRole === "owner";
   const updateEvent = useMutation(api.events.updateEvent);
   const deleteEvent = useMutation(api.events.deleteEvent);
 
@@ -155,6 +158,23 @@ export default function SettingsPage() {
   }
 
   const isLoading = event === undefined;
+
+  // Editors (content-only) can't reach settings. The sidebar hides this route,
+  // but guard direct navigation too.
+  if (!canManage) {
+    return (
+      <div className="p-6 max-w-2xl space-y-4">
+        <h1 className="text-2xl font-semibold text-zinc-900">Event Settings</h1>
+        <p className="text-sm text-zinc-500">
+          You don&apos;t have permission to manage this event&apos;s settings.
+          Ask an owner or co-owner for access.
+        </p>
+        <Button asChild variant="outline">
+          <Link href={`/dashboard/${event.slug}`}>Back to overview</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-2xl space-y-8">
@@ -338,6 +358,22 @@ export default function SettingsPage() {
           <Separator />
 
           <section className="space-y-4">
+            <h2 className="text-base font-medium text-zinc-900">
+              Members &amp; Sharing
+            </h2>
+            <p className="text-sm text-zinc-500">
+              Invite co-owners and editors to collaborate on this event.
+            </p>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/${event.slug}/members`}>
+                Manage members
+              </Link>
+            </Button>
+          </section>
+
+          <Separator />
+
+          <section className="space-y-4">
             <h2 className="text-base font-medium text-rose-700">Danger Zone</h2>
             <div className="rounded-md border border-rose-200 p-4 flex items-center justify-between">
               <div>
@@ -380,45 +416,47 @@ export default function SettingsPage() {
               </AlertDialog>
             </div>
 
-            <div className="rounded-md border border-rose-200 p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Delete this event</p>
-                <p className="text-sm text-zinc-500">
-                  Permanently delete the event and all of its data —
-                  invitations, guests, special events, menus, tables, media, and
-                  messages. This cannot be undone.
-                </p>
+            {isOwner && (
+              <div className="rounded-md border border-rose-200 p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Delete this event</p>
+                  <p className="text-sm text-zinc-500">
+                    Permanently delete the event and all of its data —
+                    invitations, guests, special events, menus, tables, media,
+                    and messages. This cannot be undone.
+                  </p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" className="bg-rose-600 hover:bg-rose-700">
+                      Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Event</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to permanently delete &ldquo;
+                        {event?.name}&rdquo;? This will remove the event and all
+                        related invitations, guests, special events, menus,
+                        drinks, tables, media, and messages. This action cannot
+                        be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="bg-rose-600 hover:bg-rose-700"
+                      >
+                        {deleting ? "Deleting..." : "Delete Event"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" className="bg-rose-600 hover:bg-rose-700">
-                    Delete
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Event</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to permanently delete &ldquo;
-                      {event?.name}&rdquo;? This will remove the event and all
-                      related invitations, guests, special events, menus,
-                      drinks, tables, media, and messages. This action cannot be
-                      undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="bg-rose-600 hover:bg-rose-700"
-                    >
-                      {deleting ? "Deleting..." : "Delete Event"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
+            )}
           </section>
         </>
       )}

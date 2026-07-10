@@ -8,6 +8,7 @@ const EVENT_SCOPED_TABLES = [
   "guestSpecialEventRsvps",
   "invitationSpecialEventAccess",
   "guestMessages",
+  "activityLogs",
   "guests",
   "invitations",
   "specialEvents",
@@ -22,7 +23,7 @@ const EVENT_SCOPED_TABLES = [
 // Caller is responsible for authorization.
 export async function cascadeDeleteEvent(
   ctx: MutationCtx,
-  eventId: Id<"events">
+  eventId: Id<"events">,
 ) {
   for (const table of EVENT_SCOPED_TABLES) {
     const rows = await ctx.db

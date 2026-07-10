@@ -22,7 +22,8 @@ export default defineSchema({
     role: v.string(),
   })
     .index("by_clerkId", ["clerkId"])
-    .index("by_tokenIdentifier", ["tokenIdentifier"]),
+    .index("by_tokenIdentifier", ["tokenIdentifier"])
+    .index("by_email", ["email"]),
 
   events: defineTable({
     name: v.string(),
@@ -232,4 +233,27 @@ export default defineSchema({
   })
     .index("by_eventId", ["eventId"])
     .index("by_invitationId", ["invitationId"]),
+
+  // Append-only audit trail of dashboard actions on an event (member-visible
+  // on the Activity page). Timestamps come from `_creationTime`.
+  activityLogs: defineTable({
+    eventId: v.id("events"),
+    actorUserId: v.id("users"),
+    // Denormalized "First Last" (or email) so the Activity list doesn't have
+    // to join the users table for display.
+    actorName: v.string(),
+    action: v.union(
+      v.literal("create"),
+      v.literal("update"),
+      v.literal("delete"),
+    ),
+    entity: v.union(
+      v.literal("guest"),
+      v.literal("invitation"),
+      v.literal("specialEvent"),
+      v.literal("template"),
+      v.literal("meta"),
+    ),
+    entityName: v.optional(v.string()),
+  }).index("by_eventId", ["eventId"]),
 });

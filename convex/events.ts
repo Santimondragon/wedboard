@@ -3,7 +3,13 @@ import { query, mutation } from "./_generated/server";
 import { Doc } from "./_generated/dataModel";
 import { LAYOUT_BLOCKS_VALIDATOR } from "./schema";
 import { requireUser } from "./lib/auth";
-import { requireEventAccess, requireEventMember } from "./lib/permissions";
+import {
+  requireEventAccess,
+  requireEventEditor,
+  requireEventMember,
+  getEventRole,
+} from "./lib/permissions";
+import { logActivity } from "./lib/activity";
 import { cascadeDeleteEvent } from "./lib/events";
 import {
   generateSlug,
@@ -48,7 +54,10 @@ export const getEventBySlug = query({
       .unique();
     if (!event) return null;
     await requireEventAccess(ctx, event._id, user._id);
-    return event;
+    // Surface the caller's effective role so the dashboard can gate UI
+    // (Members, Settings, Danger Zone) without a second round trip.
+    const myRole = await getEventRole(ctx, event._id, user._id);
+    return { ...event, myRole };
   },
 });
 
@@ -183,11 +192,17 @@ export const setInvitationTemplate = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-    await requireEventMember(ctx, args.eventId, user._id, "planner");
+    // Template is content-adjacent — editors may author it.
+    const user = await requireEventEditor(ctx, args.eventId, "editor");
 
     const { eventId, ...updates } = args;
     await ctx.db.patch(eventId, updates);
+    await logActivity(ctx, {
+      eventId,
+      actor: user,
+      action: "update",
+      entity: "template",
+    });
   },
 });
 

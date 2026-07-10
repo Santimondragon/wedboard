@@ -9,12 +9,14 @@
  */
 
 import type * as _debug from "../_debug.js";
+import type * as activity from "../activity.js";
 import type * as admin from "../admin.js";
 import type * as dashboard from "../dashboard.js";
 import type * as drinks from "../drinks.js";
 import type * as events from "../events.js";
 import type * as guests from "../guests.js";
 import type * as invitations from "../invitations.js";
+import type * as lib_activity from "../lib/activity.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_domains from "../lib/domains.js";
 import type * as lib_events from "../lib/events.js";
@@ -25,6 +27,7 @@ import type * as lib_permissions from "../lib/permissions.js";
 import type * as lib_public from "../lib/public.js";
 import type * as lib_slug from "../lib/slug.js";
 import type * as media from "../media.js";
+import type * as members from "../members.js";
 import type * as menu from "../menu.js";
 import type * as messages from "../messages.js";
 import type * as meta from "../meta.js";
@@ -41,12 +44,14 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   _debug: typeof _debug;
+  activity: typeof activity;
   admin: typeof admin;
   dashboard: typeof dashboard;
   drinks: typeof drinks;
   events: typeof events;
   guests: typeof guests;
   invitations: typeof invitations;
+  "lib/activity": typeof lib_activity;
   "lib/auth": typeof lib_auth;
   "lib/domains": typeof lib_domains;
   "lib/events": typeof lib_events;
@@ -57,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   "lib/public": typeof lib_public;
   "lib/slug": typeof lib_slug;
   media: typeof media;
+  members: typeof members;
   menu: typeof menu;
   messages: typeof messages;
   meta: typeof meta;

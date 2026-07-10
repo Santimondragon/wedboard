@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { requireEventEditor } from "./lib/permissions";
+import { logActivity } from "./lib/activity";
 
 export const listByEvent = query({
   args: { eventId: v.id("events") },
@@ -38,9 +39,7 @@ export const getSpecialEventsPageData = query({
     for (const se of specialEvents) {
       const accesses = await ctx.db
         .query("invitationSpecialEventAccess")
-        .withIndex("by_specialEventId", (q) =>
-          q.eq("specialEventId", se._id)
-        )
+        .withIndex("by_specialEventId", (q) => q.eq("specialEventId", se._id))
         .take(500);
       accessByEvent[se._id] = accesses.map((a) => a.invitationId);
     }
@@ -56,18 +55,16 @@ export const listForInvitation = query({
     const accesses = await ctx.db
       .query("invitationSpecialEventAccess")
       .withIndex("by_invitationId", (q) =>
-        q.eq("invitationId", args.invitationId)
+        q.eq("invitationId", args.invitationId),
       )
       .take(100);
 
     // Per-id get fan-out is bounded by the take(100) above — fine at this scale.
     const specialEvents = await Promise.all(
-      accesses.map((a) => ctx.db.get(a.specialEventId))
+      accesses.map((a) => ctx.db.get(a.specialEventId)),
     );
 
-    return specialEvents.filter(
-      (se) => se !== null && se.isActive
-    );
+    return specialEvents.filter((se) => se !== null && se.isActive);
   },
 });
 
@@ -83,7 +80,7 @@ export const createSpecialEvent = mutation({
     location: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    await requireEventEditor(ctx, args.eventId);
+    const user = await requireEventEditor(ctx, args.eventId);
 
     // An event may have at most MAX_SPECIAL_EVENTS special invitations.
     const existing = await ctx.db
@@ -92,11 +89,11 @@ export const createSpecialEvent = mutation({
       .take(MAX_SPECIAL_EVENTS + 1);
     if (existing.length >= MAX_SPECIAL_EVENTS) {
       throw new ConvexError(
-        `An event can have at most ${MAX_SPECIAL_EVENTS} special invitations`
+        `An event can have at most ${MAX_SPECIAL_EVENTS} special invitations`,
       );
     }
 
-    return await ctx.db.insert("specialEvents", {
+    const specialEventId = await ctx.db.insert("specialEvents", {
       eventId: args.eventId,
       name: args.name,
       description: args.description,
@@ -104,6 +101,14 @@ export const createSpecialEvent = mutation({
       location: args.location,
       isActive: true,
     });
+    await logActivity(ctx, {
+      eventId: args.eventId,
+      actor: user,
+      action: "create",
+      entity: "specialEvent",
+      entityName: args.name,
+    });
+    return specialEventId;
   },
 });
 
@@ -119,10 +124,17 @@ export const updateSpecialEvent = mutation({
   handler: async (ctx, args) => {
     const specialEvent = await ctx.db.get(args.id);
     if (!specialEvent) throw new ConvexError("Special event not found");
-    await requireEventEditor(ctx, specialEvent.eventId);
+    const user = await requireEventEditor(ctx, specialEvent.eventId);
 
     const { id, ...updates } = args;
     await ctx.db.patch(id, updates);
+    await logActivity(ctx, {
+      eventId: specialEvent.eventId,
+      actor: user,
+      action: "update",
+      entity: "specialEvent",
+      entityName: updates.name ?? specialEvent.name,
+    });
   },
 });
 
@@ -131,14 +143,12 @@ export const deleteSpecialEvent = mutation({
   handler: async (ctx, args) => {
     const specialEvent = await ctx.db.get(args.id);
     if (!specialEvent) throw new ConvexError("Special event not found");
-    await requireEventEditor(ctx, specialEvent.eventId);
+    const user = await requireEventEditor(ctx, specialEvent.eventId);
 
     // Clean up invitationSpecialEventAccess
     const accesses = await ctx.db
       .query("invitationSpecialEventAccess")
-      .withIndex("by_specialEventId", (q) =>
-        q.eq("specialEventId", args.id)
-      )
+      .withIndex("by_specialEventId", (q) => q.eq("specialEventId", args.id))
       .take(500);
     for (const access of accesses) {
       await ctx.db.delete(access._id);
@@ -147,14 +157,19 @@ export const deleteSpecialEvent = mutation({
     // Clean up guestSpecialEventRsvps
     const rsvps = await ctx.db
       .query("guestSpecialEventRsvps")
-      .withIndex("by_specialEventId", (q) =>
-        q.eq("specialEventId", args.id)
-      )
+      .withIndex("by_specialEventId", (q) => q.eq("specialEventId", args.id))
       .take(500);
     for (const rsvp of rsvps) {
       await ctx.db.delete(rsvp._id);
     }
 
     await ctx.db.delete(args.id);
+    await logActivity(ctx, {
+      eventId: specialEvent.eventId,
+      actor: user,
+      action: "delete",
+      entity: "specialEvent",
+      entityName: specialEvent.name,
+    });
   },
 });

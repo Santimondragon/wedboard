@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { requireEventEditor } from "./lib/permissions";
+import { logActivity } from "./lib/activity";
 import { generateSlug, generateUniqueInvitationSlug } from "./lib/slug";
 import {
   resolvePublicEvent,
@@ -275,7 +276,7 @@ export const createInvitation = mutation({
     specialEventIds: v.optional(v.array(v.id("specialEvents"))),
   },
   handler: async (ctx, args) => {
-    await requireEventEditor(ctx, args.eventId);
+    const user = await requireEventEditor(ctx, args.eventId);
 
     const baseSlug = args.slug
       ? generateSlug(args.slug)
@@ -322,6 +323,14 @@ export const createInvitation = mutation({
       }
     }
 
+    await logActivity(ctx, {
+      eventId: args.eventId,
+      actor: user,
+      action: "create",
+      entity: "invitation",
+      entityName: args.title,
+    });
+
     return invitationId;
   },
 });
@@ -341,7 +350,7 @@ export const updateInvitation = mutation({
   handler: async (ctx, args) => {
     const invitation = await ctx.db.get(args.id);
     if (!invitation) throw new ConvexError("Invitation not found");
-    await requireEventEditor(ctx, invitation.eventId);
+    const user = await requireEventEditor(ctx, invitation.eventId);
 
     const { id, slug, guestIds, specialEventIds, ...rest } = args;
 
@@ -424,6 +433,14 @@ export const updateInvitation = mutation({
         }
       }
     }
+
+    await logActivity(ctx, {
+      eventId: invitation.eventId,
+      actor: user,
+      action: "update",
+      entity: "invitation",
+      entityName: rest.title ?? invitation.title,
+    });
   },
 });
 
@@ -432,7 +449,7 @@ export const deleteInvitation = mutation({
   handler: async (ctx, args) => {
     const invitation = await ctx.db.get(args.id);
     if (!invitation) throw new ConvexError("Invitation not found");
-    await requireEventEditor(ctx, invitation.eventId);
+    const user = await requireEventEditor(ctx, invitation.eventId);
 
     // Unassign guests for this invitation — they return to the un-invited
     // pool rather than being deleted.
@@ -455,6 +472,13 @@ export const deleteInvitation = mutation({
     }
 
     await ctx.db.delete(args.id);
+    await logActivity(ctx, {
+      eventId: invitation.eventId,
+      actor: user,
+      action: "delete",
+      entity: "invitation",
+      entityName: invitation.title,
+    });
   },
 });
 

@@ -42,7 +42,9 @@
       "Bash(npm run *)",
       "Bash(rm -f /tmp/frame.json /tmp/figma_node.json /tmp/figma_525_3.png 2>/dev/null; echo \"temp cleaned\"; echo \"=== public assets ===\"; ls /Users/santimondragon/development/personal/wedding-management-app/public/templates/elegant/; echo \"=== leftover assets dir? ===\"; ls /Users/santimondragon/development/personal/wedding-management-app/src/components/public-invitation/templates/elegant/assets 2>&1 | head -1)",
       "Bash(pnpm tsc *)",
-      "Bash(xargs ls)"
+      "Bash(xargs ls)",
+      "Bash(npx vitest *)",
+      "Bash(npx next *)"
     ]
   }
 }
