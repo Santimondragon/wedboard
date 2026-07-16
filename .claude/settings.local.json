@@ -44,7 +44,13 @@
       "Bash(pnpm tsc *)",
       "Bash(xargs ls)",
       "Bash(npx vitest *)",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(node -e \"console.log\\(Date.now\\(\\)+45*86400000+3*3600000+22*60000\\)\")",
+      "Bash(curl -s -H \"Host: mywedding.test\" http://localhost:3000/ -o /dev/null -w \"%{http_code}\\\\n\")",
+      "Bash(curl -s -H \"Host: mywedding.test\" http://localhost:3000/)",
+      "Bash(curl -s -H \"Host: mywedding.test\" http://localhost:3000/some/other/path -o /dev/null -w \"other-path:%{http_code}\\\\n\")",
+      "Bash(curl -s http://localhost:3000/_domain/mywedding.test -o /dev/null -w \"direct:%{http_code}\\\\n\")",
+      "Bash(curl -s http://localhost:3000/test-event/invitations/whatever -o /dev/null -w \"primary-inv:%{http_code}\\\\n\")"
     ]
   }
 }

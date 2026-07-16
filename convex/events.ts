@@ -17,6 +17,7 @@ import {
   RESERVED_EVENT_SLUGS,
 } from "./lib/slug";
 import { normalizeCustomDomain, validateCustomDomain } from "./lib/domains";
+import { resolvePublicEventByHost } from "./lib/public";
 
 export const listMyEvents = query({
   args: {},
@@ -58,6 +59,25 @@ export const getEventBySlug = query({
     // (Members, Settings, Danger Zone) without a second round trip.
     const myRole = await getEventRole(ctx, event._id, user._id);
     return { ...event, myRole };
+  },
+});
+
+// Public (unauthenticated) event lookup by custom-domain Host header, for the
+// custom domain's root landing page. Returns only display-safe fields.
+export const getPublicEventByHost = query({
+  args: { host: v.string() },
+  handler: async (ctx, args) => {
+    const event = await resolvePublicEventByHost(ctx, args.host);
+    if (!event) return null;
+    return {
+      name: event.name,
+      brideName: event.brideName,
+      groomName: event.groomName,
+      date: event.date,
+      venueName: event.venueName,
+      venueAddress: event.venueAddress,
+      venueMapUrl: event.venueMapUrl,
+    };
   },
 });
 

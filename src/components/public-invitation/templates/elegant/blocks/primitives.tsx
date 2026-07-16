@@ -70,15 +70,11 @@ export function WeddingButton({
 
 export function SealStamp({ className }: { className?: string }) {
   return (
-    <div
-      aria-hidden
-      className={cn(
-        "flex size-16 items-center justify-center rounded-full border-2 border-wedding-gold bg-white font-script text-2xl text-wedding-gold",
-        className,
-      )}
-    >
-      ❧
-    </div>
+    <img
+      src={`${ASSET_BASE}/golden-seal.png`}
+      alt={"golden-seal-decoration"}
+      className={cn("object-cover w-24 h-24", className)}
+    />
   );
 }
 
