@@ -482,6 +482,18 @@ export const deleteInvitation = mutation({
   },
 });
 
+// Owner-managed "sent" flag — a plain informational toggle, so it follows the
+// per-toggle convention and is intentionally not activity-logged.
+export const setInvitationSent = mutation({
+  args: { id: v.id("invitations"), isSent: v.boolean() },
+  handler: async (ctx, args) => {
+    const invitation = await ctx.db.get(args.id);
+    if (!invitation) throw new ConvexError("Invitation not found");
+    await requireEventEditor(ctx, invitation.eventId);
+    await ctx.db.patch(args.id, { isSent: args.isSent });
+  },
+});
+
 export const setSpecialEventAccess = mutation({
   args: {
     invitationId: v.id("invitations"),

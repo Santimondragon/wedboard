@@ -110,6 +110,9 @@ export default defineSchema({
     // optional for back-compat with existing docs; no longer read or written.
     allowPlusOne: v.optional(v.boolean()),
     isActive: v.boolean(),
+    // Owner-managed flag: the invitation link was sent to its guests. Purely
+    // informational — nothing automated gates on it.
+    isSent: v.optional(v.boolean()),
     notes: v.optional(v.string()),
   })
     .index("by_eventId", ["eventId"])

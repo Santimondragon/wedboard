@@ -1,59 +1,64 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
-import { useForm, useWatch } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useQuery } from "convex/react"
-import { api } from "convex/_generated/api"
-import { type Id } from "convex/_generated/dataModel"
-import { useToastMutation } from "@/hooks/use-toast-mutation"
-import { RefreshCw, UserPlus, Lock } from "lucide-react"
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "convex/react";
+import { api } from "convex/_generated/api";
+import { type Id } from "convex/_generated/dataModel";
+import { useToastMutation } from "@/hooks/use-toast-mutation";
+import { RefreshCw, UserPlus, Lock } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Checkbox } from "@/components/ui/checkbox"
-import { invitationSchema, type InvitationFormData } from "@/lib/validations/invitation"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import {
+  invitationSchema,
+  type InvitationFormData,
+} from "@/lib/validations/invitation";
 
 function slugify(title: string): string {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
+    .replace(/^-|-$/g, "");
 }
 
 interface ExistingInvitationGuest {
-  _id: Id<"guests">
-  firstName: string
-  lastName: string
-  isPlusOne: boolean
-  rsvpStatus: string
+  _id: Id<"guests">;
+  firstName: string;
+  lastName: string;
+  isPlusOne: boolean;
+  rsvpStatus: string;
 }
 
 interface ExistingInvitation {
-  _id: Id<"invitations">
-  title: string
-  slug: string
-  notes?: string
-  guests?: ExistingInvitationGuest[]
-  specialEvents?: { _id: Id<"specialEvents">; name: string }[]
+  _id: Id<"invitations">;
+  title: string;
+  slug: string;
+  isSent?: boolean;
+  notes?: string;
+  guests?: ExistingInvitationGuest[];
+  specialEvents?: { _id: Id<"specialEvents">; name: string }[];
 }
 
 interface InvitationFormProps {
-  mode: "create" | "edit"
-  invitation?: ExistingInvitation
-  eventId: Id<"events">
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  mode: "create" | "edit";
+  invitation?: ExistingInvitation;
+  eventId: Id<"events">;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function InvitationForm({
@@ -63,40 +68,44 @@ export function InvitationForm({
   open,
   onOpenChange,
 }: InvitationFormProps) {
-  const params = useParams()
-  const eventSlug = params?.eventSlug as string | undefined
+  const params = useParams();
+  const eventSlug = params?.eventSlug as string | undefined;
   const createInvitation = useToastMutation(api.invitations.createInvitation, {
     success: "Invitation created",
     error: "Failed to create invitation",
-  })
+  });
   const updateInvitation = useToastMutation(api.invitations.updateInvitation, {
     success: "Invitation updated",
     error: "Failed to update invitation",
-  })
+  });
   const regenerateSlug = useToastMutation(api.invitations.regenerateSlug, {
     error: "Failed to regenerate slug",
-  })
+  });
+  const setInvitationSent = useToastMutation(
+    api.invitations.setInvitationSent,
+    { error: "Failed to update sent status" },
+  );
 
   // Both modes need the un-invited pool (to add) and the event's special
   // invitations (to grant access).
   const unassignedGuests = useQuery(
     api.guests.listUnassignedByEvent,
     open ? { eventId } : "skip",
-  )
+  );
   const specialEvents = useQuery(
     api.specialEvents.listByEvent,
     open ? { eventId } : "skip",
-  )
-  const [selectedGuestIds, setSelectedGuestIds] = useState<Id<"guests">[]>([])
+  );
+  const [selectedGuestIds, setSelectedGuestIds] = useState<Id<"guests">[]>([]);
   const [selectedSpecialIds, setSelectedSpecialIds] = useState<
     Id<"specialEvents">[]
-  >([])
+  >([]);
 
   // Guests/special invitations are locked once any linked guest has responded.
-  const currentGuests = invitation?.guests ?? []
-  const currentDirectGuests = currentGuests.filter((g) => !g.isPlusOne)
+  const currentGuests = invitation?.guests ?? [];
+  const currentDirectGuests = currentGuests.filter((g) => !g.isPlusOne);
   const composeLocked =
-    mode === "edit" && currentGuests.some((g) => g.rsvpStatus !== "pending")
+    mode === "edit" && currentGuests.some((g) => g.rsvpStatus !== "pending");
 
   // Candidate guests: directly-linked guests (so they can be removed) plus the
   // un-invited pool (to add). In create mode there are no current guests yet.
@@ -113,29 +122,29 @@ export function InvitationForm({
       firstName: g.firstName,
       lastName: g.lastName,
     })),
-  ]
+  ];
 
   // Initialize the selection sets from the invitation each time the dialog
   // opens (or the source invitation changes while open). Done during render via
   // a sync key rather than an effect — the latter trips React Compiler's
   // set-state-in-effect rule.
-  const syncKey = open ? `${mode}:${invitation?._id ?? ""}` : null
-  const [syncedFor, setSyncedFor] = useState<string | null>(null)
+  const syncKey = open ? `${mode}:${invitation?._id ?? ""}` : null;
+  const [syncedFor, setSyncedFor] = useState<string | null>(null);
   if (syncKey !== syncedFor) {
-    setSyncedFor(syncKey)
+    setSyncedFor(syncKey);
     if (open) {
       if (mode === "create") {
-        setSelectedGuestIds([])
-        setSelectedSpecialIds([])
+        setSelectedGuestIds([]);
+        setSelectedSpecialIds([]);
       } else if (invitation) {
         setSelectedGuestIds(
           (invitation.guests ?? [])
             .filter((g) => !g.isPlusOne)
             .map((g) => g._id),
-        )
+        );
         setSelectedSpecialIds(
           (invitation.specialEvents ?? []).map((s) => s._id),
-        )
+        );
       }
     }
   }
@@ -143,13 +152,13 @@ export function InvitationForm({
   function toggleGuest(id: Id<"guests">) {
     setSelectedGuestIds((prev) =>
       prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id],
-    )
+    );
   }
 
   function toggleSpecial(id: Id<"specialEvents">) {
     setSelectedSpecialIds((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
-    )
+    );
   }
 
   const {
@@ -166,9 +175,9 @@ export function InvitationForm({
       slug: "",
       notes: "",
     },
-  })
+  });
 
-  const title = useWatch({ control, name: "title" })
+  const title = useWatch({ control, name: "title" });
 
   useEffect(() => {
     if (mode === "edit" && invitation) {
@@ -176,35 +185,38 @@ export function InvitationForm({
         title: invitation.title,
         slug: invitation.slug,
         notes: invitation.notes ?? "",
-      })
+      });
     } else if (mode === "create") {
       reset({
         title: "",
         slug: "",
         notes: "",
-      })
+      });
     }
-  }, [mode, invitation, reset, open])
+  }, [mode, invitation, reset, open]);
 
   useEffect(() => {
     if (mode === "create" && title) {
-      setValue("slug", slugify(title))
+      setValue("slug", slugify(title));
     }
-  }, [title, mode, setValue])
+  }, [title, mode, setValue]);
 
   async function handleRegenerateSlug() {
     if (mode === "edit" && invitation) {
-      const result = await regenerateSlug.run({ id: invitation._id })
+      const result = await regenerateSlug.run({ id: invitation._id });
       if (result.ok && typeof result.value === "string") {
-        setValue("slug", result.value)
+        setValue("slug", result.value);
       }
     } else {
-      setValue("slug", slugify(title) + "-" + Math.random().toString(36).slice(2, 6))
+      setValue(
+        "slug",
+        slugify(title) + "-" + Math.random().toString(36).slice(2, 6),
+      );
     }
   }
 
   async function onSubmit(data: InvitationFormData) {
-    let result
+    let result;
     if (mode === "create") {
       result = await createInvitation.run({
         eventId,
@@ -213,7 +225,7 @@ export function InvitationForm({
         notes: data.notes,
         guestIds: selectedGuestIds,
         specialEventIds: selectedSpecialIds,
-      })
+      });
     } else if (mode === "edit" && invitation) {
       result = await updateInvitation.run({
         id: invitation._id,
@@ -223,10 +235,13 @@ export function InvitationForm({
         // Only send composition changes while still editable.
         ...(composeLocked
           ? {}
-          : { guestIds: selectedGuestIds, specialEventIds: selectedSpecialIds }),
-      })
+          : {
+              guestIds: selectedGuestIds,
+              specialEventIds: selectedSpecialIds,
+            }),
+      });
     }
-    if (result?.ok) onOpenChange(false)
+    if (result?.ok) onOpenChange(false);
   }
 
   return (
@@ -245,9 +260,12 @@ export function InvitationForm({
               <UserPlus className="h-6 w-6 text-zinc-500" />
             </div>
             <div className="space-y-1">
-              <p className="font-medium text-zinc-900">No guests to invite yet</p>
+              <p className="font-medium text-zinc-900">
+                No guests to invite yet
+              </p>
               <p className="text-sm text-zinc-500">
-                Add guests to this event first, then group them into an invitation.
+                Add guests to this event first, then group them into an
+                invitation.
               </p>
             </div>
             <Button asChild>
@@ -260,160 +278,203 @@ export function InvitationForm({
             </Button>
           </div>
         ) : (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="title">Title *</Label>
-            <Input id="title" {...register("title")} placeholder="Smith Family" />
-            {errors.title && (
-              <p className="text-xs text-red-500">{errors.title.message}</p>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {mode === "edit" && invitation && (
+              <div
+                className={
+                  "flex items-center justify-between rounded-lg border p-3 " +
+                  (invitation.isSent
+                    ? "border-green-200 bg-green-50"
+                    : "border-zinc-200 bg-zinc-50")
+                }
+              >
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium text-zinc-900">
+                    {invitation.isSent ? "Invitation sent" : "Not sent yet"}
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    Mark this once you have shared the link with the guests.
+                  </p>
+                </div>
+                <Switch
+                  checked={invitation.isSent ?? false}
+                  onCheckedChange={(checked) =>
+                    setInvitationSent.run({
+                      id: invitation._id,
+                      isSent: checked,
+                    })
+                  }
+                  aria-label="Mark invitation as sent"
+                />
+              </div>
             )}
-          </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="slug">Slug *</Label>
-            <div className="flex gap-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="title">Title *</Label>
               <Input
-                id="slug"
-                {...register("slug")}
-                placeholder="smith-family"
-                className="font-mono text-sm"
+                id="title"
+                {...register("title")}
+                placeholder="Smith Family"
               />
+              {errors.title && (
+                <p className="text-xs text-red-500">{errors.title.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="slug">Slug *</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="slug"
+                  {...register("slug")}
+                  placeholder="smith-family"
+                  className="font-mono text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleRegenerateSlug}
+                  title="Regenerate slug"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+              {errors.slug && (
+                <p className="text-xs text-red-500">{errors.slug.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                {...register("notes")}
+                placeholder="Optional notes about this invitation..."
+                rows={3}
+              />
+            </div>
+
+            {composeLocked && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+                <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Guests and special invitations are locked because a guest has
+                  already responded.
+                </span>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label>Special invitations</Label>
+              {specialEvents === undefined ? (
+                <p className="text-xs text-zinc-500">Loading…</p>
+              ) : specialEvents.length === 0 ? (
+                <div className="rounded-lg border border-dashed p-3 text-center">
+                  <p className="text-sm text-zinc-500">
+                    No special invitations yet (optional).
+                  </p>
+                  <Button
+                    asChild
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0"
+                  >
+                    <Link
+                      href={`/dashboard/${eventSlug}/special-events`}
+                      onClick={() => onOpenChange(false)}
+                    >
+                      Create a special invitation
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-zinc-500">
+                    Choose which special invitations this group can see.
+                  </p>
+                  <div className="space-y-1 rounded-lg border p-2">
+                    {specialEvents.map((se) => (
+                      <label
+                        key={se._id}
+                        className={
+                          "flex items-center gap-2 rounded-md px-2 py-1.5 " +
+                          (composeLocked
+                            ? "cursor-not-allowed opacity-60"
+                            : "cursor-pointer hover:bg-zinc-50")
+                        }
+                      >
+                        <Checkbox
+                          checked={selectedSpecialIds.includes(se._id)}
+                          disabled={composeLocked}
+                          onCheckedChange={() => toggleSpecial(se._id)}
+                        />
+                        <span className="text-sm text-zinc-800">{se.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Guests</Label>
+              {candidateGuests.length === 0 ? (
+                <p className="text-xs text-zinc-500">
+                  No guests available. Add guests to this event first.
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-zinc-500">
+                    Select the guests included in this invitation.
+                  </p>
+                  <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2">
+                    {candidateGuests.map((guest) => (
+                      <label
+                        key={guest._id}
+                        className={
+                          "flex items-center gap-2 rounded-md px-2 py-1.5 " +
+                          (composeLocked
+                            ? "cursor-not-allowed opacity-60"
+                            : "cursor-pointer hover:bg-zinc-50")
+                        }
+                      >
+                        <Checkbox
+                          checked={selectedGuestIds.includes(guest._id)}
+                          disabled={composeLocked}
+                          onCheckedChange={() => toggleGuest(guest._id)}
+                        />
+                        <span className="text-sm text-zinc-800">
+                          {guest.firstName} {guest.lastName}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                size="icon"
-                onClick={handleRegenerateSlug}
-                title="Regenerate slug"
+                onClick={() => onOpenChange(false)}
               >
-                <RefreshCw className="h-4 w-4" />
+                Cancel
               </Button>
-            </div>
-            {errors.slug && (
-              <p className="text-xs text-red-500">{errors.slug.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              {...register("notes")}
-              placeholder="Optional notes about this invitation..."
-              rows={3}
-            />
-          </div>
-
-          {composeLocked && (
-            <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-              <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>
-                Guests and special invitations are locked because a guest has
-                already responded.
-              </span>
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <Label>Special invitations</Label>
-            {specialEvents === undefined ? (
-              <p className="text-xs text-zinc-500">Loading…</p>
-            ) : specialEvents.length === 0 ? (
-              <div className="rounded-lg border border-dashed p-3 text-center">
-                <p className="text-sm text-zinc-500">
-                  No special invitations yet (optional).
-                </p>
-                <Button asChild variant="link" size="sm" className="h-auto p-0">
-                  <Link
-                    href={`/dashboard/${eventSlug}/special-events`}
-                    onClick={() => onOpenChange(false)}
-                  >
-                    Create a special invitation
-                  </Link>
-                </Button>
-              </div>
-            ) : (
-              <>
-                <p className="text-xs text-zinc-500">
-                  Choose which special invitations this group can see.
-                </p>
-                <div className="space-y-1 rounded-lg border p-2">
-                  {specialEvents.map((se) => (
-                    <label
-                      key={se._id}
-                      className={
-                        "flex items-center gap-2 rounded-md px-2 py-1.5 " +
-                        (composeLocked
-                          ? "cursor-not-allowed opacity-60"
-                          : "cursor-pointer hover:bg-zinc-50")
-                      }
-                    >
-                      <Checkbox
-                        checked={selectedSpecialIds.includes(se._id)}
-                        disabled={composeLocked}
-                        onCheckedChange={() => toggleSpecial(se._id)}
-                      />
-                      <span className="text-sm text-zinc-800">{se.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Guests</Label>
-            {candidateGuests.length === 0 ? (
-              <p className="text-xs text-zinc-500">
-                No guests available. Add guests to this event first.
-              </p>
-            ) : (
-              <>
-                <p className="text-xs text-zinc-500">
-                  Select the guests included in this invitation.
-                </p>
-                <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2">
-                  {candidateGuests.map((guest) => (
-                    <label
-                      key={guest._id}
-                      className={
-                        "flex items-center gap-2 rounded-md px-2 py-1.5 " +
-                        (composeLocked
-                          ? "cursor-not-allowed opacity-60"
-                          : "cursor-pointer hover:bg-zinc-50")
-                      }
-                    >
-                      <Checkbox
-                        checked={selectedGuestIds.includes(guest._id)}
-                        disabled={composeLocked}
-                        onCheckedChange={() => toggleGuest(guest._id)}
-                      />
-                      <span className="text-sm text-zinc-800">
-                        {guest.firstName} {guest.lastName}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting
-                ? mode === "create"
-                  ? "Creating..."
-                  : "Saving..."
-                : mode === "create"
-                ? "Create Invitation"
-                : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </form>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting
+                  ? mode === "create"
+                    ? "Creating..."
+                    : "Saving..."
+                  : mode === "create"
+                    ? "Create Invitation"
+                    : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
         )}
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil, Trash2, Sparkles } from "lucide-react";
 import { CopyInvitationLinkButton } from "@/components/invitations/copy-invitation-link-button";
 import { InvitationForm } from "@/components/invitations/invitation-form";
@@ -41,6 +42,7 @@ interface Invitation {
   title: string;
   slug: string;
   isActive: boolean;
+  isSent?: boolean;
   notes?: string;
   guestCount?: number;
   guests?: InvitationGuest[];
@@ -68,6 +70,10 @@ export function InvitationList({
     success: "Invitation deleted",
     error: "Failed to delete invitation",
   });
+  const setInvitationSent = useToastMutation(
+    api.invitations.setInvitationSent,
+    { error: "Failed to update sent status" },
+  );
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -85,6 +91,7 @@ export function InvitationList({
               <TableHead>Guests</TableHead>
               <TableHead>Special Invitations</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Sent</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -154,6 +161,18 @@ export function InvitationList({
                   </Badge>
                 </TableCell>
                 <TableCell>
+                  <Checkbox
+                    checked={invitation.isSent ?? false}
+                    onCheckedChange={(checked) =>
+                      setInvitationSent.run({
+                        id: invitation._id,
+                        isSent: checked === true,
+                      })
+                    }
+                    aria-label={`Mark ${invitation.title} as sent`}
+                  />
+                </TableCell>
+                <TableCell>
                   <div className="flex items-center justify-end gap-1">
                     <CopyInvitationLinkButton
                       eventSlug={eventSlug}
@@ -185,7 +204,11 @@ export function InvitationList({
 
       <InvitationForm
         mode="edit"
-        invitation={editTarget ?? undefined}
+        invitation={
+          editTarget
+            ? (invitations.find((i) => i._id === editTarget._id) ?? editTarget)
+            : undefined
+        }
         eventId={eventId}
         open={editTarget !== null}
         onOpenChange={(open) => {
