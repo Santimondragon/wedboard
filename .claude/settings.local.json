@@ -50,7 +50,12 @@
       "Bash(curl -s -H \"Host: mywedding.test\" http://localhost:3000/)",
       "Bash(curl -s -H \"Host: mywedding.test\" http://localhost:3000/some/other/path -o /dev/null -w \"other-path:%{http_code}\\\\n\")",
       "Bash(curl -s http://localhost:3000/_domain/mywedding.test -o /dev/null -w \"direct:%{http_code}\\\\n\")",
-      "Bash(curl -s http://localhost:3000/test-event/invitations/whatever -o /dev/null -w \"primary-inv:%{http_code}\\\\n\")"
+      "Bash(curl -s http://localhost:3000/test-event/invitations/whatever -o /dev/null -w \"primary-inv:%{http_code}\\\\n\")",
+      "mcp__4a2fa4ee-ba22-445a-aafc-7f2a312ee441__read_file_content",
+      "mcp__4a2fa4ee-ba22-445a-aafc-7f2a312ee441__create_file",
+      "mcp__4a2fa4ee-ba22-445a-aafc-7f2a312ee441__get_file_metadata",
+      "mcp__Control_Chrome__list_tabs",
+      "mcp__claude-in-chrome__tabs_context_mcp"
     ]
   }
 }

@@ -761,9 +761,38 @@ Implemented for **custom domains only** (`events.subdomain` + `by_subdomain` rem
 - Removing (`DELETE /api/domains`) detaches from Vercel (404 tolerated) then clears the Convex fields. Media URLs are absolute Convex URLs, so they are domain-independent.
 - Local testing: set `customDomain` on an event, then `curl -H "Host: mywedding.test" http://localhost:3000/invitations/{slug}` (or add the host to `/etc/hosts`).
 
+## Product Specs (`docs/`)
+
+This file is the **system** reference: schema, Convex modules, routes, component map — _what
+exists in the codebase_. [`docs/`](docs/) is the **product** reference: _what workflow a user
+performs, under what rules, and how we know it works._ Reach for it whenever the question is
+behavioral rather than structural.
+
+| Document                                                       | Use it for                                                               |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [docs/README.md](docs/README.md)                               | Index, how to read a spec, status legend, epic map                       |
+| [docs/glossary.md](docs/glossary.md)                           | Domain language — Event, Invitation, +1, RSVP Variant, Event Key, Block… |
+| [docs/roles-and-permissions.md](docs/roles-and-permissions.md) | **Authoritative** capability × role matrix                               |
+| [docs/workflow-catalog.md](docs/workflow-catalog.md)           | All 86 workflows → epic, actor, spec, status                             |
+| [docs/backlog.md](docs/backlog.md)                             | All 298 defects and gaps, P0–P2, issue-ready                             |
+| [docs/\_conventions/](docs/_conventions/)                      | The spec template and authoring guide                                    |
+
+16 epics, 64 feature specs under `docs/epics/`. Each spec follows a fixed 16-section
+skeleton; the sections most worth reading are §10 Business Rules (each tagged `[AS-BUILT]`
+and traced to `path:line`), §11 Acceptance Criteria, §14 TODOs & defects, and §15
+Traceability.
+
+**Before changing behavior, read the owning spec.** Its §10 states the rules the code is
+expected to satisfy, and §14 records what is already known to be wrong — which often means
+the change is already specified.
+
+> **The specs are as-built, not aspirational.** Where a spec and the code disagree, the code
+> wins and the discrepancy is a defect. Where this file and the code disagree, the same rule
+> applies — several such discrepancies are recorded in `docs/CHANGELOG.md`.
+
 ## Documentation Rule
 
-**CLAUDE.md (and AGENTS.md) must be updated whenever the app changes.**
+**CLAUDE.md, AGENTS.md, _and the affected product spec_ must be updated whenever the app changes.**
 
 This applies to every PR, fix, or feature — no exceptions:
 
@@ -774,6 +803,21 @@ This applies to every PR, fix, or feature — no exceptions:
 - Introduced a new convention or changed an existing one → update Key Conventions
 - Changed how auth works → update the Auth Flow section
 - Added or changed a Zod schema → update the Zod Validations section
+
+**Behavior changes additionally require a spec update, in the same change as the code:**
+
+- Changed a business rule, guard, cap, or contract → update the owning spec's §10/§9, bump
+  its `version` (`MAJOR` when a rule changes meaning, `MINOR` when one is added), and add a
+  row to its §16 Changelog
+- Added a user-facing capability → add or update the feature spec, and register its
+  workflow in `docs/workflow-catalog.md`
+- Fixed a `DEF-`/`TODO-` → remove it from the spec's §14 **and** from `docs/backlog.md`
+- Found a new defect or gap → add it to the owning spec's §14 **and** `docs/backlog.md`
+
+Spec ↔ backlog parity is a hard requirement: an ID exists in exactly one spec's §14 and in
+`docs/backlog.md`, never one without the other. See
+[docs/\_conventions/authoring-guide.md](docs/_conventions/authoring-guide.md) for the ID
+scheme and semver rules.
 
 Since AGENTS.md is a copy of CLAUDE.md, both must be kept in sync. Update one, then copy to the other.
 
