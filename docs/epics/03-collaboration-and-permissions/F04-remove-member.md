@@ -2,9 +2,9 @@
 id: EP-03-F04
 title: Remove a member
 epic: EP-03 Collaboration & Permissions
-version: 1.0.0
+version: 1.1.0
 status: implemented
-last_updated: 2026-07-27
+last_updated: 2026-08-09
 depends_on: [EP-03-F01, EP-03-F02]
 ---
 
@@ -264,11 +264,6 @@ As with `updateMemberRole`, the args carry no `eventId`; the event is derived fr
 - See **TODO-03-02** — defined in [EP-03-F05 §14](./F05-activity-log.md#14-todos--open-questions).
   Removals are not recorded: `convex/members.ts:150` deletes without calling `logActivity`.
   Revocation is an access-control event the owner has no way to audit after the fact.
-- **TODO-03-13** `[P2]` `[CHANGE]` — The remove trigger is an icon-only button with no
-  `aria-label` or visually hidden text, so assistive technology announces it only as "button".
-  - **Evidence:** `src/components/members/member-list.tsx:118`–`:124`
-  - **Proposed rule:** the trigger carries an accessible name that includes the member being
-    removed.
 - **TODO-03-14** `[P2]` `[CHANGE]` — `removeMember.pending` is computed but never bound to a
   control, so the confirm button is clickable during the in-flight request and a double
   confirmation issues a second mutation (which then fails with the unreadable "Member not found").
@@ -306,6 +301,7 @@ As with `updateMemberRole`, the args carry no `eventId`; the event is derived fr
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-27 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                |
+| ------- | ---------- | ------------------ | ----------------------------------------------------------------------------------------------------- |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-03-13 closed.** The remove trigger carries an `aria-label` naming the member, plus a `Tooltip` |
+| 1.0.0   | 2026-07-27 | Spec suite v1      | Initial as-built specification                                                                        |

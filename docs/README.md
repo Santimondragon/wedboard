@@ -85,9 +85,9 @@ materially wrong or missing capability · **P2** polish and future enhancements.
 64 feature specs, 86 catalogued workflows, 5 actors.
 
 **Where things stand.** The suite is an as-built baseline, so it records the product as it
-is rather than as intended. Of the 86 workflows, 33 are `implemented`, 35 `defective`, 16
-`partial` and 2 `proposed`. [backlog.md](./backlog.md) consolidates the 298 findings — start
-with the 4 P0 entries.
+is rather than as intended. Of the 86 workflows, 33 are `implemented`, 33 `defective`, 18
+`partial` and 2 `proposed`. [backlog.md](./backlog.md) consolidates the 278 findings — start
+with the 3 P0 entries.
 
 **Sub-epics.** A feature cluster gets its own subfolder when it has its own lifecycle, an
 external dependency, or ≥4 features. Only **Custom Domain** qualifies today — it has a DNS

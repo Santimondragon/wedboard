@@ -2,9 +2,9 @@
 id: EP-03-F05
 title: Activity Log
 epic: EP-03 Collaboration & Permissions
-version: 1.0.0
+version: 1.1.0
 status: implemented
-last_updated: 2026-07-27
+last_updated: 2026-08-09
 depends_on: [EP-03-F01]
 ---
 
@@ -132,15 +132,15 @@ point from the guests, invitations or template pages.
 
 ### Screens & components
 
-| Element          | Component         | Path                                                             |
-| ---------------- | ----------------- | ---------------------------------------------------------------- |
-| Page host        | `ActivityPage`    | `src/app/(dashboard)/dashboard/[eventSlug]/activity/page.tsx:11` |
-| Feed             | `ActivityList`    | `src/components/activity/activity-list.tsx:35`                   |
-| Sentence builder | `describe(item)`  | `src/components/activity/activity-list.tsx:26`                   |
-| Empty state      | `EmptyState`      | `src/components/app/empty-state.tsx`                             |
-| Loading state    | `LoadingState`    | `src/components/app/loading-state.tsx`                           |
-| Sidebar link     | `NAV_ITEMS` entry | `src/components/dashboard/dashboard-sidebar.tsx:62`              |
-| Write helper     | `logActivity`     | `convex/lib/activity.ts:26`                                      |
+| Element          | Component          | Path                                                             |
+| ---------------- | ------------------ | ---------------------------------------------------------------- |
+| Page host        | `ActivityPage`     | `src/app/(dashboard)/dashboard/[eventSlug]/activity/page.tsx:11` |
+| Feed             | `ActivityList`     | `src/components/activity/activity-list.tsx:35`                   |
+| Sentence builder | `describe(item)`   | `src/components/activity/activity-list.tsx:26`                   |
+| Empty state      | `EmptyState`       | `src/components/app/empty-state.tsx`                             |
+| Loading state    | `LoadingState`     | `src/components/app/loading-state.tsx`                           |
+| Sidebar link     | `NAV_GROUPS` entry | `src/components/dashboard/dashboard-sidebar.tsx:62`              |
+| Write helper     | `logActivity`      | `convex/lib/activity.ts:26`                                      |
 
 ### Fields & validation
 
@@ -437,7 +437,9 @@ mutations are the one exclusion with no such rationale.
   - **Proposed rule:** the three member mutations each write an `activityLogs` entry with a
     new `member` entity and the affected member's display name.
 - **TODO-03-05** `[P2]` `[CHANGE]` — The log has no retention policy and no pagination beyond
-  the fixed cap. `activityLogs` grows without bound for the life of the event, while
+  the fixed cap. _(Partially addressed: the page now renders a footer disclosing the 200-row
+  cap once it is reached, so the truncation is no longer silent. Neither pagination nor
+  retention exists.)_ `activityLogs` grows without bound for the life of the event, while
   `listByEvent` returns only the newest 200 rows with no cursor.
   - **Evidence:** `convex/activity.ts:15` (`.take(200)`, no `paginate`), `convex/schema.ts:242`
     (no TTL or archival field), and the page renders `items` directly with no "load more"
@@ -559,6 +561,7 @@ mutations are the one exclusion with no such rationale.
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-27 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                                                |
+| ------- | ---------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | TODO-03-05 narrowed: the Activity page discloses the 200-row cap in a footer. Pagination and retention remain open. Page restyled onto `PageHeader`/`Panel`/`ListRow` |
+| 1.0.0   | 2026-07-27 | Spec suite v1      | Initial as-built specification                                                                                                                                        |

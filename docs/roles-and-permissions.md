@@ -116,13 +116,15 @@ hides controls.
 
 ## 5. UI gating
 
-`NAV_ITEMS` in `src/components/dashboard/dashboard-sidebar.tsx` carries a `minRole` per
-link and filters against `useEventRole()`:
+`NAV_GROUPS` in `src/components/dashboard/dashboard-sidebar.tsx` carries a `minRole` per
+link and filters against `useEventRole()`. Links are grouped (Overview / Guests / Event /
+Design / Manage); a group whose every item is gated out renders nothing at all, its label
+included, so the sidebar never shows an empty heading:
 
-| Sidebar section                                                                                        | Minimum role |
-| ------------------------------------------------------------------------------------------------------ | ------------ |
-| Overview, Invitations, Special Events, Guests, Menu, Tables, Messages, Activity, Template, Media, Meta | `editor`     |
-| Members, Settings                                                                                      | `planner`    |
+| Sidebar section                                                                                                                | Minimum role |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| Overview, Guests, Invitations, Special Invitations, Menu & Drinks, Tables, Messages, Template, Media, Meta & Sharing, Activity | `editor`     |
+| Members, Settings                                                                                                              | `planner`    |
 
 Page-level guards repeat the check: `/members` redirects editors, and `/settings` shows an
 access notice with the Delete card rendered for the owner only.

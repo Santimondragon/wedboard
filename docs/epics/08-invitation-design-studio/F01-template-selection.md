@@ -2,9 +2,9 @@
 id: EP-08-F01
 title: Template Selection
 epic: EP-08 Invitation Design Studio
-version: 1.0.0
+version: 1.0.2
 status: partial
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-02-F01, EP-03-F05]
 ---
 
@@ -54,7 +54,7 @@ The only gate this feature applies is `requireEventEditor(ctx, args.eventId, "ed
 | Entry point             | Route / control                                                                                                                                          | Actor   |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | Design Studio page      | `/dashboard/[eventSlug]/template`                                                                                                                        | Editor+ |
-| Sidebar link "Template" | `NAV_ITEMS` entry, `minRole: editor`                                                                                                                     | Editor+ |
+| Sidebar link "Template" | `NAV_GROUPS` entry, `minRole: editor`                                                                                                                    | Editor+ |
 | Template picker cards   | The `Template` section of the left column, rendered only when `TEMPLATE_LIST.length > 1` (`src/components/template-selection/template-settings.tsx:207`) | Editor+ |
 | Save                    | "Save layout" button (`src/components/template-selection/template-settings.tsx:385`)                                                                     | Editor+ |
 
@@ -313,6 +313,19 @@ block type that no template implements and no `BlockType` names.
 
 ## 14. TODOs & Open Questions
 
+- **TODO-08-33** `[P2]` `[ADD]` — Nothing enforces the `.invitation-theme` contract on a new
+  template.
+  - **Rationale:** Since the dashboard redesign, design tokens are global and the public
+    invitation is protected only by a `.invitation-theme` class applied by hand in three places
+    (`templates/elegant/frame.tsx`, `blocks/special-invitation-dialog.tsx`, and the editor
+    preview in `template-selection/template-settings.tsx`). A second `TemplateDef` whose `Frame`
+    forgets the class inherits the dashboard palette, radius and font on the guest page, and
+    nothing — no type, no lint rule, no test — catches it. `TemplateDef` does not model the
+    requirement at all.
+  - **Proposed rule:** the shared frame contract applies the class (e.g. `InvitationTemplate`
+    wraps every template's `Frame` in it), so a template cannot opt out by omission; or a test
+    asserts the class is present on each registered template's rendered root.
+
 - **DEF-08-06** `[P2]` — Switching the template preserves the saved layouts verbatim, so blocks
   the new template does not implement are kept in the layout and then silently render nothing.
   - **Evidence:** `src/components/template-selection/template-settings.tsx:215` (changing
@@ -400,6 +413,7 @@ block type that no template implements and no `BlockType` names.
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                        |
+| ------- | ---------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.2   | 2026-08-09 | Dashboard redesign | Filed TODO-08-33 — nothing enforces the `.invitation-theme` contract that now protects the public invitation from the global dashboard tokens |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                                                                |

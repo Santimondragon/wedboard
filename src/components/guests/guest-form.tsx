@@ -1,27 +1,31 @@
-"use client"
+"use client";
 
-import { useForm, useWatch } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { api } from "convex/_generated/api"
-import { Id } from "convex/_generated/dataModel"
-import { useToastMutation } from "@/hooks/use-toast-mutation"
-import { guestSchema, type GuestFormData } from "@/lib/validations/guest"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { api } from "convex/_generated/api";
+import { Id } from "convex/_generated/dataModel";
+import { useToastMutation } from "@/hooks/use-toast-mutation";
+import { guestSchema, type GuestFormData } from "@/lib/validations/guest";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface GuestFormProps {
-  eventId: Id<"events">
-  invitationId?: Id<"invitations">
-  onSuccess: () => void
+  eventId: Id<"events">;
+  invitationId?: Id<"invitations">;
+  onSuccess: () => void;
 }
 
-export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) {
+export function GuestForm({
+  eventId,
+  invitationId,
+  onSuccess,
+}: GuestFormProps) {
   const createGuest = useToastMutation(api.guests.createGuest, {
     success: "Guest added successfully",
     error: "Failed to add guest",
-  })
+  });
 
   const {
     register,
@@ -35,9 +39,9 @@ export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) 
     defaultValues: {
       allowsPlusOne: false,
     },
-  })
+  });
 
-  const allowsPlusOne = useWatch({ control, name: "allowsPlusOne" })
+  const allowsPlusOne = useWatch({ control, name: "allowsPlusOne" });
 
   async function onSubmit(data: GuestFormData) {
     const result = await createGuest.run({
@@ -48,10 +52,10 @@ export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) 
       email: data.email || undefined,
       phone: data.phone || undefined,
       allowsPlusOne: data.allowsPlusOne,
-    })
+    });
     if (result.ok) {
-      reset()
-      onSuccess()
+      reset();
+      onSuccess();
     }
   }
 
@@ -62,14 +66,18 @@ export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) 
           <Label htmlFor="firstName">First Name *</Label>
           <Input id="firstName" {...register("firstName")} />
           {errors.firstName && (
-            <p className="text-xs text-rose-600">{errors.firstName.message}</p>
+            <p className="text-caption text-danger">
+              {errors.firstName.message}
+            </p>
           )}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="lastName">Last Name *</Label>
           <Input id="lastName" {...register("lastName")} />
           {errors.lastName && (
-            <p className="text-xs text-rose-600">{errors.lastName.message}</p>
+            <p className="text-caption text-danger">
+              {errors.lastName.message}
+            </p>
           )}
         </div>
       </div>
@@ -78,7 +86,7 @@ export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) 
         <Label htmlFor="email">Email</Label>
         <Input id="email" type="email" {...register("email")} />
         {errors.email && (
-          <p className="text-xs text-rose-600">{errors.email.message}</p>
+          <p className="text-caption text-danger">{errors.email.message}</p>
         )}
       </div>
 
@@ -102,5 +110,5 @@ export function GuestForm({ eventId, invitationId, onSuccess }: GuestFormProps) 
         {isSubmitting ? "Adding..." : "Add Guest"}
       </Button>
     </form>
-  )
+  );
 }

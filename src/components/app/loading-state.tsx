@@ -1,14 +1,15 @@
 "use client";
 
+import { StateBlock } from "@/components/app/state-block";
+
 interface LoadingStateProps {
   message?: string;
 }
 
-export function LoadingState({ message = "Loading..." }: LoadingStateProps) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-200 border-t-zinc-700" />
-      <p className="text-sm text-zinc-500">{message}</p>
-    </div>
-  );
+/**
+ * Thin compatibility wrapper over {@link StateBlock} with `kind="loading"`.
+ * Kept because ~8 call sites import it; prefer `StateBlock` in new code.
+ */
+export function LoadingState({ message = "Loading…" }: LoadingStateProps) {
+  return <StateBlock kind="loading" title={message} />;
 }

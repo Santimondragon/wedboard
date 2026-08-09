@@ -33,9 +33,9 @@ Status is the owning spec's frontmatter `status:` — see the
 | WF-04-03 | Record a guest's answer by hand                   | Guest Management            | Editor+          | [EP-04-F03](epics/04-guest-management/F03-edit-guest-and-rsvp-override.md)    | `defective`   |
 | WF-04-04 | Grant and manage a guest's +1                     | Guest Management            | Editor+          | [EP-04-F04](epics/04-guest-management/F04-plus-one-lifecycle.md)              | `defective`   |
 | WF-04-05 | Remove a guest from the event                     | Guest Management            | Editor+          | [EP-04-F05](epics/04-guest-management/F05-delete-guest.md)                    | `implemented` |
-| WF-04-06 | Add several guests to one invitation              | Guest Management            | Editor+          | [EP-04-F06](epics/04-guest-management/F06-bulk-guest-entry.md)                | `defective`   |
+| WF-04-06 | Add several guests to one invitation              | Guest Management            | Editor+          | [EP-04-F06](epics/04-guest-management/F06-bulk-guest-entry.md)                | `partial`     |
 | WF-05-01 | Create invitation for a household                 | Invitations                 | Editor+          | [EP-05-F01](epics/05-invitations/F01-create-invitation.md)                    | `defective`   |
-| WF-05-02 | Adjust an invitation's guest composition          | Invitations                 | Editor+          | [EP-05-F02](epics/05-invitations/F02-invitation-composition-and-lock.md)      | `defective`   |
+| WF-05-02 | Adjust an invitation's guest composition          | Invitations                 | Editor+          | [EP-05-F02](epics/05-invitations/F02-invitation-composition-and-lock.md)      | `partial`     |
 | WF-05-03 | Copy and share an invitation link                 | Invitations                 | Editor+          | [EP-05-F03](epics/05-invitations/F03-invitation-link-and-slug.md)             | `defective`   |
 | WF-05-04 | Track which invitations were sent                 | Invitations                 | Editor+          | [EP-05-F04](epics/05-invitations/F04-sent-tracking.md)                        | `implemented` |
 | WF-05-05 | Edit, deactivate or delete an invitation          | Invitations                 | Editor+          | [EP-05-F05](epics/05-invitations/F05-edit-deactivate-delete.md)               | `partial`     |

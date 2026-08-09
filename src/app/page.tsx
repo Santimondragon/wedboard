@@ -1,17 +1,51 @@
 import Link from "next/link";
+import {
+  ClipboardList,
+  LayoutGrid,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import { Logo } from "@/components/app";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Logo } from "@/components/app/logo";
-import { Users, ClipboardList, LayoutGrid } from "lucide-react";
+
+const FEATURES: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}[] = [
+  {
+    icon: Users,
+    title: "Guest Management",
+    description:
+      "Easily manage your guest list, track dietary requirements, and keep all guest details organized in one place.",
+  },
+  {
+    icon: ClipboardList,
+    title: "RSVP Tracking",
+    description:
+      "Send digital invitations and track responses in real time. Know exactly who is coming at a glance.",
+  },
+  {
+    icon: LayoutGrid,
+    title: "Table Seating",
+    description:
+      "Drag-and-drop seating charts to arrange tables and seats. Ensure every guest is perfectly placed.",
+  },
+];
 
 export default function HomePage() {
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/80 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Logo />
-          <nav className="flex items-center gap-3">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-[1180px] items-center justify-between px-6 py-4">
+          <Link
+            href="/"
+            className="rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+          >
+            <Logo />
+          </Link>
+          <nav className="flex items-center gap-2 sm:gap-3">
             <Button variant="ghost" asChild>
               <Link href="/sign-in">Sign in</Link>
             </Button>
@@ -22,89 +56,63 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero */}
       <main className="flex flex-1 flex-col">
-        <section className="mx-auto flex max-w-4xl flex-col items-center px-6 py-24 text-center">
-          <h1 className="text-5xl font-semibold tracking-tight text-zinc-900 sm:text-6xl">
-            Your wedding,{" "}
-            <span className="text-rose-500">beautifully managed</span>
-          </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-zinc-500">
-            Manage RSVPs, seating arrangements, menus, and more — all in one
-            elegant platform built for your perfect day.
-          </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-            <Button size="lg" asChild>
-              <Link href="/sign-up">Get started</Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <Link href="/sign-in">Sign in</Link>
-            </Button>
+        {/* Hero */}
+        <section className="relative overflow-hidden">
+          {/* A single soft clay wash behind the hero — the one brand gesture. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-gradient-to-b from-accent-soft/60 to-transparent"
+          />
+          <div className="mx-auto flex max-w-3xl flex-col items-center px-6 py-24 text-center sm:py-28">
+            <h1 className="text-display text-balance text-foreground sm:text-[3.25rem] sm:leading-[1.05]">
+              Your wedding,{" "}
+              <span className="text-accent">beautifully managed</span>
+            </h1>
+            <p className="text-body mt-6 max-w-xl text-pretty text-muted-foreground sm:text-base">
+              Manage RSVPs, seating arrangements, menus, and more — all in one
+              elegant platform built for your perfect day.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+              <Button size="lg" asChild>
+                <Link href="/sign-up">Get started</Link>
+              </Button>
+              <Button size="lg" variant="outline" asChild>
+                <Link href="/sign-in">Sign in</Link>
+              </Button>
+            </div>
           </div>
         </section>
 
         {/* Features */}
-        <section className="mx-auto w-full max-w-6xl px-6 pb-24">
-          <div className="grid gap-6 sm:grid-cols-3">
-            <Card className="border-zinc-100 shadow-sm">
-              <CardHeader className="pb-3">
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-rose-50">
-                  <Users className="h-5 w-5 text-rose-500" />
+        <section className="mx-auto w-full max-w-[1180px] px-6 pb-24">
+          <div className="grid gap-5 sm:grid-cols-3">
+            {FEATURES.map(({ icon: Icon, title, description }) => (
+              <article
+                key={title}
+                className="rounded-lg border border-border bg-card p-7 shadow-soft-xs transition-shadow hover:shadow-soft-sm"
+              >
+                <div className="mb-5 flex size-10 items-center justify-center rounded-md bg-accent-soft">
+                  <Icon
+                    className="size-5 text-accent-soft-foreground"
+                    aria-hidden
+                  />
                 </div>
-                <CardTitle className="text-base font-semibold text-zinc-900">
-                  Guest Management
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-zinc-500">
-                  Easily manage your guest list, track dietary requirements, and
-                  keep all guest details organized in one place.
+                <h2 className="text-section text-foreground">{title}</h2>
+                <p className="text-caption mt-2 text-muted-foreground">
+                  {description}
                 </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-zinc-100 shadow-sm">
-              <CardHeader className="pb-3">
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-rose-50">
-                  <ClipboardList className="h-5 w-5 text-rose-500" />
-                </div>
-                <CardTitle className="text-base font-semibold text-zinc-900">
-                  RSVP Tracking
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-zinc-500">
-                  Send digital invitations and track responses in real time.
-                  Know exactly who is coming at a glance.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-zinc-100 shadow-sm">
-              <CardHeader className="pb-3">
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-rose-50">
-                  <LayoutGrid className="h-5 w-5 text-rose-500" />
-                </div>
-                <CardTitle className="text-base font-semibold text-zinc-900">
-                  Table Seating
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-zinc-500">
-                  Drag-and-drop seating charts to arrange tables and seats.
-                  Ensure every guest is perfectly placed.
-                </p>
-              </CardContent>
-            </Card>
+              </article>
+            ))}
           </div>
         </section>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-zinc-100 bg-zinc-50 py-8">
-        <div className="mx-auto max-w-6xl px-6 text-center">
-          <Logo className="text-sm text-zinc-400" />
-          <p className="mt-2 text-xs text-zinc-400">
+      <footer className="border-t border-border bg-secondary/60 py-10">
+        <div className="mx-auto flex max-w-[1180px] flex-col items-center gap-2 px-6 text-center">
+          <Logo className="text-base text-muted-foreground" />
+          <p className="text-caption text-muted-foreground">
             &copy; {new Date().getFullYear()} Wedboard. All rights reserved.
           </p>
         </div>

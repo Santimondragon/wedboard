@@ -1,31 +1,37 @@
-"use client"
+"use client";
 
-import { Badge } from "@/components/ui/badge"
+import { StatusPill, type StatusTone } from "@/components/app";
 
-type RsvpStatus = "attending" | "declined" | "pending"
+type RsvpStatus = "attending" | "declined" | "pending";
 
 interface RsvpStatusBadgeProps {
-  status: RsvpStatus | string
+  status: RsvpStatus | string;
+  className?: string;
 }
 
-export function RsvpStatusBadge({ status }: RsvpStatusBadgeProps) {
-  if (status === "attending") {
-    return (
-      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200">
-        Attending
-      </Badge>
-    )
-  }
-  if (status === "declined") {
-    return (
-      <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-100 border-rose-200">
-        Declined
-      </Badge>
-    )
-  }
+const RSVP_TONE: Record<RsvpStatus, StatusTone> = {
+  attending: "success",
+  declined: "danger",
+  pending: "warning",
+};
+
+const RSVP_LABEL: Record<RsvpStatus, string> = {
+  attending: "Attending",
+  declined: "Declined",
+  pending: "Pending",
+};
+
+/**
+ * The RSVP state of a guest. Semantics live in the tokens — attending reads as
+ * success, declined as danger, pending as warning — never a hardcoded palette.
+ */
+export function RsvpStatusBadge({ status, className }: RsvpStatusBadgeProps) {
+  const key: RsvpStatus =
+    status === "attending" || status === "declined" ? status : "pending";
+
   return (
-    <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200">
-      Pending
-    </Badge>
-  )
+    <StatusPill tone={RSVP_TONE[key]} dot className={className}>
+      {RSVP_LABEL[key]}
+    </StatusPill>
+  );
 }

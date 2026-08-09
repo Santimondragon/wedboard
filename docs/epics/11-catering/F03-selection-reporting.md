@@ -2,9 +2,9 @@
 id: EP-11-F03
 title: Selection Reporting
 epic: EP-11 Catering
-version: 1.0.0
+version: 1.1.0
 status: defective
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-11-F01, EP-11-F02, EP-04-F03]
 ---
 
@@ -358,10 +358,6 @@ ConvexError("Menu option does not belong to this event")` (`convex/guests.ts:558
     retypes them.
   - **Proposed rule:** Each option row links to the guest directory pre-filtered to that option,
     and the panel offers a copy-to-clipboard summary.
-- **TODO-11-11** `[P2]` `[CHANGE]` — The panel has no loading state of its own.
-  - **Rationale:** `selectionCounts && …` (`.../menu/page.tsx:111`, `:149`) hides the panel while
-    the query is in flight, so it appears abruptly after the option list has already rendered.
-  - **Proposed rule:** Render a skeleton row set while `selectionCounts === undefined`.
 
 ### Open questions
 
@@ -396,6 +392,7 @@ ConvexError("Menu option does not belong to this event")` (`convex/guests.ts:558
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                              |
+| ------- | ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-11-11 closed.** The tally panel renders its own loading `StateBlock` while `getSelectionCounts` is in flight |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                                      |

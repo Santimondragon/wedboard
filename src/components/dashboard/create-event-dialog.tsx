@@ -1,33 +1,36 @@
-"use client"
+"use client";
 
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useRouter } from "next/navigation"
-import { api } from "convex/_generated/api"
-import { useToastMutation } from "@/hooks/use-toast-mutation"
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
+import { api } from "convex/_generated/api";
+import { useToastMutation } from "@/hooks/use-toast-mutation";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { eventSchema, type EventFormData } from "@/lib/validations/event"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { eventSchema, type EventFormData } from "@/lib/validations/event";
 
 interface CreateEventDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps) {
-  const router = useRouter()
+export function CreateEventDialog({
+  open,
+  onOpenChange,
+}: CreateEventDialogProps) {
+  const router = useRouter();
   const createEvent = useToastMutation(api.events.createEvent, {
     success: "Event created",
     error: "Failed to create event",
-  })
+  });
 
   const {
     register,
@@ -36,17 +39,17 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
     formState: { errors, isSubmitting },
   } = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
-  })
+  });
 
   async function onSubmit(data: EventFormData) {
     const result = await createEvent.run({
       ...data,
       date: data.date ? new Date(data.date).getTime() : undefined,
-    })
+    });
     if (result.ok) {
-      reset()
-      onOpenChange(false)
-      router.push(`/dashboard/${result.value.slug}`)
+      reset();
+      onOpenChange(false);
+      router.push(`/dashboard/${result.value.slug}`);
     }
   }
 
@@ -54,38 +57,64 @@ export function CreateEventDialog({ open, onOpenChange }: CreateEventDialogProps
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create Event</DialogTitle>
+          <DialogTitle>Create event</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Event Name *</Label>
-            <Input id="name" {...register("name")} placeholder="Our Wedding" />
+          <div className="space-y-1.5">
+            <Label htmlFor="name">Event name *</Label>
+            <Input
+              id="name"
+              {...register("name")}
+              placeholder="Our Wedding"
+              aria-invalid={errors.name ? true : undefined}
+              aria-describedby={
+                errors.name ? "create-event-name-error" : undefined
+              }
+            />
             {errors.name && (
-              <p className="text-xs text-red-500">{errors.name.message}</p>
+              <p
+                id="create-event-name-error"
+                role="alert"
+                className="text-caption text-danger"
+              >
+                {errors.name.message}
+              </p>
             )}
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="date">Date</Label>
             <Input id="date" type="date" {...register("date")} />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="venueName">Venue Name</Label>
-            <Input id="venueName" {...register("venueName")} placeholder="The Grand Ballroom" />
+          <div className="space-y-1.5">
+            <Label htmlFor="venueName">Venue name</Label>
+            <Input
+              id="venueName"
+              {...register("venueName")}
+              placeholder="The Grand Ballroom"
+            />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="venueAddress">Venue Address</Label>
-            <Input id="venueAddress" {...register("venueAddress")} placeholder="123 Main St, City, State" />
+          <div className="space-y-1.5">
+            <Label htmlFor="venueAddress">Venue address</Label>
+            <Input
+              id="venueAddress"
+              {...register("venueAddress")}
+              placeholder="123 Main St, City, State"
+            />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creating..." : "Create Event"}
+              {isSubmitting ? "Creating…" : "Create event"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

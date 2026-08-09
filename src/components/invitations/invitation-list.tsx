@@ -22,10 +22,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Pencil, Trash2, Sparkles } from "lucide-react";
+import { DataTableShell, StatusPill } from "@/components/app";
 import { CopyInvitationLinkButton } from "@/components/invitations/copy-invitation-link-button";
 import { InvitationForm } from "@/components/invitations/invitation-form";
 
@@ -63,35 +68,47 @@ export function InvitationList({
   invitations,
 }: InvitationListProps) {
   const [editTarget, setEditTarget] = useState<Invitation | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Id<"invitations"> | null>(
-    null,
-  );
+  const [deleteTarget, setDeleteTarget] = useState<Invitation | null>(null);
   const deleteInvitation = useToastMutation(api.invitations.deleteInvitation, {
     success: "Invitation deleted",
     error: "Failed to delete invitation",
   });
   const setInvitationSent = useToastMutation(
     api.invitations.setInvitationSent,
-    { error: "Failed to update sent status" },
+    {
+      error: "Failed to update sent status",
+    },
   );
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    await deleteInvitation.run({ id: deleteTarget });
+    await deleteInvitation.run({ id: deleteTarget._id });
     setDeleteTarget(null);
   }
 
+  const sentCount = invitations.filter((i) => i.isSent).length;
+
   return (
     <>
-      <div className="rounded-md border">
+      <DataTableShell
+        footer={
+          <span className="tabular-nums">
+            {invitations.length}{" "}
+            {invitations.length === 1 ? "invitation" : "invitations"} ·{" "}
+            {sentCount} sent
+          </span>
+        }
+      >
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Invitation</TableHead>
-              <TableHead>Guests</TableHead>
-              <TableHead>Special Invitations</TableHead>
+              <TableHead className="min-w-[200px]">Invitation</TableHead>
+              <TableHead className="min-w-[220px]">Guests</TableHead>
+              <TableHead className="min-w-[180px]">
+                Special invitations
+              </TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Sent</TableHead>
+              <TableHead className="text-center">Sent</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -100,25 +117,26 @@ export function InvitationList({
               <TableRow key={invitation._id}>
                 <TableCell>
                   <div className="min-w-0">
-                    <p className="font-medium text-zinc-900">
+                    <p className="text-body truncate font-medium text-foreground">
                       {invitation.title}
                     </p>
-                    <p className="text-xs text-zinc-500 font-mono">
+                    <p className="text-caption truncate font-mono text-muted-foreground">
                       /{invitation.slug}
                     </p>
                   </div>
                 </TableCell>
+
                 <TableCell>
                   {invitation.guests && invitation.guests.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {invitation.guests.map((g) => (
+                    <div className="flex flex-wrap gap-1.5">
+                      {invitation.guests.map((guest) => (
                         <span
-                          key={g._id}
-                          className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700"
+                          key={guest._id}
+                          className="text-caption inline-flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-0.5 text-secondary-foreground"
                         >
-                          {g.firstName} {g.lastName}
-                          {g.isPlusOne && (
-                            <span className="text-[10px] font-medium text-amber-600">
+                          {guest.firstName} {guest.lastName}
+                          {guest.isPlusOne && (
+                            <span className="rounded-sm bg-accent-soft px-1 text-[10px] font-semibold text-accent-soft-foreground">
                               +1
                             </span>
                           )}
@@ -126,41 +144,40 @@ export function InvitationList({
                       ))}
                     </div>
                   ) : (
-                    <span className="text-sm text-zinc-400">No guests</span>
+                    <span className="text-caption text-muted-foreground">
+                      No guests
+                    </span>
                   )}
                 </TableCell>
+
                 <TableCell>
                   {invitation.specialEvents &&
                   invitation.specialEvents.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {invitation.specialEvents.map((se) => (
-                        <Badge
-                          key={se._id}
-                          variant="outline"
-                          className="text-xs gap-1 bg-amber-50 text-amber-700 border-amber-200"
-                        >
-                          <Sparkles className="h-3 w-3" />
-                          {se.name}
-                        </Badge>
+                    <div className="flex flex-wrap gap-1.5">
+                      {invitation.specialEvents.map((specialEvent) => (
+                        <StatusPill key={specialEvent._id} tone="accent">
+                          <Sparkles className="size-3" aria-hidden />
+                          {specialEvent.name}
+                        </StatusPill>
                       ))}
                     </div>
                   ) : (
-                    <span className="text-sm text-zinc-400">—</span>
+                    <span className="text-caption text-muted-foreground">
+                      —
+                    </span>
                   )}
                 </TableCell>
+
                 <TableCell>
-                  <Badge
-                    variant="outline"
-                    className={
-                      invitation.isActive
-                        ? "text-xs bg-green-50 text-green-700 border-green-200"
-                        : "text-xs bg-zinc-100 text-zinc-500 border-zinc-200"
-                    }
+                  <StatusPill
+                    tone={invitation.isActive ? "success" : "neutral"}
+                    dot
                   >
                     {invitation.isActive ? "Active" : "Inactive"}
-                  </Badge>
+                  </StatusPill>
                 </TableCell>
-                <TableCell>
+
+                <TableCell className="text-center">
                   <Checkbox
                     checked={invitation.isSent ?? false}
                     onCheckedChange={(checked) =>
@@ -172,6 +189,7 @@ export function InvitationList({
                     aria-label={`Mark ${invitation.title} as sent`}
                   />
                 </TableCell>
+
                 <TableCell>
                   <div className="flex items-center justify-end gap-1">
                     <CopyInvitationLinkButton
@@ -179,28 +197,44 @@ export function InvitationList({
                       slug={invitation.slug}
                       customDomain={customDomain}
                     />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditTarget(invitation)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeleteTarget(invitation._id)}
-                      className="text-red-500 hover:text-red-600"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditTarget(invitation)}
+                        >
+                          <Pencil className="size-4" aria-hidden />
+                          <span className="sr-only">
+                            Edit {invitation.title}
+                          </span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Edit invitation</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteTarget(invitation)}
+                          className="text-danger hover:bg-danger-soft hover:text-danger"
+                        >
+                          <Trash2 className="size-4" aria-hidden />
+                          <span className="sr-only">
+                            Delete {invitation.title}
+                          </span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Delete invitation</TooltipContent>
+                    </Tooltip>
                   </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-      </div>
+      </DataTableShell>
 
       <InvitationForm
         mode="edit"
@@ -222,18 +256,20 @@ export function InvitationList({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Invitation</AlertDialogTitle>
+            <AlertDialogTitle>Delete invitation</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this invitation and cannot be undone.
+              {deleteTarget
+                ? `“${deleteTarget.title}” will be permanently deleted and its link will stop working. Its guests stay in the event and become un-invited.`
+                : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-danger text-danger-foreground hover:bg-danger/90 focus-visible:ring-danger/30"
             >
-              Delete
+              Delete invitation
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -2,9 +2,9 @@
 id: EP-02-F02
 title: Event Directory & Switcher
 epic: EP-02 Event Setup
-version: 1.0.0
+version: 1.1.0
 status: implemented
-last_updated: 2026-07-27
+last_updated: 2026-08-09
 depends_on: [EP-02-F01]
 ---
 
@@ -243,11 +243,6 @@ Sources: `convex/events.ts:22`, `convex/events.ts:48`, `convex/users.ts`.
     list, only to the global `/admin` table.
   - **Proposed rule:** `/admin` links to a superadmin-reachable personal event directory, or
     the redirect becomes a one-time suggestion rather than a hard replace.
-- **TODO-02-06** `[P2]` `[CHANGE]` — Directory cards are clickable `Card` elements rather than
-  links, so they cannot be keyboard-activated, middle-clicked or opened in a new tab
-  (`src/app/(dashboard)/dashboard/page.tsx:83`).
-  - **Rationale:** Accessibility and basic browser affordances.
-  - **Proposed rule:** Each card wraps a `next/link` to `/dashboard/{slug}`.
 
 ### Open questions
 
@@ -274,6 +269,7 @@ Sources: `convex/events.ts:22`, `convex/events.ts:48`, `convex/users.ts`.
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-27 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                                      |
+| ------- | ---------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-02-06 closed.** Directory cards are real `Link`s (keyboard-activatable, middle-clickable). The switcher is now a `Command`-based searchable combobox |
+| 1.0.0   | 2026-07-27 | Spec suite v1      | Initial as-built specification                                                                                                                              |

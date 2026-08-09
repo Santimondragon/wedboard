@@ -2,9 +2,9 @@
 id: EP-14-F01
 title: Overview Dashboard
 epic: EP-14 Insights
-version: 1.0.1
+version: 2.0.0
 status: defective
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on:
   [EP-01-F01, EP-02-F01, EP-03-F01, EP-04-F01, EP-05-F01, EP-11-F01, EP-12-F02]
 ---
@@ -55,7 +55,7 @@ Role semantics are defined once in
 
 | Entry point                                | Route / control                                           | Actor                                                   |
 | ------------------------------------------ | --------------------------------------------------------- | ------------------------------------------------------- |
-| Sidebar link "Overview"                    | `/dashboard/[eventSlug]`                                  | Editor+ (`minRole: "editor"` in `NAV_ITEMS`)            |
+| Sidebar link "Overview"                    | `/dashboard/[eventSlug]`                                  | Editor+ (`minRole: "editor"` in `NAV_GROUPS`)           |
 | Event switcher — selecting any event       | `/dashboard/{slug}`                                       | Editor+ (`src/components/dashboard/event-switcher.tsx`) |
 | Events list — opening an event             | `/dashboard/{slug}`                                       | Editor+                                                 |
 | Quick Actions — "Manage Invitations"       | `/dashboard/{slug}/invitations`                           | Editor+ (`.../[eventSlug]/page.tsx:96`)                 |
@@ -80,7 +80,7 @@ The metric cards themselves are **not** links; there is no deep link to a filter
    (`convex/dashboard.ts:34-43`); the two totals are array lengths (`:24-25`).
 5. The page maps the returned object into seven card descriptors — five direct, two computed
    by subtraction (`.../[eventSlug]/page.tsx:54-93`) — and renders them in a
-   `grid-cols-2 md:grid-cols-4` grid of `MetricCard`s (`:104-114`).
+   responsive grid of `StatCard`s, each carrying an `href` into the list it summarises.
 6. The Quick Actions card renders four outline buttons wrapped in `next/link` (`:116-132`).
 
 ### Alternate & edge paths
@@ -96,12 +96,12 @@ The metric cards themselves are **not** links; there is no deep link to a filter
 - **A4** — Seeding fails (for example the caller already owns three or more events) → the
   catch branch fires `toast.error("Failed to seed demo data")` and the page is unchanged
   (`:37-39`).
-- **A5** — The event has invitations but zero guests → every guest-derived card shows `0`, and
-  both derived cards show `0 - 0 = 0`. No distinction is drawn between "nothing to do" and
-  "no data yet".
-- **E1** — The caller is a `viewer` or not a member → `requireEventEditor` throws. The page has
-  no error branch: `stats` never resolves, so the skeleton grid is displayed indefinitely
-  (TODO-14-10).
+- **A5** — The event has invitations but zero guests → every guest-derived card shows `0`, but
+  its hint reads "No guests yet" / "No guests to seat yet" rather than a completion ratio, so
+  "nothing to do" is distinguishable from "no data yet" (BR-14-F01-21).
+- **E1** — The caller is a `viewer` or not a member → `requireEventEditor` throws. `useQuery`
+  re-throws, and the `(dashboard)` route error boundary (`src/app/(dashboard)/error.tsx`)
+  renders `StateBlock kind="error"` with a retry inside the shell (BR-14-F01-22).
 - **E2** — The event holds more than 1000 guests or more than 1000 invitations → the counts
   reflect only the first 1000 rows the index returns, with no indication (DEF-14-01).
 
@@ -135,9 +135,9 @@ The metric cards themselves are **not** links; there is no deep link to a filter
 
 | State             | Behavior                                                                                                                                                   |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Loading           | Eight `Skeleton` blocks (`h-28 rounded-lg`) in the metric grid; Quick Actions and the seed card are not rendered at all (`.../[eventSlug]/page.tsx:42-52`) |
+| Loading           | Seven `Skeleton` blocks matching the rendered card layout (4 + 3), plus placeholders for the two panels; Quick Actions and the seed card are not rendered  |
 | Empty             | There is no empty state for the metrics — all cards render with `0`. When `totalInvitations === 0` an extra dashed card offers demo seeding (`:134-145`)   |
-| Error             | None. A thrown query error leaves the page in the loading skeleton forever (E1)                                                                            |
+| Error             | The `(dashboard)/error.tsx` boundary renders `StateBlock kind="error"` with a `reset` retry, inside the shell (E1). The page writes no inline error branch |
 | Success           | Seven metric cards + Quick Actions card                                                                                                                    |
 | Disabled / locked | None. Nothing on the page is disabled; the sidebar hides the route below `editor`                                                                          |
 | Mobile            | The metric grid is `grid-cols-2` below the `md` breakpoint and `md:grid-cols-4` above; Quick Actions uses the same responsive pattern (`:104, :121`)       |
@@ -146,18 +146,21 @@ The metric cards themselves are **not** links; there is no deep link to a filter
 
 ### Screens & components
 
-| Element                 | Component                             | Path                                                    |
-| ----------------------- | ------------------------------------- | ------------------------------------------------------- |
-| Overview page           | `EventOverviewPage`                   | `src/app/(dashboard)/dashboard/[eventSlug]/page.tsx:24` |
-| Metric card             | `MetricCard`                          | `src/components/dashboard/metric-card.tsx:14`           |
-| Loading placeholder     | `Skeleton`                            | `src/components/ui/skeleton.tsx`                        |
-| Quick Actions container | `Card` / `CardHeader` / `CardContent` | `src/components/ui/card.tsx`                            |
-| Event resolution        | `useEvent()`                          | `src/components/dashboard/event-provider.tsx`           |
+| Element                 | Component                     | Path                                                    |
+| ----------------------- | ----------------------------- | ------------------------------------------------------- |
+| Overview page           | `EventOverviewPage`           | `src/app/(dashboard)/dashboard/[eventSlug]/page.tsx:24` |
+| Metric card             | `StatCard`                    | `src/components/app/stat-card.tsx`                      |
+| Loading placeholder     | `Skeleton`                    | `src/components/ui/skeleton.tsx`                        |
+| Page header             | `PageHeader`                  | `src/components/app/page-header.tsx`                    |
+| Quick Actions container | `Panel`                       | `src/components/app/panel.tsx`                          |
+| Error surface           | `StateBlock` (route boundary) | `src/app/(dashboard)/error.tsx`                         |
+| Event resolution        | `useEvent()`                  | `src/components/dashboard/event-provider.tsx`           |
 
-`MetricCard` accepts `{ title, value, description?, icon?, trend? }`
-(`src/components/dashboard/metric-card.tsx:6-12`). The overview page passes `title`, `value`,
-`description` and `icon`; **`trend` is never passed by any caller**, so the trend line is dead
-UI (TODO-14-02).
+`StatCard` accepts `{ label, value, hint?, icon?, href?, tone? }`
+(`src/components/app/stat-card.tsx`). It replaced `dashboard/metric-card.tsx`, which was
+deleted along with its never-passed `trend` prop. The overview passes `href` on every card, so
+each metric is a real link into the list it summarises (BR-14-F01-19). Values render in
+`text-metric` (tabular numerals).
 
 ### Fields & validation
 
@@ -252,8 +255,9 @@ it appears here only because the overview page is its sole entry point.
   `totalGuests - tableAssignmentCount`, computed on the client (`.../page.tsx:89`).
 - **BR-14-F01-14** `[AS-BUILT]` — Seven metric cards are rendered; `allergyCount` is returned
   but has no card (`.../page.tsx:54-93`).
-- **BR-14-F01-15** `[AS-BUILT]` — While the query is in flight the page renders eight skeleton
-  placeholders and nothing else (`.../page.tsx:42-52`).
+- **BR-14-F01-15** `[AS-BUILT]` — While the query is in flight the page renders one skeleton
+  per rendered card (4 + 3) plus the two panel placeholders, and nothing else. _(Changed in
+  2.0.0; was eight placeholders for seven cards — TODO-14-01.)_
 - **BR-14-F01-16** `[AS-BUILT]` — The "Seed Demo Data" card is rendered only when
   `totalInvitations === 0` (`.../page.tsx:134`).
 - **BR-14-F01-17** `[AS-BUILT]` — A successful seed navigates to the slug returned by the
@@ -261,8 +265,17 @@ it appears here only because the overview page is its sole entry point.
   (`.../page.tsx:36`; `convex/seed.ts:459`).
 - **BR-14-F01-18** `[AS-BUILT]` — The four Quick Action links are built from `event.slug` and
   point at invitations, guests, menu and tables (`.../page.tsx:95-100`).
-- **BR-14-F01-19** `[AS-BUILT]` — Metric cards are static: `MetricCard` renders no link and
-  the page passes no navigation target (`src/components/dashboard/metric-card.tsx:14-31`).
+- **BR-14-F01-19** `[AS-BUILT]` — Every metric card is a link: the page passes an `href` to
+  each `StatCard`, pointing at the list the metric summarises (guests, invitations, menu or
+  tables) under the current `event.slug`. _(Changed in 2.0.0; cards were previously static —
+  TODO-14-04.)_
+- **BR-14-F01-21** `[AS-BUILT]` — A card whose underlying set is empty renders a zero-data hint
+  ("No guests yet", "No guests to seat yet") instead of a completion ratio, so `0` meaning
+  "done" is distinguishable from `0` meaning "nothing here yet". _(Added in 2.0.0 —
+  TODO-14-09.)_
+- **BR-14-F01-22** `[AS-BUILT]` — The page renders no inline error branch. A thrown query error
+  is handled by the `(dashboard)` route error boundary, which renders `StateBlock kind="error"`
+  with a retry. _(Added in 2.0.0 — TODO-14-10.)_
 - **BR-14-F01-20** `[AS-BUILT]` — The query writes nothing and stores no snapshot; every value
   is recomputed per read (`convex/dashboard.ts:5-55`).
 
@@ -299,7 +312,8 @@ it appears here only because the overview page is its sole entry point.
 - **AC-14-F01-14** — **Given** any loaded overview **When** the cards are counted **Then**
   there are exactly 7, and none of them displays `allergyCount`. _(BR-14-F01-14)_
 - **AC-14-F01-15** — **Given** the query has not resolved **When** the page renders **Then**
-  8 skeleton blocks are shown and no Quick Actions card. _(BR-14-F01-15)_
+  the skeleton count equals the rendered card count and no Quick Actions card is shown.
+  _(BR-14-F01-15)_
 - **AC-14-F01-16** — **Given** an event with at least one invitation **When** the overview
   loads **Then** the "Seed Demo Data" card is absent. _(BR-14-F01-16)_
 - **AC-14-F01-17** — **Given** an event with zero invitations **When** the host clicks
@@ -307,8 +321,13 @@ it appears here only because the overview page is its sole entry point.
   dashboard. _(BR-14-F01-17)_
 - **AC-14-F01-18** — **Given** an event whose slug is `casa-verde` **When** the overview loads
   **Then** "View Guests" links to `/dashboard/casa-verde/guests`. _(BR-14-F01-18)_
-- **AC-14-F01-19** — **Given** any metric card **When** it is clicked **Then** no navigation
-  occurs. _(BR-14-F01-19)_
+- **AC-14-F01-19** — **Given** any metric card **When** it is activated by click, keyboard or
+  middle-click **Then** the browser navigates to the list it summarises. _(BR-14-F01-19)_
+- **AC-14-F01-21** — **Given** an event with zero guests **When** the overview loads **Then**
+  the seating and RSVP cards read "No guests yet" rather than a `0 / 0` ratio. _(BR-14-F01-21)_
+- **AC-14-F01-22** — **Given** a caller without access **When** the overview loads **Then** a
+  styled error panel with a retry is shown inside the shell, not an indefinite skeleton.
+  _(BR-14-F01-22)_
 - **AC-14-F01-20** — **Given** the overview is loaded twice with no intervening mutation
   **When** the results are compared **Then** they are identical and no document was written.
   _(BR-14-F01-20)_
@@ -332,7 +351,8 @@ it appears here only because the overview page is its sole entry point.
 ### Manual QA checklist
 
 - [ ] Cards render two-per-row at 375px and four-per-row on desktop.
-- [ ] Skeleton grid appears briefly on a cold load and is replaced by real numbers.
+- [ ] Skeleton grid appears briefly on a cold load, matches the card count, and is replaced by real numbers.
+- [ ] Open the overview for an event you are not a member of and confirm the styled error panel renders.
 - [ ] "Attending" increases by one after materializing a +1 through the RSVP flow.
 - [ ] "Guests Without Table" decreases by one after seating a guest.
 - [ ] "Menu Selections Missing" only changes when a host assigns a menu option in the guest dialog.
@@ -396,14 +416,6 @@ rule because no code detects or communicates it.
     declined guests; the number can never reach zero on an event with any declines.
   - **Proposed fix:** Base the card on attending guests only:
     `attendingCount − (attending guests with a tableId)`.
-- **TODO-14-01** `[P2]` `[CHANGE]` — The loading skeleton renders 8 blocks for 7 cards.
-  - **Rationale:** `Array.from({ length: 8 })` (`.../page.tsx:46`) predates the card list; the
-    layout visibly reflows when the query resolves.
-  - **Proposed rule:** The skeleton count equals the rendered card count.
-- **TODO-14-02** `[P2]` `[REMOVE]` — `MetricCard`'s `trend` prop is dead.
-  - **Rationale:** Declared and rendered (`src/components/dashboard/metric-card.tsx:11, 26-28`)
-    but passed by no caller, implying a trend capability that does not exist.
-  - **Proposed rule:** Remove the prop, or implement trends (see TODO-14-03).
 - **TODO-14-03** `[P1]` `[ADD]` — No trend over time.
   - **Rationale:** Nothing stores a historical value: the query writes nothing
     (`convex/dashboard.ts:5-55`) and no table holds a snapshot. A host cannot see whether RSVPs
@@ -411,13 +423,6 @@ rule because no code detects or communicates it.
     guests.
   - **Proposed rule:** Persist a daily aggregate per event and render an RSVP burn-up
     alongside the cards.
-- **TODO-14-04** `[P1]` `[ADD]` — Metric cards do not link to the underlying list.
-  - **Rationale:** `MetricCard` has no `href` (`src/components/dashboard/metric-card.tsx:6-12`)
-    and the page wraps none of them in a `Link`. Seeing "Pending: 12" gives no path to _which_
-    twelve; the host must open Guests and re-apply the filter by hand, even though the guest
-    table already supports an RSVP filter.
-  - **Proposed rule:** Each card links to `/dashboard/{slug}/guests` with the matching filter
-    pre-applied.
 - **TODO-14-05** `[P2]` `[ADD]` — No per-special-invitation breakdown.
   - **Rationale:** Special invitations are first-class sub-events with their own per-guest RSVP
     rows (`guestSpecialEventRsvps`), and an event may have up to two of them, but the overview
@@ -441,15 +446,6 @@ rule because no code detects or communicates it.
     somewhere else, with an extra event on their list.
   - **Proposed rule:** Either seed into the current event, or label the button so the outcome
     is unambiguous.
-- **TODO-14-09** `[P2]` `[ADD]` — No zero-data distinction.
-  - **Rationale:** An event with 40 guests all seated and an event with no guests both show
-    "Guests Without Table: 0". The card cannot distinguish "done" from "nothing to do".
-  - **Proposed rule:** Show a completion ratio (`38 / 40 seated`) rather than a bare remainder.
-- **TODO-14-10** `[P1]` `[ADD]` — No error state.
-  - **Rationale:** The page branches only on `stats === undefined` (`.../page.tsx:42`), so a
-    permission or network failure is indistinguishable from a slow load and the skeleton never
-    clears. `ErrorState` already exists (`src/components/app/error-state.tsx`).
-  - **Proposed rule:** Render `ErrorState` with a retry when the query fails.
 - **TODO-14-11** `[P2]` `[CHANGE]` — Derived cards are computed on the client.
   - **Rationale:** "Menu Selections Missing" and "Guests Without Table" are subtractions in the
     page component (`.../page.tsx:83, 89`), so the definition of each card lives outside the
@@ -486,8 +482,8 @@ rule because no code detects or communicates it.
 | Derived card — tables                           | `src/app/(dashboard)/dashboard/[eventSlug]/page.tsx:89`                       |
 | Quick Actions                                   | `src/app/(dashboard)/dashboard/[eventSlug]/page.tsx:95-100, 116-132`          |
 | Seed affordance                                 | `src/app/(dashboard)/dashboard/[eventSlug]/page.tsx:32-40, 134-145`           |
-| UI — card                                       | `src/components/dashboard/metric-card.tsx:14`                                 |
-| UI — unused trend prop                          | `src/components/dashboard/metric-card.tsx:11, 26-28`                          |
+| UI — card                                       | `src/components/app/stat-card.tsx`                                            |
+| UI — error boundary                             | `src/app/(dashboard)/error.tsx`                                               |
 | Backend — query                                 | `convex/dashboard.ts:5`                                                       |
 | Backend — guard                                 | `convex/dashboard.ts:8`                                                       |
 | Backend — take bounds                           | `convex/dashboard.ts:17, 21`                                                  |
@@ -501,7 +497,8 @@ rule because no code detects or communicates it.
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                                                                                               |
-| ------- | ---------- | ------------- | ---------------------------------------------------------------------------------------------------- |
-| 1.0.1   | 2026-07-28 | Spec suite v1 | Status corrected to `defective` per authoring-guide §3 (spec carries a behaviour-breaking P1 defect) |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification                                                                       |
+| Version | Date       | Author             | Change                                                                                                                                                                                                                                                                                   |
+| ------- | ---------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2.0.0   | 2026-08-09 | Dashboard redesign | **TODO-14-01, -02, -04, -09, -10 closed.** BR-14-F01-15 and -19 changed meaning (skeleton count matches cards; every metric card is a link). Added BR-14-F01-21 (zero-data hints) and BR-14-F01-22 (errors belong to the route boundary). `MetricCard` replaced by the shared `StatCard` |
+| 1.0.1   | 2026-07-28 | Spec suite v1      | Status corrected to `defective` per authoring-guide §3 (spec carries a behaviour-breaking P1 defect)                                                                                                                                                                                     |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                                                                                                                                                                                                           |

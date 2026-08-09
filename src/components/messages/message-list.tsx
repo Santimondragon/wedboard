@@ -1,39 +1,59 @@
-import { formatDistanceToNow } from "date-fns"
+import { formatDistanceToNow } from "date-fns";
+import { ListRow, ListRows } from "@/components/app";
 
 export interface GuestMessageItem {
-  _id: string
-  name: string
-  message: string
-  createdAt: number
-  invitationTitle: string
+  _id: string;
+  name: string;
+  message: string;
+  createdAt: number;
+  invitationTitle: string;
+}
+
+/** Dashboard copy is English — the guest-facing layer is the Spanish surface. */
+const ANONYMOUS = "Anonymous";
+
+function initial(name: string): string {
+  const trimmed = name.trim();
+  return trimmed ? trimmed[0].toUpperCase() : "?";
 }
 
 export function MessageList({ messages }: { messages: GuestMessageItem[] }) {
   return (
-    <ul className="space-y-4">
-      {messages.map((m) => (
-        <li
-          key={m._id}
-          className="rounded-lg border border-zinc-200 p-4 space-y-2"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-zinc-900">
-                {m.name || "Anónimo"}
-              </p>
-              <p className="truncate text-xs text-zinc-500">
-                {m.invitationTitle}
-              </p>
-            </div>
-            <span className="shrink-0 text-xs text-zinc-400">
-              {formatDistanceToNow(new Date(m.createdAt), { addSuffix: true })}
-            </span>
-          </div>
-          <p className="whitespace-pre-wrap text-sm text-zinc-700">
-            {m.message}
-          </p>
-        </li>
-      ))}
-    </ul>
-  )
+    <ListRows>
+      {messages.map((m) => {
+        const sender = m.name?.trim() || ANONYMOUS;
+
+        return (
+          <ListRow
+            key={m._id}
+            className="items-start"
+            leading={
+              <span
+                aria-hidden
+                className="text-caption flex size-9 items-center justify-center rounded-full bg-secondary font-medium text-muted-foreground"
+              >
+                {m.name?.trim() ? initial(m.name) : "—"}
+              </span>
+            }
+            title={sender}
+            subtitle={
+              <>
+                <span className="block">{m.invitationTitle}</span>
+                <p className="text-body mt-2.5 whitespace-pre-wrap text-foreground">
+                  {m.message}
+                </p>
+              </>
+            }
+            meta={
+              <time dateTime={new Date(m.createdAt).toISOString()}>
+                {formatDistanceToNow(new Date(m.createdAt), {
+                  addSuffix: true,
+                })}
+              </time>
+            }
+          />
+        );
+      })}
+    </ListRows>
+  );
 }

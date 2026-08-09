@@ -1,50 +1,74 @@
-"use client"
+"use client";
 
-import { useEffect } from "react"
-import { useForm, useWatch } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation } from "convex/react"
-import { api } from "convex/_generated/api"
-import { Doc, Id } from "convex/_generated/dataModel"
-import { format } from "date-fns"
-import { toast } from "sonner"
-import { useToastMutation } from "@/hooks/use-toast-mutation"
+import { useEffect, type ReactNode } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "convex/react";
+import { api } from "convex/_generated/api";
+import { Doc, Id } from "convex/_generated/dataModel";
+import { format } from "date-fns";
+import { toast } from "sonner";
+import { Mail } from "lucide-react";
+import { useToastMutation } from "@/hooks/use-toast-mutation";
 import {
   specialEventSchema,
   type SpecialEventFormData,
-} from "@/lib/validations/special-event"
+} from "@/lib/validations/special-event";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
-import { Checkbox } from "@/components/ui/checkbox"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 
-type SpecialEvent = Doc<"specialEvents">
-type Invitation = Doc<"invitations">
+type SpecialEvent = Doc<"specialEvents">;
+type Invitation = Doc<"invitations">;
 
 interface SpecialEventFormProps {
-  mode: "create" | "edit"
-  specialEvent?: SpecialEvent
-  eventId: Id<"events">
-  invitations: Invitation[]
+  mode: "create" | "edit";
+  specialEvent?: SpecialEvent;
+  eventId: Id<"events">;
+  invitations: Invitation[];
   /** invitation ids this special event is currently visible to (edit mode). */
-  accessIds: string[]
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  accessIds: string[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 /** Unix ms → the value an <input type="datetime-local"> expects. */
 function toDateTimeLocal(ms?: number): string {
-  if (!ms) return ""
-  return format(new Date(ms), "yyyy-MM-dd'T'HH:mm")
+  if (!ms) return "";
+  return format(new Date(ms), "yyyy-MM-dd'T'HH:mm");
+}
+
+function FormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="space-y-1">
+        <h3 className="text-section text-foreground">{title}</h3>
+        {description && (
+          <p className="text-caption text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
 }
 
 export function SpecialEventForm({
@@ -61,18 +85,18 @@ export function SpecialEventForm({
     {
       success: "Special invitation created",
       error: "Failed to create special invitation",
-    }
-  )
+    },
+  );
   const updateSpecialEvent = useToastMutation(
     api.specialEvents.updateSpecialEvent,
     {
       success: "Special invitation updated",
       error: "Failed to update special invitation",
-    }
-  )
+    },
+  );
   const setSpecialEventAccess = useMutation(
-    api.invitations.setSpecialEventAccess
-  )
+    api.invitations.setSpecialEventAccess,
+  );
 
   const {
     register,
@@ -90,9 +114,9 @@ export function SpecialEventForm({
       location: "",
       isActive: true,
     },
-  })
+  });
 
-  const isActive = useWatch({ control, name: "isActive" })
+  const isActive = useWatch({ control, name: "isActive" });
 
   useEffect(() => {
     if (open && specialEvent) {
@@ -102,7 +126,7 @@ export function SpecialEventForm({
         date: toDateTimeLocal(specialEvent.date),
         location: specialEvent.location ?? "",
         isActive: specialEvent.isActive ?? true,
-      })
+      });
     } else if (open && mode === "create") {
       reset({
         name: "",
@@ -110,12 +134,12 @@ export function SpecialEventForm({
         date: "",
         location: "",
         isActive: true,
-      })
+      });
     }
-  }, [open, specialEvent, mode, reset])
+  }, [open, specialEvent, mode, reset]);
 
   async function onSubmit(data: SpecialEventFormData) {
-    const date = data.date ? new Date(data.date).getTime() : undefined
+    const date = data.date ? new Date(data.date).getTime() : undefined;
     if (mode === "create") {
       const result = await createSpecialEvent.run({
         eventId,
@@ -123,10 +147,10 @@ export function SpecialEventForm({
         description: data.description || undefined,
         date,
         location: data.location || undefined,
-      })
-      if (result.ok) onOpenChange(false)
+      });
+      if (result.ok) onOpenChange(false);
     } else {
-      if (!specialEvent) return
+      if (!specialEvent) return;
       const result = await updateSpecialEvent.run({
         id: specialEvent._id,
         name: data.name,
@@ -134,107 +158,167 @@ export function SpecialEventForm({
         date,
         location: data.location || undefined,
         isActive: data.isActive,
-      })
-      if (result.ok) onOpenChange(false)
+      });
+      if (result.ok) onOpenChange(false);
     }
   }
 
-  async function toggleAccess(invitationId: Id<"invitations">, hasAccess: boolean) {
-    if (!specialEvent) return
+  async function toggleAccess(
+    invitationId: Id<"invitations">,
+    hasAccess: boolean,
+  ) {
+    if (!specialEvent) return;
     try {
       await setSpecialEventAccess({
         invitationId,
         specialEventId: specialEvent._id,
         hasAccess,
-      })
+      });
     } catch {
-      toast.error("Failed to update visibility")
+      toast.error("Failed to update visibility");
     }
   }
 
-  const accessSet = new Set(accessIds)
+  const accessSet = new Set(accessIds);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {mode === "create"
-              ? "Add special invitation"
-              : "Edit special invitation"}
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-h-[88vh] gap-0 overflow-hidden p-0 sm:max-w-xl">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex max-h-[88vh] flex-col"
+        >
+          <DialogHeader className="border-b border-border px-8 pt-8 pb-5 text-left">
+            <DialogTitle>
+              {mode === "create"
+                ? "Add special invitation"
+                : "Edit special invitation"}
+            </DialogTitle>
+            <DialogDescription>
+              A mini sub-event — welcome dinner, after-party — guests RSVP to
+              from their invitation.
+            </DialogDescription>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="name">Name *</Label>
-            <Input id="name" {...register("name")} />
-            {errors.name && (
-              <p className="text-xs text-rose-600">{errors.name.message}</p>
-            )}
-          </div>
+          <div className="flex-1 space-y-8 overflow-y-auto px-8 py-7">
+            <FormSection
+              title="Details"
+              description="What guests see on the special-invitation card."
+            >
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="name">Name *</Label>
+                  <Input
+                    id="name"
+                    placeholder="Welcome dinner"
+                    {...register("name")}
+                  />
+                  {errors.name && (
+                    <p className="text-caption text-danger">
+                      {errors.name.message}
+                    </p>
+                  )}
+                </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="description">Description</Label>
-            <Textarea id="description" {...register("description")} rows={3} />
-          </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="A short note about this sub-event…"
+                    rows={3}
+                    {...register("description")}
+                  />
+                </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="date">Date &amp; time</Label>
-              <Input id="date" type="datetime-local" {...register("date")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="location">Location</Label>
-              <Input id="location" {...register("location")} />
-            </div>
-          </div>
-
-          {mode === "edit" && (
-            <div className="flex items-center gap-3">
-              <Switch
-                id="isActive"
-                checked={isActive}
-                onCheckedChange={(v) => setValue("isActive", v)}
-              />
-              <Label htmlFor="isActive" className="font-normal cursor-pointer">
-                Active
-              </Label>
-            </div>
-          )}
-
-          {/* Per-invitation visibility — assignment needs a saved id. */}
-          <div className="space-y-2 rounded-md border bg-zinc-50 p-3">
-            <p className="text-sm font-medium text-zinc-900">
-              Visible to invitations
-            </p>
-            {mode === "create" ? (
-              <p className="text-xs text-zinc-500">
-                Save first, then reopen to choose which invitations can see this.
-              </p>
-            ) : invitations.length === 0 ? (
-              <p className="text-xs text-zinc-500">No invitations yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {invitations.map((invitation) => (
-                  <label
-                    key={invitation._id}
-                    className="flex items-center gap-2 text-sm text-zinc-700 cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={accessSet.has(invitation._id)}
-                      onCheckedChange={(checked) =>
-                        toggleAccess(invitation._id, checked === true)
-                      }
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="date">Date &amp; time</Label>
+                    <Input
+                      id="date"
+                      type="datetime-local"
+                      {...register("date")}
                     />
-                    {invitation.title}
-                  </label>
-                ))}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="location">Location</Label>
+                    <Input
+                      id="location"
+                      placeholder="Casa del Mar"
+                      {...register("location")}
+                    />
+                  </div>
+                </div>
+
+                {mode === "edit" && (
+                  <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-secondary p-4">
+                    <div className="space-y-0.5">
+                      <Label
+                        htmlFor="isActive"
+                        className="text-body cursor-pointer font-medium"
+                      >
+                        Active
+                      </Label>
+                      <p className="text-caption text-muted-foreground">
+                        Inactive special invitations stay hidden from guests.
+                      </p>
+                    </div>
+                    <Switch
+                      id="isActive"
+                      checked={isActive}
+                      onCheckedChange={(v) => setValue("isActive", v)}
+                    />
+                  </div>
+                )}
               </div>
-            )}
+            </FormSection>
+
+            {/* Per-invitation visibility — assignment needs a saved id. */}
+            <FormSection
+              title="Visible to invitations"
+              description="Only the invitations you tick here can see and RSVP to this."
+            >
+              {mode === "create" ? (
+                <div className="rounded-lg border border-dashed border-border p-5 text-center">
+                  <p className="text-caption text-muted-foreground">
+                    Save first, then reopen to choose which invitations can see
+                    this.
+                  </p>
+                </div>
+              ) : invitations.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-5 text-center">
+                  <Mail
+                    className="mx-auto mb-2 size-5 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <p className="text-caption text-muted-foreground">
+                    No invitations yet. Create one first, then come back to
+                    grant access.
+                  </p>
+                </div>
+              ) : (
+                <div className="max-h-56 overflow-y-auto rounded-lg border border-border bg-card p-1.5">
+                  {invitations.map((invitation) => (
+                    <label
+                      key={invitation._id}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 transition-colors hover:bg-secondary"
+                    >
+                      <Checkbox
+                        checked={accessSet.has(invitation._id)}
+                        onCheckedChange={(checked) =>
+                          toggleAccess(invitation._id, checked === true)
+                        }
+                      />
+                      <span className="text-body text-foreground">
+                        {invitation.title}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </FormSection>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-border px-8 py-5">
             <Button
               type="button"
               variant="outline"
@@ -244,14 +328,14 @@ export function SpecialEventForm({
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting
-                ? "Saving..."
+                ? "Saving…"
                 : mode === "create"
-                  ? "Add"
-                  : "Save Changes"}
+                  ? "Add special invitation"
+                  : "Save changes"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

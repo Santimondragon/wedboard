@@ -2,9 +2,9 @@
 id: EP-13-F01
 title: Guest Messages Inbox
 epic: EP-13 Host Inbox
-version: 1.0.0
+version: 1.1.0
 status: partial
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-01-F01, EP-02-F01, EP-03-F01, EP-05-F01, EP-07-F06]
 ---
 
@@ -49,10 +49,10 @@ Role semantics are defined once in
 
 ## 4. Entry Points
 
-| Entry point                                    | Route / control                   | Actor                                                                                                            |
-| ---------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Sidebar link "Messages" (`MessageSquare` icon) | `/dashboard/[eventSlug]/messages` | Editor+ — `NAV_ITEMS` entry carries `minRole: "editor"` (`src/components/dashboard/dashboard-sidebar.tsx:56-61`) |
-| Direct URL                                     | `/dashboard/[eventSlug]/messages` | Any authenticated user; a non-member's query throws                                                              |
+| Entry point                                    | Route / control                   | Actor                                                                                                             |
+| ---------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Sidebar link "Messages" (`MessageSquare` icon) | `/dashboard/[eventSlug]/messages` | Editor+ — `NAV_GROUPS` entry carries `minRole: "editor"` (`src/components/dashboard/dashboard-sidebar.tsx:56-61`) |
+| Direct URL                                     | `/dashboard/[eventSlug]/messages` | Any authenticated user; a non-member's query throws                                                               |
 
 There are no deep links to an individual message: messages have no own route, no anchor and
 no detail view.
@@ -83,8 +83,8 @@ no detail view.
   (`.../messages/page.tsx:19, 26-27`).
 - **A2** — Zero messages → `EmptyState` with the `MessageSquare` icon and explanatory copy
   (`.../messages/page.tsx:28-33`).
-- **A3** — A message was submitted with an empty `name` → the card shows `"Anónimo"`
-  (`src/components/messages/message-list.tsx:22`).
+- **A3** — A message was submitted with an empty `name` → the card shows `"Anonymous"` and its
+  avatar initial renders as an em dash (`src/components/messages/message-list.tsx:13`).
 - **A4** — The message's invitation no longer exists → `invitationTitle` falls back to `"—"`
   (`convex/messages.ts:30`). See DEF-13-02.
 - **A5** — A new message is submitted while the page is open → Convex reactivity re-runs the
@@ -92,7 +92,8 @@ no detail view.
   or count highlight (see TODO-13-03).
 - **E1** — The caller is not a member, or is a `viewer` → `requireEventEditor` throws
   (`Unauthorized` / `Insufficient permissions`); the page renders no error UI of its own and
-  the Convex error surfaces uncaught. There is no `ErrorState` on this page.
+  the Convex error is re-thrown by `useQuery` and caught by the `(dashboard)` route error
+  boundary, which renders `StateBlock kind="error"` with a retry (BR-13-F01-18).
 - **E2** — More than 500 messages exist for the event → the query returns only the first 500
   rows the index yields, and the sort happens _after_ the truncation, so the newest messages
   are not guaranteed to be among them. See TODO-13-05.
@@ -103,7 +104,7 @@ no detail view.
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Loading           | `LoadingState message="Loading messages…"`; heading count hidden                                                                                                                 |
 | Empty             | `EmptyState` — icon `MessageSquare`, title "No messages yet", description explaining guests leave messages from their invitation                                                 |
-| Error             | None implemented. A thrown guard error is not caught by the page (E1)                                                                                                            |
+| Error             | Handled by the `(dashboard)` route error boundary, which renders `StateBlock kind="error"` with a retry inside the shell. The page writes no inline error branch (E1)            |
 | Success           | Heading `Messages (N)` plus a vertical list (`ul.space-y-4`) of bordered message cards                                                                                           |
 | Disabled / locked | Not applicable — the page has no controls to disable. Editors and above see it; the sidebar hides it below `editor`                                                              |
 | Mobile            | The list is a single-column stack; name and invitation title `truncate`, the timestamp is `shrink-0`, so a long name never pushes the date off-screen (`message-list.tsx:19-30`) |
@@ -112,14 +113,14 @@ no detail view.
 
 ### Screens & components
 
-| Element           | Component              | Path                                                             |
-| ----------------- | ---------------------- | ---------------------------------------------------------------- |
-| Messages page     | `MessagesPage`         | `src/app/(dashboard)/dashboard/[eventSlug]/messages/page.tsx:11` |
-| Message list      | `MessageList`          | `src/components/messages/message-list.tsx:11`                    |
-| Message item type | `GuestMessageItem`     | `src/components/messages/message-list.tsx:3`                     |
-| Loading indicator | `LoadingState`         | `src/components/app/loading-state.tsx`                           |
-| Empty placeholder | `EmptyState`           | `src/components/app/empty-state.tsx`                             |
-| Sidebar entry     | `NAV_ITEMS` "Messages" | `src/components/dashboard/dashboard-sidebar.tsx:56`              |
+| Element           | Component               | Path                                                             |
+| ----------------- | ----------------------- | ---------------------------------------------------------------- |
+| Messages page     | `MessagesPage`          | `src/app/(dashboard)/dashboard/[eventSlug]/messages/page.tsx:11` |
+| Message list      | `MessageList`           | `src/components/messages/message-list.tsx:11`                    |
+| Message item type | `GuestMessageItem`      | `src/components/messages/message-list.tsx:3`                     |
+| Loading indicator | `LoadingState`          | `src/components/app/loading-state.tsx`                           |
+| Empty placeholder | `EmptyState`            | `src/components/app/empty-state.tsx`                             |
+| Sidebar entry     | `NAV_GROUPS` "Messages" | `src/components/dashboard/dashboard-sidebar.tsx:56`              |
 
 ### Fields & validation
 
@@ -150,7 +151,7 @@ fallback rendered on a message card.
 | Loading                          | `Loading messages…`                                                                            | `.../messages/page.tsx:27`                                       |
 | Empty title                      | `No messages yet`                                                                              | `.../messages/page.tsx:31`                                       |
 | Empty description                | `Guests who can't attend can leave you a message from their invitation. They'll show up here.` | `.../messages/page.tsx:32`                                       |
-| Anonymous sender fallback        | `Anónimo`                                                                                      | `src/components/messages/message-list.tsx:22`                    |
+| Anonymous sender fallback        | `Anonymous`                                                                                    | `src/components/messages/message-list.tsx:13`                    |
 | Missing invitation fallback      | `—`                                                                                            | `convex/messages.ts:30`                                          |
 | Client validation — empty        | `Message cannot be empty`                                                                      | `src/lib/validations/guest-message.ts:7`                         |
 | Client validation — long message | `Message is too long`                                                                          | `src/lib/validations/guest-message.ts:8`                         |
@@ -209,8 +210,17 @@ UI and acceptance criteria belong to **EP-07-F06** and are not restated here.
 - **BR-13-F01-07** `[AS-BUILT]` — The query exposes only `_id`, `name`, `message`,
   `createdAt` and `invitationTitle`; `eventId` and `invitationId` are not returned, so the
   client cannot link a message to its invitation record (`convex/messages.ts:25-31`).
-- **BR-13-F01-08** `[AS-BUILT]` — A message with an empty `name` is displayed as `"Anónimo"`
-  (`src/components/messages/message-list.tsx:22`).
+- **BR-13-F01-08** `[AS-BUILT]` — A message with an empty `name` is displayed as `"Anonymous"`,
+  matching the host UI's language (`src/components/messages/message-list.tsx:13`). _(Changed in
+  1.1.0; was the Spanish `"Anónimo"` — TODO-13-07.)_
+- **BR-13-F01-17** `[AS-BUILT]` — The relative timestamp is rendered inside a
+  `<time datetime="…">` element carrying the ISO instant, so the absolute time is available to
+  assistive technology and on hover. _(Added in 1.1.0 — TODO-13-06.)_
+- **BR-13-F01-18** `[AS-BUILT]` — The page renders no inline error branch; a thrown query error
+  is handled by the `(dashboard)` route error boundary. _(Added in 1.1.0 — TODO-13-12.)_
+- **BR-13-F01-19** `[AS-BUILT]` — When the returned message count reaches the query's 500-row
+  cap the page renders a footer saying so, rather than truncating silently. The cap itself and
+  its truncate-before-sort behavior are unchanged (TODO-13-05). _(Added in 1.1.0.)_
 - **BR-13-F01-09** `[AS-BUILT]` — Message bodies render with preserved line breaks
   (`whitespace-pre-wrap`) and are never truncated (`src/components/messages/message-list.tsx:32`).
 - **BR-13-F01-10** `[AS-BUILT]` — The page heading shows the number of returned messages once
@@ -245,7 +255,7 @@ UI and acceptance criteria belong to **EP-07-F06** and are not restated here.
 - **AC-13-F01-07** — **Given** any returned message **When** the query payload is inspected
   **Then** it contains no `invitationId` and no `eventId`. _(BR-13-F01-07)_
 - **AC-13-F01-08** — **Given** a message submitted with a blank name **When** the inbox loads
-  **Then** the card's primary line reads `Anónimo`. _(BR-13-F01-08)_
+  **Then** the card's primary line reads `Anonymous`. _(BR-13-F01-08)_
 - **AC-13-F01-09** — **Given** a message body containing two newline characters **When** the
   card renders **Then** the text displays on three lines in full. _(BR-13-F01-09)_
 - **AC-13-F01-10** — **Given** an event with 4 messages **When** the query resolves **Then**
@@ -274,7 +284,7 @@ UI and acceptance criteria belong to **EP-07-F06** and are not restated here.
 | TC-13-F01-07 | integration | `cascadeDeleteEvent` removes all `guestMessages` for the event                                                             |
 | TC-13-F01-08 | e2e         | Editor opens the Messages page on an event with no messages and sees "No messages yet"                                     |
 | TC-13-F01-09 | e2e         | A guest submits a message from a declined invitation; the editor's open Messages page shows it at the top without a reload |
-| TC-13-F01-10 | e2e         | A blank-name submission renders as "Anónimo" on the host's card                                                            |
+| TC-13-F01-10 | e2e         | A blank-name submission renders as "Anonymous" on the host's card                                                          |
 
 ### Manual QA checklist
 
@@ -293,8 +303,8 @@ UI and acceptance criteria belong to **EP-07-F06** and are not restated here.
 | Limits & caps    | 500 messages read per event per query (`convex/messages.ts:18`); 1000-character message body; 200-character sender name; per-invitation volume cap of `MAX_PER_INVITATION = 20` (see DEF-13-01). Practical ceiling per event = invitations × cap      |
 | Performance      | One indexed read plus **one `ctx.db.get` per message** for invitation titles (`convex/messages.ts:22-32`) — up to 501 document reads for a full page. There is no invitation-title memoization, so N messages from the same invitation cost N lookups |
 | Security & authz | Read gated at `editor` by `requireEventEditor`; the query never accepts a slug, only an `eventId`, so cross-event reads are impossible. The write path is fully anonymous — see the abuse assessment below                                            |
-| Accessibility    | Semantic `ul`/`li` list; no interactive controls, so no keyboard trap. Timestamps are relative text only, with no `title`/`datetime` attribute carrying the absolute time (TODO-13-06)                                                                |
-| i18n             | Host UI is English; the anonymous fallback `"Anónimo"` is Spanish, inconsistent with the surrounding page (TODO-13-07). Message bodies are whatever the guest wrote                                                                                   |
+| Accessibility    | Semantic `ListRows`/`ListRow` list; no interactive controls, so no keyboard trap. Timestamps carry the absolute instant in a `<time datetime>` (BR-13-F01-17)                                                                                         |
+| i18n             | Host UI is English throughout, including the `"Anonymous"` fallback (BR-13-F01-08). Message bodies are whatever the guest wrote                                                                                                                       |
 | Analytics        | None. No event is emitted when the inbox is opened or when a message arrives                                                                                                                                                                          |
 
 ### Abuse surface assessment
@@ -366,16 +376,6 @@ them today.
     the ones missing, which is the opposite of the intent.
   - **Proposed rule:** Page the inbox, or index on `(eventId, createdAt)` and take from the
     descending end.
-- **TODO-13-06** `[P2]` `[ADD]` — Only relative timestamps are shown.
-  - **Rationale:** `formatDistanceToNow` gives "3 months ago"
-    (`src/components/messages/message-list.tsx:29`); the absolute date is never rendered or
-    exposed as a tooltip/`<time datetime>`, so the host cannot cite when a message arrived.
-  - **Proposed rule:** Render the exact timestamp as a `title`/`<time>` attribute alongside
-    the relative string.
-- **TODO-13-07** `[P2]` `[CHANGE]` — Mixed-language fallback.
-  - **Rationale:** The host dashboard is English but an unnamed sender renders as `"Anónimo"`
-    (`src/components/messages/message-list.tsx:22`).
-  - **Proposed rule:** Use the host UI's language for host-facing fallbacks.
 - **TODO-13-08** `[P2]` `[ADD]` — No export.
   - **Rationale:** Couples commonly want to keep these notes after the event, but the only way
     to retain them is a screenshot; deleting the event destroys them permanently
@@ -395,11 +395,6 @@ them today.
     independently; a full page of 500 messages from 30 invitations performs 500 gets instead
     of 30.
   - **Proposed rule:** Resolve the distinct invitation ids once and map titles from that.
-- **TODO-13-12** `[P2]` `[ADD]` — No error state on the page.
-  - **Rationale:** The page handles `undefined` (loading) and empty, but a thrown query error
-    has no UI (`.../messages/page.tsx:26-36`), while `ErrorState` exists in
-    `src/components/app/error-state.tsx`.
-  - **Proposed rule:** Render `ErrorState` with a retry when the query fails.
 
 ### Open questions
 
@@ -440,6 +435,7 @@ them today.
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                                                                                                                                                                                                                                          |
+| ------- | ---------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-13-06, TODO-13-07 and TODO-13-12 closed.** The relative timestamp is wrapped in `<time datetime>` carrying the absolute instant; the unnamed-sender fallback is "Anonymous" (host UI is English); errors are handled by the `(dashboard)` route boundary. Added BR-13-F01-19 (500-cap disclosure footer). TODO-13-05 (truncate-before-sort) remains open |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                                                                                                                                                                                                                                                                                  |

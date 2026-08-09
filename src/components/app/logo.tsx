@@ -4,12 +4,16 @@ interface LogoProps {
   className?: string;
 }
 
+/**
+ * The Wedboard wordmark. Pinned to the display face rather than inheriting
+ * `font-sans`, so it can't drift when body type changes.
+ */
 export function Logo({ className }: LogoProps) {
   return (
     <span
       className={cn(
-        "text-xl font-semibold tracking-tight text-zinc-900",
-        className
+        "font-heading text-xl leading-none font-semibold tracking-[-0.03em] text-foreground",
+        className,
       )}
     >
       Wedboard

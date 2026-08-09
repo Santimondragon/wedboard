@@ -1,35 +1,38 @@
-"use client"
+"use client";
 
-import { useEffect } from "react"
-import { useForm, useWatch } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { api } from "convex/_generated/api"
-import { Doc, Id } from "convex/_generated/dataModel"
-import { useToastMutation } from "@/hooks/use-toast-mutation"
-import { menuOptionSchema, type MenuOptionFormData } from "@/lib/validations/menu"
+import { useEffect } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { api } from "convex/_generated/api";
+import { Doc, Id } from "convex/_generated/dataModel";
+import { useToastMutation } from "@/hooks/use-toast-mutation";
+import {
+  menuOptionSchema,
+  type MenuOptionFormData,
+} from "@/lib/validations/menu";
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
-type MenuOption = Doc<"menuOptions">
-type DrinkOption = Doc<"drinkOptions">
+type MenuOption = Doc<"menuOptions">;
+type DrinkOption = Doc<"drinkOptions">;
 
 interface MenuOptionFormProps {
-  type: "menu" | "drink"
-  mode: "create" | "edit"
-  option?: MenuOption | DrinkOption
-  eventId: Id<"events">
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  type: "menu" | "drink";
+  mode: "create" | "edit";
+  option?: MenuOption | DrinkOption;
+  eventId: Id<"events">;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function MenuOptionForm({
@@ -40,23 +43,23 @@ export function MenuOptionForm({
   open,
   onOpenChange,
 }: MenuOptionFormProps) {
-  const label = type === "menu" ? "Menu" : "Drink"
+  const label = type === "menu" ? "Menu" : "Drink";
   const createMenuOption = useToastMutation(api.menu.createMenuOption, {
     success: `${label} option created`,
     error: "Failed to create option",
-  })
+  });
   const updateMenuOption = useToastMutation(api.menu.updateMenuOption, {
     success: `${label} option updated`,
     error: "Failed to update option",
-  })
+  });
   const createDrinkOption = useToastMutation(api.drinks.createDrinkOption, {
     success: `${label} option created`,
     error: "Failed to create option",
-  })
+  });
   const updateDrinkOption = useToastMutation(api.drinks.updateDrinkOption, {
     success: `${label} option updated`,
     error: "Failed to update option",
-  })
+  });
 
   const {
     register,
@@ -68,9 +71,9 @@ export function MenuOptionForm({
   } = useForm<MenuOptionFormData>({
     resolver: zodResolver(menuOptionSchema),
     defaultValues: { name: "", description: "", isActive: true },
-  })
+  });
 
-  const isActive = useWatch({ control, name: "isActive" })
+  const isActive = useWatch({ control, name: "isActive" });
 
   useEffect(() => {
     if (open && option) {
@@ -78,24 +81,24 @@ export function MenuOptionForm({
         name: option.name,
         description: option.description ?? "",
         isActive: option.isActive ?? true,
-      })
+      });
     } else if (open && mode === "create") {
-      reset({ name: "", description: "", isActive: true })
+      reset({ name: "", description: "", isActive: true });
     }
-  }, [open, option, mode, reset])
+  }, [open, option, mode, reset]);
 
   async function onSubmit(data: MenuOptionFormData) {
     if (mode === "create") {
       const createOption =
-        type === "menu" ? createMenuOption : createDrinkOption
+        type === "menu" ? createMenuOption : createDrinkOption;
       const result = await createOption.run({
         eventId,
         name: data.name,
         description: data.description || undefined,
-      })
-      if (result.ok) onOpenChange(false)
+      });
+      if (result.ok) onOpenChange(false);
     } else {
-      if (!option) return
+      if (!option) return;
       const result =
         type === "menu"
           ? await updateMenuOption.run({
@@ -109,8 +112,8 @@ export function MenuOptionForm({
               name: data.name,
               description: data.description || undefined,
               isActive: data.isActive,
-            })
-      if (result.ok) onOpenChange(false)
+            });
+      if (result.ok) onOpenChange(false);
     }
   }
 
@@ -119,7 +122,9 @@ export function MenuOptionForm({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {mode === "create" ? `Add ${label} Option` : `Edit ${label} Option`}
+            {mode === "create"
+              ? `Add ${label.toLowerCase()} option`
+              : `Edit ${label.toLowerCase()} option`}
           </DialogTitle>
         </DialogHeader>
 
@@ -128,7 +133,7 @@ export function MenuOptionForm({
             <Label htmlFor="name">Name *</Label>
             <Input id="name" {...register("name")} />
             {errors.name && (
-              <p className="text-xs text-rose-600">{errors.name.message}</p>
+              <p className="text-caption text-danger">{errors.name.message}</p>
             )}
           </div>
 
@@ -144,22 +149,30 @@ export function MenuOptionForm({
                 checked={isActive}
                 onCheckedChange={(v) => setValue("isActive", v)}
               />
-              <Label htmlFor="isActive" className="font-normal cursor-pointer">
-                Active
+              <Label htmlFor="isActive" className="cursor-pointer font-normal">
+                Shown to guests on the invitation
               </Label>
             </div>
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : mode === "create" ? "Add Option" : "Save Changes"}
+              {isSubmitting
+                ? "Saving…"
+                : mode === "create"
+                  ? "Add option"
+                  : "Save changes"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

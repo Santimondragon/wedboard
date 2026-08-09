@@ -74,7 +74,7 @@ export function AddMemberDialog({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="collaborator@example.com"
             />
-            <p className="text-xs text-zinc-400">
+            <p className="text-caption text-muted-foreground">
               They must already have a Wedboard account.
             </p>
           </div>
@@ -96,7 +96,7 @@ export function AddMemberDialog({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-zinc-400">
+            <p className="text-caption text-muted-foreground">
               Co-owners get full access except deleting the event. Editors
               manage content only.
             </p>

@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface CopyInvitationLinkButtonProps {
   eventSlug: string;
@@ -27,13 +32,27 @@ export function CopyInvitationLinkButton({
   }
 
   return (
-    <Button variant="ghost" size="sm" onClick={handleCopy} className="gap-1.5">
-      {copied ? (
-        <Check className="h-3.5 w-3.5 text-green-600" />
-      ) : (
-        <Copy className="h-3.5 w-3.5" />
-      )}
-      {copied ? "Copied" : "Copy Link"}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleCopy}
+          className="gap-1.5 text-muted-foreground hover:text-foreground"
+        >
+          {copied ? (
+            <Check className="size-4 text-success" aria-hidden />
+          ) : (
+            <Copy className="size-4" aria-hidden />
+          )}
+          {copied ? "Copied" : "Copy link"}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {customDomain
+          ? `Copy ${customDomain}/invitations/${slug}`
+          : `Copy /${eventSlug}/invitations/${slug}`}
+      </TooltipContent>
+    </Tooltip>
   );
 }

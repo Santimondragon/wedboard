@@ -48,14 +48,14 @@ for the id-scoped ones, after loading the doc (`convex/specialEvents.ts:127`, `:
 
 ## 4. Entry Points
 
-| Entry point                     | Route / control                         | Actor   |
-| ------------------------------- | --------------------------------------- | ------- |
-| Special Events page             | `/dashboard/[eventSlug]/special-events` | Editor+ |
-| Sidebar link "Special Events"   | `NAV_ITEMS`, `minRole: editor`          | Editor+ |
-| "Add special invitation" button | Page header, disabled at cap            | Editor+ |
-| Pencil icon on a row            | Opens the edit dialog                   | Editor+ |
-| Trash icon on a row             | Opens the delete confirmation           | Editor+ |
-| Active switch on a row          | Immediate `updateSpecialEvent`          | Editor+ |
+| Entry point                        | Route / control                                | Actor   |
+| ---------------------------------- | ---------------------------------------------- | ------- |
+| Special Events page                | `/dashboard/[eventSlug]/special-events`        | Editor+ |
+| Sidebar link "Special Invitations" | `NAV_GROUPS` (Guests group), `minRole: editor` | Editor+ |
+| "Add special invitation" button    | Page header, disabled at cap                   | Editor+ |
+| Pencil icon on a row               | Opens the edit dialog                          | Editor+ |
+| Trash icon on a row                | Opens the delete confirmation                  | Editor+ |
+| Active switch on a row             | Immediate `updateSpecialEvent`                 | Editor+ |
 
 ## 5. UX Flow
 

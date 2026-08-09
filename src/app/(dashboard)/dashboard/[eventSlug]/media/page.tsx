@@ -1,47 +1,84 @@
-"use client"
+"use client";
 
-import { useQuery } from "convex/react"
-import { api } from "convex/_generated/api"
-import { Image as ImageIcon } from "lucide-react"
-import { useEvent } from "@/components/dashboard/event-provider"
-import { MediaGrid } from "@/components/media/media-grid"
-import { UploadButton } from "@/components/media/upload-button"
-import { EmptyState } from "@/components/app/empty-state"
-import { Skeleton } from "@/components/ui/skeleton"
+import { useQuery } from "convex/react";
+import { api } from "convex/_generated/api";
+import { Image as ImageIcon } from "lucide-react";
+import { useEvent } from "@/components/dashboard/event-provider";
+import { MediaGrid } from "@/components/media/media-grid";
+import { UploadButton } from "@/components/media/upload-button";
+import { PageHeader, Panel, StateBlock } from "@/components/app";
+import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
+
+/** Mirrors the per-event cap enforced in `convex/media.ts`. */
+const MEDIA_LIMIT = 50;
 
 export default function MediaPage() {
-  const eventId = useEvent()._id
-  const items = useQuery(api.media.listByEvent, { eventId })
+  const eventId = useEvent()._id;
+  const items = useQuery(api.media.listByEvent, { eventId });
+
+  const used = items?.length ?? 0;
+  const pct = Math.min(100, Math.round((used / MEDIA_LIMIT) * 100));
+  const nearLimit = used >= MEDIA_LIMIT * 0.8;
+  const atLimit = used >= MEDIA_LIMIT;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-zinc-900">
-          Media
-          {items !== undefined && (
-            <span className="ml-2 text-base font-normal text-zinc-500">
-              ({items.length})
-            </span>
-          )}
-        </h1>
-        <UploadButton eventId={eventId} />
-      </div>
+    <div className="space-y-9">
+      <PageHeader
+        title="Media"
+        description="Images you can drop into your invitation template — hero photos, maps, dress-code shots. Up to 50 images, 5MB each."
+        actions={<UploadButton eventId={eventId} />}
+      />
 
-      {items === undefined ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="aspect-square rounded-lg" />
-          ))}
-        </div>
-      ) : items.length === 0 ? (
-        <EmptyState
-          icon={ImageIcon}
-          title="No images yet"
-          description="Upload images to use them in your public invitation template"
-        />
-      ) : (
-        <MediaGrid items={items} />
-      )}
+      <Panel
+        title="Library"
+        description={
+          items === undefined
+            ? undefined
+            : `${used} of ${MEDIA_LIMIT} images used`
+        }
+        actions={
+          items !== undefined ? (
+            <div className="w-40 space-y-1.5">
+              <Progress
+                value={pct}
+                aria-label={`${used} of ${MEDIA_LIMIT} images used`}
+                className={cn(
+                  "h-2",
+                  atLimit
+                    ? "[&_[data-slot=progress-indicator]]:bg-danger"
+                    : nearLimit
+                      ? "[&_[data-slot=progress-indicator]]:bg-warning"
+                      : "[&_[data-slot=progress-indicator]]:bg-accent",
+                )}
+              />
+              <p
+                className={cn(
+                  "text-caption text-right",
+                  atLimit ? "text-danger" : "text-muted-foreground",
+                )}
+              >
+                {atLimit
+                  ? "Library full — delete an image to upload more"
+                  : `${MEDIA_LIMIT - used} slots left`}
+              </p>
+            </div>
+          ) : undefined
+        }
+      >
+        {items === undefined ? (
+          <StateBlock kind="loading" title="Loading your images…" />
+        ) : items.length === 0 ? (
+          <StateBlock
+            kind="empty"
+            icon={ImageIcon}
+            title="No images yet"
+            description="Upload an image and it becomes available to every image slot in the template editor."
+          />
+        ) : (
+          <MediaGrid items={items} />
+        )}
+      </Panel>
     </div>
-  )
+  );
 }

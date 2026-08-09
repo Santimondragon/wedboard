@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  ExternalLink,
+  Globe,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
 import type { Id } from "convex/_generated/dataModel";
-import { Badge } from "@/components/ui/badge";
+import { Panel, StateBlock, StatusPill } from "@/components/app";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -156,27 +163,24 @@ export function CustomDomainSettings({
   }
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h2 className="text-base font-medium text-zinc-900">Custom Domain</h2>
-        {isLive && (
-          <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+    <Panel
+      title="Custom domain"
+      description="Serve your invitations from a domain you already own, instead of the standard Wedboard address."
+      actions={
+        isLive ? (
+          <StatusPill tone="success" dot>
             Live
-          </Badge>
-        )}
-        {isPending && (
-          <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
+          </StatusPill>
+        ) : isPending ? (
+          <StatusPill tone="warning" dot>
             Waiting for DNS
-          </Badge>
-        )}
-      </div>
-
+          </StatusPill>
+        ) : undefined
+      }
+    >
+      {/* Step 1 — no domain connected yet. */}
       {!customDomain && (
-        <>
-          <p className="text-sm text-zinc-500">
-            Serve your invitations from your own domain. Enter a domain you
-            already own — we&apos;ll walk you through the rest.
-          </p>
+        <div className="max-w-md space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="customDomain">Domain</Label>
             <Input
@@ -184,28 +188,30 @@ export function CustomDomainSettings({
               value={domainInput}
               onChange={(e) => setDomainInput(e.target.value)}
               placeholder="invites.mywedding.com"
-              className="font-mono text-sm"
+              className="font-mono"
             />
+            <p className="text-caption text-muted-foreground">
+              Enter a domain you already own — we&apos;ll walk you through the
+              DNS setup.
+            </p>
           </div>
-          <Button
-            onClick={handleConnect}
-            disabled={connecting}
-            variant="outline"
-          >
-            {connecting ? "Connecting..." : "Connect Domain"}
+          <Button onClick={handleConnect} disabled={connecting}>
+            <Globe className="mr-1 size-4" aria-hidden />
+            {connecting ? "Connecting…" : "Connect domain"}
           </Button>
-        </>
+        </div>
       )}
 
       {customDomain && (
-        <div className="rounded-md border border-zinc-200 p-4 space-y-4">
-          <div className="flex items-center justify-between gap-4">
+        <div className="space-y-6">
+          {/* The domain itself, and where it points. */}
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-secondary/60 px-5 py-4">
             <div className="min-w-0">
-              <p className="text-sm font-medium font-mono truncate">
+              <p className="text-body truncate font-mono font-medium text-foreground">
                 {customDomain}
               </p>
-              <p className="text-xs text-zinc-500 font-mono">
-                https://{customDomain}/invitations/...
+              <p className="text-caption truncate font-mono text-muted-foreground">
+                https://{customDomain}/invitations/…
               </p>
             </div>
             {isLive && (
@@ -216,87 +222,93 @@ export function CustomDomainSettings({
                   rel="noreferrer"
                 >
                   Visit
+                  <ExternalLink className="ml-1 size-3.5" aria-hidden />
                 </a>
               </Button>
             )}
           </div>
 
+          {/* Step 2 — DNS records still pending at the registrar. */}
           {isPending && (
-            <div className="space-y-3">
-              <p className="text-sm text-zinc-600">
-                One more step: sign in to the website where you bought your
-                domain (GoDaddy, Namecheap, Cloudflare, ...), find its{" "}
-                <span className="font-medium">DNS settings</span>, and add the
-                record{dnsRecords && dnsRecords.length > 1 ? "s" : ""} below.
-                Then come back and check the status — changes can take a few
-                minutes to a few hours to take effect.
+            <div className="space-y-4">
+              <p className="text-body text-muted-foreground">
+                One more step: sign in where you bought your domain (GoDaddy,
+                Namecheap, Cloudflare, …), open its{" "}
+                <span className="font-medium text-foreground">
+                  DNS settings
+                </span>
+                , and add the record
+                {dnsRecords && dnsRecords.length > 1 ? "s" : ""} below. Then
+                come back and check the status — changes can take a few minutes
+                to a few hours to take effect.
               </p>
+
               {dnsRecords === null ? (
-                <p className="text-sm text-zinc-400">Loading DNS records...</p>
+                <StateBlock
+                  kind="loading"
+                  title="Fetching your DNS records…"
+                  compact
+                />
               ) : (
-                <div className="space-y-2">
+                <ul className="space-y-3">
                   {dnsRecords.map((record, i) => (
-                    <div
+                    <li
                       key={i}
-                      className="rounded-md bg-zinc-50 border border-zinc-200 p-3 space-y-2"
+                      className="overflow-hidden rounded-lg border border-border bg-card shadow-soft-xs"
                     >
-                      <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-1 text-sm">
-                        <span className="text-xs text-zinc-400 uppercase">
-                          Type
-                        </span>
-                        <span className="font-mono">{record.type}</span>
-                        <span />
-                        <span className="text-xs text-zinc-400 uppercase">
-                          Name
-                        </span>
-                        <span className="font-mono break-all">
-                          {record.name}
-                        </span>
-                        <CopyButton text={record.name} />
-                        <span className="text-xs text-zinc-400 uppercase">
-                          Value
-                        </span>
-                        <span className="font-mono break-all">
-                          {record.value}
-                        </span>
-                        <CopyButton text={record.value} />
-                      </div>
+                      <dl className="divide-y divide-border">
+                        <DnsRow label="Type" value={record.type} />
+                        <DnsRow label="Name" value={record.name} copyable />
+                        <DnsRow label="Value" value={record.value} copyable />
+                      </dl>
                       {record.type === "TXT" && (
-                        <p className="text-xs text-amber-700">
-                          This TXT record proves you own the domain — it&apos;s
-                          required because the domain is registered elsewhere.
+                        <p className="text-caption flex items-start gap-2 border-t border-border bg-warning-soft px-4 py-3 text-warning-foreground">
+                          <ShieldCheck
+                            className="mt-0.5 size-3.5 shrink-0"
+                            aria-hidden
+                          />
+                          <span>
+                            This TXT record proves you own the domain — required
+                            because it is registered elsewhere.
+                          </span>
                         </p>
                       )}
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          {/* Step 3 — live: nothing left to do but keep the controls handy. */}
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={handleCheckStatus}
               disabled={checking}
               variant="outline"
               size="sm"
             >
-              {checking ? "Checking..." : "Check Status"}
+              {checking ? (
+                <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <RefreshCw className="mr-1 size-3.5" aria-hidden />
+              )}
+              {checking ? "Checking…" : "Check status"}
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="text-rose-600 border-rose-200 hover:bg-rose-50"
+                  className="text-danger hover:bg-danger-soft hover:text-danger"
                   disabled={removing}
                 >
-                  {removing ? "Removing..." : "Remove Domain"}
+                  {removing ? "Removing…" : "Remove domain"}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Remove Custom Domain</AlertDialogTitle>
+                  <AlertDialogTitle>Remove custom domain</AlertDialogTitle>
                   <AlertDialogDescription>
                     Invitation links on {customDomain} will stop working. Guests
                     can still use the standard links. You can reconnect the
@@ -307,9 +319,9 @@ export function CustomDomainSettings({
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleRemove}
-                    className="bg-rose-600 hover:bg-rose-700"
+                    className="bg-danger text-danger-foreground hover:bg-danger/90"
                   >
-                    Remove Domain
+                    Remove domain
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -317,6 +329,29 @@ export function CustomDomainSettings({
           </div>
         </div>
       )}
-    </section>
+    </Panel>
+  );
+}
+
+/** One label/value line of a DNS record, with an optional copy affordance. */
+function DnsRow({
+  label,
+  value,
+  copyable = false,
+}: {
+  label: string;
+  value: string;
+  copyable?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-4 px-4 py-2.5">
+      <dt className="text-caption w-14 shrink-0 font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </dt>
+      <dd className="text-body min-w-0 flex-1 font-mono break-all text-foreground">
+        {value}
+      </dd>
+      {copyable && <CopyButton text={value} />}
+    </div>
   );
 }

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import {
-  Geist,
-  Geist_Mono,
-  Figtree,
+  Inter,
+  Bricolage_Grotesque,
   Fleur_De_Leah,
   Gowun_Batang,
 } from "next/font/google";
@@ -10,7 +9,15 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { RootProviders } from "@/components/providers/root-providers";
 
-const figtree = Figtree({ subsets: ["latin"], variable: "--font-sans" });
+// Dashboard + marketing body text.
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+
+// Dashboard + marketing display face — consumed via `--font-heading`, which
+// every shadcn title primitive (card/dialog/sheet/alert-dialog) already uses.
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-display",
+});
 
 // Fonts for the "elegant" invitation template.
 const fleurDeLeah = Fleur_De_Leah({
@@ -23,16 +30,6 @@ const gowunBatang = Gowun_Batang({
   weight: ["400", "700"],
   subsets: ["latin"],
   variable: "--font-serif-elegant",
-});
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
@@ -51,12 +48,11 @@ export default function RootLayout({
       className={cn(
         "h-full",
         "antialiased",
-        geistSans.variable,
-        geistMono.variable,
         "font-sans",
-        figtree.variable,
+        inter.variable,
+        bricolage.variable,
         fleurDeLeah.variable,
-        gowunBatang.variable
+        gowunBatang.variable,
       )}
     >
       <body className="min-h-full flex flex-col">

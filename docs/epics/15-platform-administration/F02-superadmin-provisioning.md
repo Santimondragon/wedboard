@@ -96,7 +96,7 @@ There is deliberately no UI entry point for granting or revoking.
 2. `EventProvider` resolves the slug through `events.getEventBySlug`, which calls
    `getEventRole` (`convex/events.ts:60`); the superadmin branch returns `"owner"`, so the
    payload's `myRole` is `"owner"` (`convex/lib/permissions.ts:72`).
-3. The sidebar's `NAV_ITEMS` filter with `hasMinRole("owner", …)` passes for every link, so the
+3. The sidebar's `NAV_GROUPS` filter with `hasMinRole("owner", …)` passes for every link, so the
    Superadmin sees the complete navigation including Members and Settings.
 4. Every page's Convex query runs its usual `requireEventEditor`, which delegates to
    `requireEventMember`, which early-returns for the superadmin role

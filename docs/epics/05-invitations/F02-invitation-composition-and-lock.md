@@ -2,9 +2,9 @@
 id: EP-05-F02
 title: Invitation Composition & the Composition Lock
 epic: EP-05 Invitations
-version: 1.0.0
-status: defective
-last_updated: 2026-07-28
+version: 1.1.0
+status: partial
+last_updated: 2026-08-09
 depends_on: [EP-05-F01, EP-04-F01, EP-04-F04, EP-06-F02]
 ---
 
@@ -373,20 +373,6 @@ inspects guest RSVP status (`convex/invitations.ts:497`–`:532`).
 
 ## 14. TODOs & Open Questions
 
-- **DEF-05-02** `[P1]` — The Composition Lock rejection (and every other `ConvexError` from these
-  mutations) reaches the user as a contentless failure toast.
-  - **Evidence:** `src/hooks/use-toast-mutation.ts:39` — `catch { toast.error(error) }` discards
-    the thrown value, so the server's
-    `"Cannot edit guests or special invitations after a guest has responded"`
-    (`convex/invitations.ts:383`) and `"Cannot link more than 20 guests at once"`
-    (`convex/invitations.ts:301`) are replaced by `"Failed to update invitation"` /
-    `"Failed to create invitation"` (`src/components/invitations/invitation-form.tsx:75`, `:79`).
-  - **Impact:** Whenever the client mirror and the server disagree — a stale dialog, a collaborator
-    answering concurrently, or any non-dialog caller — the Editor is told the save failed but not
-    that composition is frozen, and the reason is unrecoverable from the UI.
-  - **Proposed fix:** In `useToastMutation`, catch `ConvexError` specifically and toast
-    `err.data` when it is a string, falling back to the configured generic message. This is a
-    project-wide convention change; it should be made once in the hook, not per call site.
 - **TODO-05-02** `[P1]` `[ADD]` — Apply the ≤20 guest cap to `updateInvitation`.
   - **Rationale:** `createInvitation` rejects more than 20 guest ids (`convex/invitations.ts:300`),
     but `updateInvitation` has no equivalent check anywhere in its handler
@@ -435,6 +421,7 @@ inspects guest RSVP status (`convex/invitations.ts:497`–`:532`).
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                                         |
+| ------- | ---------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **DEF-05-02 closed.** The Composition Lock rejection (and every other `ConvexError` from these mutations) now reaches the user verbatim via `useToastMutation` |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                                                                                 |

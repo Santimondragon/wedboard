@@ -2,9 +2,9 @@
 id: EP-04-F02
 title: Guest Directory
 epic: EP-04 Guest Management
-version: 1.0.0
+version: 1.1.1
 status: implemented
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-04-F01, EP-06-F01, EP-11-F01, EP-12-F01]
 ---
 
@@ -91,10 +91,10 @@ See [roles-and-permissions.md](../../roles-and-permissions.md).
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Loading           | 8 `Skeleton` rows of `h-12` while `guests === undefined` (`…/guests/page.tsx:169`)                                                                                          |
 | Empty             | No guests on the event → `EmptyState`, "No guests yet" (`…/guests/page.tsx:176`)                                                                                            |
-| Error             | None implemented — an erroring query leaves the skeleton in place                                                                                                           |
+| Error             | Handled by the `(dashboard)` route error boundary (`StateBlock kind="error"` + retry, inside the shell). The page writes no inline error branch                             |
 | Success           | Table with search box, RSVP filter and the derived columns                                                                                                                  |
 | Disabled / locked | None; the directory is read-only, all writes happen in the dialog                                                                                                           |
-| Mobile            | The table is not responsive — it renders inside `rounded-md border` with no horizontal scroll container (`guest-table.tsx:198`), so wide column sets overflow. `TODO-04-11` |
+| Mobile            | The table renders inside `DataTableShell`, which owns `overflow-x-auto` and a sticky `<thead>`, so wide column sets scroll within the panel instead of overflowing the page |
 
 ## 7. UI Specification
 
@@ -219,7 +219,12 @@ index order and are never re-sorted client-side.
 - **BR-04-F02-12** `[AS-BUILT]` — Allergies longer than 30 characters are truncated with "…"
   and the full text is exposed as the element's `title` (`guest-table.tsx:143`).
 - **BR-04-F02-13** `[AS-BUILT]` — The seat number is rendered exactly as stored, with no 1-based
-  conversion in this table (`guest-table.tsx:157`).
+  conversion in this table (`guest-table.tsx:189`). Since EP-12-F02 2.0.0 made storage 0-based,
+  this column now reads one lower than the seat label on the Tables page. See DEF-04-04.
+- **BR-04-F02-16** `[AS-BUILT]` — The directory table renders inside `DataTableShell`, which
+  owns the horizontal scroll container and the sticky header. _(Added in 1.1.0 — TODO-04-11.)_
+- **BR-04-F02-17** `[AS-BUILT]` — The page renders no inline error branch; a thrown query error
+  is handled by the `(dashboard)` route error boundary. _(Added in 1.1.0 — TODO-04-15.)_
 - **BR-04-F02-14** `[AS-BUILT]` — Clicking anywhere on a row opens that guest's details dialog
   (`guest-table.tsx:223`).
 - **BR-04-F02-15** `[AS-BUILT]` — The heading count is the unfiltered total of guests on the
@@ -292,11 +297,15 @@ index order and are never re-sorted client-side.
 
 ## 14. TODOs & Open Questions
 
-- **TODO-04-11** `[P2]` `[CHANGE]` — The directory table has no horizontal scroll container.
-  - **Rationale:** With two special invitations plus menu and drink columns the table renders 10
-    columns inside a plain bordered `div` (`src/components/guests/guest-table.tsx:198`), so it
-    overflows on narrow viewports.
-  - **Proposed rule:** The table scrolls horizontally within its container at every viewport.
+- **DEF-04-04** `[P2]` — The Table / Seat column reads one seat lower than the Tables page.
+  - **Evidence:** `src/components/guests/guest-table.tsx:189` renders `Seat ${seatNumber}`
+    straight from storage, while `table-card.tsx:72` (EP-12-F02 2.0.0) now stores 0-based
+    indices and labels them `index + 1`. A guest seated in the seat labelled "3" on the Tables
+    page shows as "Seat 2" here.
+  - **Impact:** cosmetic but confusing: the two surfaces that name the same seat disagree, and
+    a guest in the first seat reads as "Seat 0".
+  - **Proposed fix:** render `seatNumber + 1`, matching BR-12-F02-20. Retire BR-04-F02-13.
+
 - **TODO-04-12** `[P2]` `[ADD]` — Rows are mouse-only.
   - **Rationale:** `onClick` lives on the `<TableRow>` with no `tabIndex`, key handler or role
     (`guest-table.tsx:220`), so the details dialog cannot be reached by keyboard.
@@ -315,10 +324,6 @@ index order and are never re-sorted client-side.
   - **Rationale:** Nothing in `src/` or `convex/` produces a CSV, XLSX or printable list; a host
     who needs a list for the caterer or venue has to copy the table by hand.
   - **Proposed rule:** The directory offers a download of the current (filtered) view.
-- **TODO-04-15** `[P2]` `[ADD]` — The page has no error state.
-  - **Rationale:** `…/guests/page.tsx:151` treats `undefined` as loading only, so a failed query
-    renders skeletons forever. `ErrorState` already exists (`src/components/app/error-state.tsx`).
-  - **Proposed rule:** A failed page query renders `ErrorState` with a retry.
 
 ### Open questions
 
@@ -345,6 +350,8 @@ index order and are never re-sorted client-side.
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                                                                                                                                         |
+| ------- | ---------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.1   | 2026-08-09 | Dashboard redesign | Filed DEF-04-04 — the Table / Seat column renders the raw stored `seatNumber`, which is 0-based since EP-12-F02 2.0.0, so it reads one lower than the Tables page                                                                                              |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-04-11 and TODO-04-15 closed.** The directory table renders inside `DataTableShell` (horizontal scroll + sticky header); a thrown query error is handled by the `(dashboard)` route error boundary. Page restyled onto `PageHeader`/`Panel`/`StateBlock` |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                                                                                                                                                                                 |

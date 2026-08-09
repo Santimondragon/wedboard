@@ -2,9 +2,9 @@
 id: EP-03-F02
 title: Share an event by email
 epic: EP-03 Collaboration & Permissions
-version: 1.0.0
+version: 1.1.0
 status: defective
-last_updated: 2026-07-27
+last_updated: 2026-08-09
 depends_on: [EP-03-F01, EP-01, EP-02]
 ---
 
@@ -46,11 +46,11 @@ semantics are defined in [roles-and-permissions.md](../../roles-and-permissions.
 
 ## 4. Entry Points
 
-| Entry point            | Route / control                             | Actor     |
-| ---------------------- | ------------------------------------------- | --------- |
-| Members page           | `/dashboard/[eventSlug]/members`            | Co-owner+ |
-| Sidebar link "Members" | `NAV_ITEMS` entry with `minRole: "planner"` | Co-owner+ |
-| "Add member" button    | Opens `AddMemberDialog`                     | Co-owner+ |
+| Entry point            | Route / control                              | Actor     |
+| ---------------------- | -------------------------------------------- | --------- |
+| Members page           | `/dashboard/[eventSlug]/members`             | Co-owner+ |
+| Sidebar link "Members" | `NAV_GROUPS` entry with `minRole: "planner"` | Co-owner+ |
+| "Add member" button    | Opens `AddMemberDialog`                      | Co-owner+ |
 
 ## 5. UX Flow
 
@@ -280,16 +280,6 @@ further action.
   - **Proposed fix:** `addMember` rejects `role === "planner"` unless
     `getEventRole(ctx, args.eventId, caller._id) === "owner"`, with the message already used by
     `updateMemberRole`: "Only the owner can manage co-owners".
-- **TODO-03-01** `[P1]` `[CHANGE]` — Server rejection messages never reach the user.
-  `useToastMutation` catches with a bare `catch {}` and toasts the fixed `options.error` string,
-  discarding the `ConvexError` payload. All five distinct `addMember` failures ("ask them to sign
-  up first", "already owns this event", "already a member", "Event not found", "Insufficient
-  permissions") render identically as "Failed to add member".
-  - **Evidence:** `src/hooks/use-toast-mutation.ts:39`–`:42`
-  - **Rationale:** the "ask them to sign up first" message is the single most actionable error in
-    this workflow and is currently unreachable, leaving the owner with no idea why the add failed.
-  - **Proposed rule:** when the caught value is a `ConvexError` with a string `data`, the toast
-    shows that message; otherwise it falls back to `options.error`.
 - **TODO-03-03** `[P1]` `[ADD]` — A user added to an event receives no notification of any kind:
   no email, no in-app signal, no badge. They discover the shared event only by returning to
   `/dashboard`.
@@ -297,8 +287,9 @@ further action.
   - **Proposed rule:** on a successful `addMember`, the new member is notified by email with the
     event name, the granting user's name and a direct link to `/dashboard/{eventSlug}`.
 - **TODO-03-07** `[P2]` `[CHANGE]` — `listMembers` is capped at `take(50)` with no total count
-  and no pagination, so members beyond the 50th are silently invisible and appear addable again
-  (the duplicate check would then reject them with an error the user cannot read, per TODO-03-01).
+  and no pagination, so members beyond the 50th are silently invisible and appear addable again.
+  _(The duplicate-check rejection is now readable — TODO-03-01 is closed — but the Members page
+  is the one capped list in the dashboard that gained no cap-disclosure footer.)_
   - **Evidence:** `convex/members.ts:29`
   - **Proposed rule:** the member list is paginated, or the cap is surfaced with an explicit
     "showing first 50 members" notice.
@@ -343,6 +334,7 @@ further action.
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-27 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                            |
+| ------- | ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-03-01 closed.** All five `addMember` rejection messages now reach the user via `useToastMutation`. TODO-03-07 (50-member cap) remains open |
+| 1.0.0   | 2026-07-27 | Spec suite v1      | Initial as-built specification                                                                                                                    |

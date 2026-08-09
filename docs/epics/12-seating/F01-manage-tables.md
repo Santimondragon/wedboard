@@ -2,9 +2,9 @@
 id: EP-12-F01
 title: Manage Tables
 epic: EP-12 Seating
-version: 1.0.0
+version: 1.1.0
 status: implemented
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-02-F01, EP-03-F01, EP-04-F01]
 ---
 
@@ -114,8 +114,10 @@ There are no deep links into an individual table; the page has a single URL.
 - **A3** — Seat count is 20 → the `+` button is disabled (`table-card.tsx:158`).
 - **A4** — Rename submitted blank/whitespace → `handleSaveName` returns early and nothing is
   sent; the input stays open with no message (`table-card.tsx:64`).
-- **A5** — Shrinking a table below an occupied seat → the occupants are unassigned with **no
-  confirmation and no warning**, and the success path shows no toast at all. See TODO-12-01.
+- **A5** — Shrinking a table below an occupied seat → an `AlertDialog` opens first, naming the
+  guest who would be displaced (or, for several, the count and the list of names) and offering
+  "Keep the seat" / confirm. Only on confirm does `updateTableSeats` run. Shrinking into
+  empty seats is not confirmed. See BR-12-F01-15.
 - **E1** — `createTable` rejected server-side → the sonner error toast "Failed to create
   table"; the `ConvexError` text is swallowed by `useToastMutation`
   (`add-table-dialog.tsx:29`).
@@ -127,14 +129,14 @@ There are no deep links into an individual table; the page has a single URL.
 
 ## 6. States
 
-| State             | Behavior                                                                                                                                           |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Loading           | `data === undefined` renders three `Skeleton` cards in the grid (`tables/page.tsx:21`, `:40-45`)                                                   |
-| Empty             | `EmptyState` with a `TableIcon`, title "No tables yet", and an "Add Table" action (`tables/page.tsx:46-52`)                                        |
-| Error             | Convex query errors are not caught by the page; mutation errors surface only as sonner toasts. There is no `ErrorState` on this route              |
-| Success           | Grid of `TableCard`s ordered by `sortOrder`; the header shows an amber "N unassigned" badge when guests remain unseated (`tables/page.tsx:28-32`)  |
-| Disabled / locked | `−` disabled at 1 seat, `+` disabled at 20 seats; the create submit button reads "Creating..." while `isSubmitting` (`add-table-dialog.tsx:88-90`) |
-| Mobile            | The grid is `grid-cols-1` below `sm`, two columns at `sm`, three at `lg` (`table-grid.tsx:65`)                                                     |
+| State             | Behavior                                                                                                                                                                                           |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Loading           | `data === undefined` renders three `Skeleton` cards in the grid (`tables/page.tsx:21`, `:40-45`)                                                                                                   |
+| Empty             | `EmptyState` with a `TableIcon`, title "No tables yet", and an "Add Table" action (`tables/page.tsx:46-52`)                                                                                        |
+| Error             | Convex query errors are caught by the `(dashboard)` route error boundary (`StateBlock kind="error"` + retry). Mutation errors surface as sonner toasts carrying the server's `ConvexError` message |
+| Success           | Grid of `TableCard`s ordered by `sortOrder`; the header shows an amber "N unassigned" badge when guests remain unseated (`tables/page.tsx:28-32`)                                                  |
+| Disabled / locked | `−` disabled at 1 seat, `+` disabled at 20 seats; the create submit button reads "Creating..." while `isSubmitting` (`add-table-dialog.tsx:88-90`)                                                 |
+| Mobile            | The grid is `grid-cols-1` below `sm`, two columns at `sm`, three at `lg` (`table-grid.tsx:65`)                                                                                                     |
 
 ## 7. UI Specification
 
@@ -214,7 +216,8 @@ with a hard seat ceiling of 20 this is unreachable in practice.
 **Shrink.** `updateTableSeats` runs the same unassignment pass, but conditionally: only when
 `args.seatsCount < table.seatsCount`, and only for guests whose `seatNumber` is defined and
 `>= args.seatsCount` (`convex/tables.ts:133-149`). Grows perform no guest writes at all. This
-release of guests is **silent** — no confirmation before, no toast after (TODO-12-01).
+release of guests is confirmed client-side before the mutation runs (BR-12-F01-15); the
+server itself performs it unconditionally.
 
 **Sort order.** `nextSortOrder(ctx, "tables", eventId)` reads up to 200 existing tables and
 returns `max(sortOrder) + 1` (`convex/lib/options.ts:11-21`), so new tables always land at
@@ -255,6 +258,11 @@ the end of the grid. `updateTable` accepts an explicit `sortOrder`
   the table row is deleted; no guest is deleted (`convex/tables.ts:105-114`).
 - **BR-12-F01-08** `[AS-BUILT]` — Reducing a table's seat count unassigns every guest at that
   table whose `seatNumber >= seatsCount` (`convex/tables.ts:133-149`).
+- **BR-12-F01-15** `[AS-BUILT]` — Before shrinking a table, the client computes the guests
+  whose `seatNumber >=` the requested count and, when there is at least one, requires explicit
+  confirmation in an `AlertDialog` that names them (`table-card.tsx:95-113`, `:314-343`). The
+  server-side unassignment (BR-12-F01-08) is unchanged and remains unconditional. _(Added in
+  1.1.0.)_
 - **BR-12-F01-09** `[AS-BUILT]` — Increasing a table's seat count never touches guest
   assignments; the unassignment pass is skipped entirely
   (`convex/tables.ts:133`).
@@ -340,18 +348,6 @@ the end of the grid. `updateTable` accepts an explicit `sortOrder`
 
 ## 14. TODOs & Open Questions
 
-- **TODO-12-01** `[P1]` `[CHANGE]` — Shrinking a table unassigns guests with no warning and
-  no feedback.
-  - **Evidence:** `convex/tables.ts:133-149` performs the unassignment; the `−` button calls
-    straight through with no confirmation (`table-card.tsx:144-152`); `updateTableSeats` is
-    registered in `useToastMutation` with an `error` message only and no `success`
-    (`table-grid.tsx:25-28`), so the successful path is completely silent.
-  - **Impact:** An Editor clicking `−` a few times to tidy a table can evict several seated
-    guests and never learn it happened. The seating work is lost and only discoverable by
-    noticing the "N unassigned" badge change.
-  - **Proposed rule:** When the requested `seatsCount` would strand at least one seated guest,
-    the client confirms first ("N guest(s) will be unassigned"), and on success the mutation
-    reports how many guests were released.
 - **TODO-12-02** `[P2]` `[ADD]` — `updateTable` validates nothing server-side.
   - **Evidence:** `convex/tables.ts:88-95` patches `{name?, sortOrder?}` directly; only the
     client checks for a non-empty name (`table-card.tsx:64`), and `tableSchema` is not applied
@@ -409,6 +405,7 @@ the end of the grid. `updateTable` accepts an explicit `sortOrder`
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                                  |
+| ------- | ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                                                                          |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-12-01 closed.** Added BR-12-F01-15 (shrink confirmation naming displaced guests); updated §5 A5 and §8. Page restyled onto the shared primitives |

@@ -1,9 +1,8 @@
 import { SignIn } from "@clerk/nextjs";
+import { authAppearance } from "../../appearance";
 
 export default function SignInPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50">
-      <SignIn fallbackRedirectUrl="/dashboard" />
-    </div>
+    <SignIn fallbackRedirectUrl="/dashboard" appearance={authAppearance} />
   );
 }

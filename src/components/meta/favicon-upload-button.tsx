@@ -91,8 +91,8 @@ export function FaviconUploadButton({
         disabled={uploading}
         onClick={() => inputRef.current?.click()}
       >
-        <Upload className="h-4 w-4 mr-1" />
-        {uploading ? "Uploading…" : "Upload Favicon"}
+        <Upload className="mr-1 size-4" />
+        {uploading ? "Uploading…" : "Upload favicon"}
       </Button>
     </>
   );

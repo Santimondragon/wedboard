@@ -2,9 +2,9 @@
 id: EP-07-F02
 title: Main RSVP Submission
 epic: EP-07 Guest Experience
-version: 1.0.0
+version: 1.0.2
 status: partial
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-07-F01, EP-07-F03, EP-04-F02, EP-05-F01, EP-08-F02]
 ---
 
@@ -383,10 +383,14 @@ Every failure mode throws a `ConvexError`:
     name tying the two options to a person.
   - **Proposed rule:** Each guest's choices are a `fieldset`/`legend` group, and the visible
     control shows a focus ring driven by `peer-focus-visible`.
-- **TODO-07-15** `[P2]` `[CHANGE]` — Server `ConvexError` messages are English and are swallowed
-  by the generic error toast, so a guest hitting a real validation failure learns nothing.
-  - **Rationale:** Every server-side rejection in §9 is invisible to the guest.
-  - **Proposed rule:** Known validation errors map to Spanish, guest-readable messages.
+- **TODO-07-15** `[P2]` `[CHANGE]` — Server `ConvexError` messages reach the guest but are in
+  English, on an otherwise Spanish page. _(Partially addressed: `useToastMutation` now unwraps
+  the `ConvexError` payload, so the message is no longer swallowed — the RSVP and guest-message
+  blocks both go through it. What remains is the language mismatch.)_
+  - **Rationale:** Every server-side rejection in §9 is authored in English; a Spanish-speaking
+    guest sees an English sentence in a Spanish toast.
+  - **Proposed rule:** Known validation errors map to Spanish, guest-readable messages — either
+    by authoring the `ConvexError` payloads in Spanish or by mapping them client-side.
 
 ### Open questions
 
@@ -425,6 +429,7 @@ Every failure mode throws a `ConvexError`:
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                                                 |
+| ------- | ---------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.2   | 2026-08-09 | Dashboard redesign | TODO-07-15 narrowed: `useToastMutation` now surfaces `ConvexError` payloads, so server rejections reach the guest; only the English-on-a-Spanish-page mismatch remains |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                                                                                         |

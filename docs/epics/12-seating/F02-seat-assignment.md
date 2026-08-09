@@ -2,9 +2,9 @@
 id: EP-12-F02
 title: Seat Assignment
 epic: EP-12 Seating
-version: 1.0.0
+version: 2.0.0
 status: defective
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-12-F01, EP-03-F01, EP-04-F01]
 ---
 
@@ -19,10 +19,12 @@ listing every guest in the event who is not currently seated anywhere. Picking a
 that guest immediately — there is no save step and no drag-and-drop.
 
 **This feature is defective.** Two confirmed defects are documented in §14: a seat-numbering
-off-by-one that makes the last seat of every table impossible to fill (**DEF-12-01**, P0),
-and a permission guard asymmetry that lets a `viewer` seat a guest they are not allowed to
-unseat (**DEF-12-02**, P1). The business rules in §10 describe the behavior as built,
-including the broken parts.
+permission guard asymmetry that lets a `viewer` seat a guest they are not allowed to unseat
+(**DEF-12-02**, P1). The seat-index off-by-one that made the last seat of every table
+impossible to fill (DEF-12-01, P0) was **fixed in 2.0.0** — the UI now stores 0-based indices
+and labels them 1-based — but no backfill of legacy 1-based data was run, so pre-fix seat
+assignments display one position lower (**DEF-12-03**). The business rules in §10 describe the
+behavior as built, including the broken parts.
 
 ## 2. Actors & Permissions
 
@@ -49,7 +51,7 @@ recorded in the capability matrix. The gates applied here are
 - **US-12-F02-03** — As an Editor, I want to see which guests are still unseated so that I
   know how much of the plan is left.
 - **US-12-F02-04** — As an Editor, I want every seat that a table physically has to be
-  fillable so that a 10-seat table holds 10 guests. _(Not satisfied today — DEF-12-01.)_
+  fillable so that a 10-seat table holds 10 guests. _(Satisfied since 2.0.0.)_
 
 ## 4. Entry Points
 
@@ -132,7 +134,7 @@ Seat assignment has no route of its own and no deep link; it is entirely in-page
 | Empty             | No tables → the page's empty state, so no seats render. Tables but no unseated guests → dropdowns render with no options |
 | Error             | Mutation failures surface only as toasts; the seat row does not change. There is no optimistic update to roll back       |
 | Success           | The seat row switches from dropdown to the guest's name plus an `×`; the header's unassigned badge updates               |
-| Disabled / locked | None. Seat controls are never disabled, including on the unassignable last seat (DEF-12-01)                              |
+| Disabled / locked | The seat dropdown is disabled when every guest is already seated ("Everyone is seated"). No seat is unassignable         |
 | Mobile            | Seat rows are a flex row inside the card; the card grid collapses to one column below `sm` (`table-grid.tsx:65`)         |
 
 ## 7. UI Specification
@@ -234,10 +236,18 @@ them without any capacity, occupancy or cross-event check
 - **BR-12-F02-04** `[AS-BUILT]` — `assignGuestToSeat` rejects `seatNumber >= table.seatsCount`
   with "Seat number exceeds table capacity" (`convex/tables.ts:173-175`). The check treats
   seat numbers as **0-based**.
-- **BR-12-F02-05** `[AS-BUILT]` — The client generates seat numbers `1..seatsCount`
-  (`table-card.tsx:55`) and sends them unchanged (`seat-select.tsx:22`,
-  `table-grid.tsx:37-38`), so stored seat numbers are **1-based**. Combined with
-  BR-12-F02-04 the highest seat of every table is unassignable — see DEF-12-01.
+- **BR-12-F02-05** `[AS-BUILT]` — The client generates seat indices **`0..seatsCount - 1`**
+  (`table-card.tsx:72`) and sends them unchanged (`seat-select.tsx`, `table-grid.tsx`), so
+  stored seat numbers are **0-based**, matching BR-12-F02-04 and the schema's documented
+  convention. Every seat of every table is fillable. _(Changed in 2.0.0; was 1-based, which
+  made the highest seat unassignable — DEF-12-01.)_
+- **BR-12-F02-20** `[AS-BUILT]` — Seat numbers are **displayed** 1-based: `TableCard` renders
+  `index + 1` as the seat label and `SeatSelect` takes a separate `seatLabel` prop used only
+  in its accessible name. Storage stays 0-based. _(Added in 2.0.0.)_
+- **BR-12-F02-21** `[AS-BUILT]` — No migration was run when BR-12-F02-05 changed. Seat
+  assignments written by the pre-2.0.0 UI are 1-based and now render one position lower than
+  they were placed; seat label "1" reads empty on any table seated before the fix. No data is
+  lost. See DEF-12-03. _(Added in 2.0.0.)_
 - **BR-12-F02-06** `[AS-BUILT]` — Assigning a guest to an occupied seat unassigns the current
   occupant from the table entirely (`tableId` and `seatNumber` both cleared) rather than
   failing or swapping (`convex/tables.ts:185-192`).
@@ -291,11 +301,11 @@ them without any capacity, occupancy or cross-event check
 - **AC-12-F02-05** — **Given** a guest of event X and a table of event Y **When** assignment is
   attempted **Then** it throws "Guest and table belong to different events".
 - **AC-12-F02-06** — **Given** a 10-seat table **When** `assignGuestToSeat` is called with
-  `seatNumber: 10` **Then** it throws "Seat number exceeds table capacity" _(this is the
-  server behavior the UI trips over — DEF-12-01)_.
+  `seatNumber: 10` **Then** it throws "Seat number exceeds table capacity" _(the UI no longer
+  sends this value — BR-12-F02-05)_.
 - **AC-12-F02-07** — **Given** a 10-seat table rendered in the grid **When** the Editor picks a
   guest for the seat labelled "10" **Then** the assignment fails with the toast "Failed to
-  assign guest to seat" **and** the seat stays empty. _(Expected once DEF-12-01 is fixed: the
+  assign guest to seat" **and** the seat stays empty. _(No longer reachable from the UI since 2.0.0: the
   guest is seated.)_
 - **AC-12-F02-08** — **Given** a guest seated at table A **Then** they do not appear in any
   dropdown of table A or table B until they are released.
@@ -315,27 +325,27 @@ them without any capacity, occupancy or cross-event check
 
 ## 12. Testing Criteria
 
-| ID           | Level       | Scenario                                                                                                                                              |
-| ------------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| TC-12-F02-01 | unit        | `TableCard` seat generation for `seatsCount: 10` — assert the seat numbers sent match the range the server accepts (this test fails today: DEF-12-01) |
-| TC-12-F02-02 | unit        | `getTablesAndGuests` partitioning: guests with `tableId` land in `guestsByTable`, others in `unassignedGuests`                                        |
-| TC-12-F02-03 | integration | Assign to an empty seat writes `tableId` + `seatNumber`                                                                                               |
-| TC-12-F02-04 | integration | Assign to an occupied seat clears the previous occupant's `tableId` and `seatNumber`                                                                  |
-| TC-12-F02-05 | integration | Assign a guest to the seat they already hold leaves them seated                                                                                       |
-| TC-12-F02-06 | integration | Two rows written with the same `(tableId, seatNumber)` are both cleared by the next assignment to that seat                                           |
-| TC-12-F02-07 | integration | `seatNumber === table.seatsCount` throws "Seat number exceeds table capacity"; `seatsCount - 1` succeeds                                              |
-| TC-12-F02-08 | integration | Cross-event guest/table throws "Guest and table belong to different events"                                                                           |
-| TC-12-F02-09 | integration | `assignGuestToSeat` as `viewer` — asserts the intended rule (throws), failing today: DEF-12-02                                                        |
-| TC-12-F02-10 | integration | `unassignGuestFromSeat` as `viewer` throws; as `editor` succeeds                                                                                      |
-| TC-12-F02-11 | integration | Deleting a seated guest leaves no row referencing the table                                                                                           |
-| TC-12-F02-12 | integration | Setting a seated guest to `declined` leaves `tableId`/`seatNumber` intact                                                                             |
-| TC-12-F02-13 | e2e         | Seat a guest into the highest seat of a 10-seat table and assert success (fails today: DEF-12-01)                                                     |
-| TC-12-F02-14 | e2e         | Seat, release, and re-seat a guest at a different table, asserting the unassigned badge each time                                                     |
+| ID           | Level       | Scenario                                                                                                                                               |
+| ------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| TC-12-F02-01 | unit        | `TableCard` seat generation for `seatsCount: 10` — assert the indices sent are `0..9` and the rendered labels are `1..10` (BR-12-F02-05, BR-12-F02-20) |
+| TC-12-F02-02 | unit        | `getTablesAndGuests` partitioning: guests with `tableId` land in `guestsByTable`, others in `unassignedGuests`                                         |
+| TC-12-F02-03 | integration | Assign to an empty seat writes `tableId` + `seatNumber`                                                                                                |
+| TC-12-F02-04 | integration | Assign to an occupied seat clears the previous occupant's `tableId` and `seatNumber`                                                                   |
+| TC-12-F02-05 | integration | Assign a guest to the seat they already hold leaves them seated                                                                                        |
+| TC-12-F02-06 | integration | Two rows written with the same `(tableId, seatNumber)` are both cleared by the next assignment to that seat                                            |
+| TC-12-F02-07 | integration | `seatNumber === table.seatsCount` throws "Seat number exceeds table capacity"; `seatsCount - 1` succeeds                                               |
+| TC-12-F02-08 | integration | Cross-event guest/table throws "Guest and table belong to different events"                                                                            |
+| TC-12-F02-09 | integration | `assignGuestToSeat` as `viewer` — asserts the intended rule (throws), failing today: DEF-12-02                                                         |
+| TC-12-F02-10 | integration | `unassignGuestFromSeat` as `viewer` throws; as `editor` succeeds                                                                                       |
+| TC-12-F02-11 | integration | Deleting a seated guest leaves no row referencing the table                                                                                            |
+| TC-12-F02-12 | integration | Setting a seated guest to `declined` leaves `tableId`/`seatNumber` intact                                                                              |
+| TC-12-F02-13 | e2e         | Seat a guest into the highest seat of a 10-seat table and assert success (regression guard for DEF-12-01)                                              |
+| TC-12-F02-14 | e2e         | Seat, release, and re-seat a guest at a different table, asserting the unassigned badge each time                                                      |
 
 ### Manual QA checklist
 
 - [ ] Seat a guest into seat 1 and confirm the row switches to their name
-- [ ] Attempt to seat a guest into the highest-numbered seat of any table (reproduces DEF-12-01)
+- [ ] Seat a guest into the highest-numbered seat of any table and confirm it succeeds (DEF-12-01 regression)
 - [ ] Confirm the fill indicator and the "N unassigned" badge both update after each change
 - [ ] Confirm a seated guest is absent from every dropdown across all tables
 - [ ] Release a guest and confirm they reappear in the dropdowns
@@ -343,7 +353,7 @@ them without any capacity, occupancy or cross-event check
 - [ ] Seat a +1 guest independently of its host
 - [ ] Delete a seated guest and confirm the seat frees up
 - [ ] Set a seated guest to `declined` and confirm they stay seated
-- [ ] Inspect stored `seatNumber` values and confirm they are 1-based (contradicting the schema comment — DEF-12-01)
+- [ ] Inspect stored `seatNumber` values and confirm newly written ones are 0-based; legacy rows may still be 1-based (DEF-12-03)
 
 ## 13. Non-Functional
 
@@ -358,48 +368,21 @@ them without any capacity, occupancy or cross-event check
 
 ## 14. TODOs & Open Questions
 
-- **DEF-12-01** `[P0]` — Seat numbering is off by one: the last seat of every table is
-  unassignable, and stored seat numbers contradict the documented convention.
-  - **Evidence:**
-    - `src/components/tables/table-card.tsx:55` —
-      `const seats = Array.from({ length: table.seatsCount }, (_, i) => i + 1)` produces
-      `1..seatsCount`.
-    - `src/components/tables/table-card.tsx:187-192` passes that value to `SeatSelect` as
-      `seatNumber`.
-    - `src/components/tables/seat-select.tsx:22` — `onAssign(guestId, tableId, seatNumber)`
-      forwards it unchanged.
-    - `src/components/tables/table-grid.tsx:37-38` — `handleAssign` passes it straight into
-      `assignGuestToSeat({ guestId, tableId, seatNumber })`.
-    - `convex/tables.ts:173-175` — `if (args.seatNumber >= table.seatsCount) throw new
-ConvexError("Seat number exceeds table capacity")`, a 0-based bound.
-    - `convex/schema.ts:148` and the `guests.seatNumber` row in `AGENTS.md` both document the
-      field as "0-based internally, 1-based in UI".
-  - **Impact:**
-    - **A — the last seat can never be filled.** For a table of N seats the UI offers seats
-      `1..N` while the server accepts `0..N-1`; `seatNumber = N` is always rejected. A 10-seat
-      table has 9 usable seats. The user sees only the generic toast "Failed to assign guest
-      to seat" (`table-grid.tsx:19`), because `useToastMutation` swallows the `ConvexError`
-      message — so the failure looks like a transient bug, not a rule. The seat count the host
-      configured no longer matches the capacity the product delivers, and the fill indicator
-      can never read "N/N seats filled".
-    - **B — stored data contradicts the documented convention.** Seat index `0` is never
-      written, and every stored `seatNumber` is 1-based, while the schema comment and
-      `AGENTS.md` describe them as 0-based. Any future consumer (an export, a chart, a
-      capacity report) that trusts the documentation will be off by one.
-  - **Proposed fix:** **Change the client, not the server.** The server's 0-based bound is the
-    convention documented in the schema and is depended on by `updateTableSeats`, which
-    unassigns guests with `seatNumber >= seatsCount` (`convex/tables.ts:139-142`) — the same
-    0-based arithmetic. `TableCard` should generate `0..seatsCount - 1` and render
-    `seatNum + 1` as the visible label, keeping the UI 1-based and the storage 0-based.
-    Independently, the server should also reject `seatNumber < 0`, which it does not today.
-  - **Migration concern:** Existing events already hold **1-based** `seatNumber` values, so
-    fixing the client alone silently shifts every seated guest one seat: a guest stored at
-    `seatNumber: 1` would render in the seat labelled "2". A backfill is required —
-    decrement `seatNumber` by 1 for every guest row where it is defined — and it must run
-    exactly once. Note the interaction with `updateTableSeats`: under today's 1-based data the
-    shrink rule already evicts one guest too many (a guest in the seat labelled "5" of a table
-    shrunk to 5 seats is unassigned even though a 5th seat still exists), so the backfill also
-    corrects that behavior.
+- **DEF-12-03** `[P1]` — Legacy seat assignments display one position lower than they were
+  placed, because the DEF-12-01 fix shipped without a backfill.
+  - **Evidence:** `src/components/tables/table-card.tsx:70-72` now generates `0..seatsCount-1`
+    and labels `index + 1`; rows written by the pre-2.0.0 UI hold 1-based `seatNumber` values
+    (BR-12-F02-21). No migration exists anywhere in `convex/`.
+  - **Impact:** no data loss and no functional breakage — every seat is assignable and the
+    server bound is respected. But on any table seated before the fix, seat label "1" reads
+    empty and each seated guest appears one seat earlier than the host placed them. A host who
+    printed or photographed a seating chart before the fix will find it disagrees with the app.
+    `updateTableSeats` now evicts the correct number of guests rather than one too many, which
+    is a second, silent change in behavior on the same legacy data.
+  - **Proposed fix:** a one-off backfill that decrements `seatNumber` by 1 for every guest row
+    where it is defined and `>= 1`, run exactly once, guarded by a marker so it cannot be
+    re-applied. Alternatively — for a deployment with no production seating data — accept the
+    shift and record it here, which is the current state.
 - **DEF-12-02** `[P1]` — Guard asymmetry: a `viewer` can seat a guest but cannot unseat them.
   - **Evidence:** `convex/tables.ts:171` —
     `await requireEventAccess(ctx, guest.eventId, user._id)` in `assignGuestToSeat`;
@@ -489,36 +472,37 @@ ConvexError("Seat number exceeds table capacity")`, a 0-based bound.
 
 ## 15. Traceability
 
-| Concern                     | Source                                                         |
-| --------------------------- | -------------------------------------------------------------- |
-| Route                       | `src/app/(dashboard)/dashboard/[eventSlug]/tables/page.tsx:15` |
-| Unassigned badge            | `src/app/(dashboard)/dashboard/[eventSlug]/tables/page.tsx:28` |
-| Mutation wiring — assign    | `src/components/tables/table-grid.tsx:17`                      |
-| Mutation wiring — unassign  | `src/components/tables/table-grid.tsx:21`                      |
-| Assign handler              | `src/components/tables/table-grid.tsx:36`                      |
-| Seat generation (DEF-12-01) | `src/components/tables/table-card.tsx:55`                      |
-| Occupied seat row           | `src/components/tables/table-card.tsx:173`                     |
-| Release control             | `src/components/tables/table-card.tsx:178`                     |
-| Seat dropdown               | `src/components/tables/seat-select.tsx:19`                     |
-| Seat number forwarding      | `src/components/tables/seat-select.tsx:22`                     |
-| Backend — page data         | `convex/tables.ts:20`                                          |
-| Backend — unassigned pool   | `convex/tables.ts:41`                                          |
-| Backend — seat ordering     | `convex/tables.ts:49`                                          |
-| Backend — assign            | `convex/tables.ts:155`                                         |
-| Guard (DEF-12-02)           | `convex/tables.ts:171`                                         |
-| Capacity check (DEF-12-01)  | `convex/tables.ts:173`                                         |
-| Bump loop                   | `convex/tables.ts:178`                                         |
-| Backend — unassign          | `convex/tables.ts:201`                                         |
-| Guard — unassign            | `convex/tables.ts:206`                                         |
-| Schema — seat fields        | `convex/schema.ts:147`                                         |
-| Schema — seat index         | `convex/schema.ts:155`                                         |
-| Foreign write path          | `convex/guests.ts:208`                                         |
-| Decline cascade             | `convex/lib/guests.ts:51`                                      |
-| Guest deletion              | `convex/guests.ts:313`                                         |
-| Guards                      | `convex/lib/permissions.ts:16`, `convex/lib/permissions.ts:50` |
+| Concern                    | Source                                                         |
+| -------------------------- | -------------------------------------------------------------- |
+| Route                      | `src/app/(dashboard)/dashboard/[eventSlug]/tables/page.tsx:15` |
+| Unassigned badge           | `src/app/(dashboard)/dashboard/[eventSlug]/tables/page.tsx:28` |
+| Mutation wiring — assign   | `src/components/tables/table-grid.tsx:17`                      |
+| Mutation wiring — unassign | `src/components/tables/table-grid.tsx:21`                      |
+| Assign handler             | `src/components/tables/table-grid.tsx:36`                      |
+| Seat generation (0-based)  | `src/components/tables/table-card.tsx:72`                      |
+| Occupied seat row          | `src/components/tables/table-card.tsx:173`                     |
+| Release control            | `src/components/tables/table-card.tsx:178`                     |
+| Seat dropdown              | `src/components/tables/seat-select.tsx:19`                     |
+| Seat number forwarding     | `src/components/tables/seat-select.tsx:22`                     |
+| Backend — page data        | `convex/tables.ts:20`                                          |
+| Backend — unassigned pool  | `convex/tables.ts:41`                                          |
+| Backend — seat ordering    | `convex/tables.ts:49`                                          |
+| Backend — assign           | `convex/tables.ts:155`                                         |
+| Guard (DEF-12-02)          | `convex/tables.ts:171`                                         |
+| Capacity check (0-based)   | `convex/tables.ts:173`                                         |
+| Bump loop                  | `convex/tables.ts:178`                                         |
+| Backend — unassign         | `convex/tables.ts:201`                                         |
+| Guard — unassign           | `convex/tables.ts:206`                                         |
+| Schema — seat fields       | `convex/schema.ts:147`                                         |
+| Schema — seat index        | `convex/schema.ts:155`                                         |
+| Foreign write path         | `convex/guests.ts:208`                                         |
+| Decline cascade            | `convex/lib/guests.ts:51`                                      |
+| Guest deletion             | `convex/guests.ts:313`                                         |
+| Guards                     | `convex/lib/permissions.ts:16`, `convex/lib/permissions.ts:50` |
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                                                                                                    |
-| ------- | ---------- | ------------- | --------------------------------------------------------------------------------------------------------- |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification; records DEF-12-01 (P0 seat off-by-one) and DEF-12-02 (P1 guard asymmetry) |
+| Version | Date       | Author             | Change                                                                                                                                                                                                                                                                                                                      |
+| ------- | ---------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification; records DEF-12-01 (P0 seat off-by-one) and DEF-12-02 (P1 guard asymmetry)                                                                                                                                                                                                                   |
+| 2.0.0   | 2026-08-09 | Dashboard redesign | **DEF-12-01 fixed.** BR-12-F02-05 changed meaning: the client now generates and stores 0-based seat indices. Added BR-12-F02-20 (1-based display labels) and BR-12-F02-21 (no backfill of legacy data). Filed DEF-12-03 for the resulting display shift on pre-fix data. §7 disabled-state row and §11/§12 criteria updated |

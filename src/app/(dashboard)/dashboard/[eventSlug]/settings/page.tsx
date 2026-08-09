@@ -7,9 +7,11 @@ import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
 import { api } from "convex/_generated/api";
 import { toast } from "sonner";
+import { ArrowUpRight, TriangleAlert } from "lucide-react";
 import { useEvent } from "@/components/dashboard/event-provider";
 import { hasMinRole } from "@/lib/roles";
 import { CustomDomainSettings } from "@/components/dashboard/custom-domain-settings";
+import { AccessNotice, PageHeader, Panel } from "@/components/app";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,8 +34,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -157,18 +157,19 @@ export default function SettingsPage() {
     }
   }
 
-  const isLoading = event === undefined;
-
   // Editors (content-only) can't reach settings. The sidebar hides this route,
   // but guard direct navigation too.
   if (!canManage) {
     return (
-      <div className="p-6 max-w-2xl space-y-4">
-        <h1 className="text-2xl font-semibold text-zinc-900">Event Settings</h1>
-        <p className="text-sm text-zinc-500">
-          You don&apos;t have permission to manage this event&apos;s settings.
-          Ask an owner or co-owner for access.
-        </p>
+      <div className="space-y-6">
+        <PageHeader
+          title="Settings"
+          description="Event details, public address, and lifecycle."
+        />
+        <AccessNotice requiredRole="planner">
+          Event settings are available to owners and co-owners. Ask an event
+          owner if you need access.
+        </AccessNotice>
         <Button asChild variant="outline">
           <Link href={`/dashboard/${event.slug}`}>Back to overview</Link>
         </Button>
@@ -177,49 +178,53 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl space-y-8">
-      <h1 className="text-2xl font-semibold text-zinc-900">Event Settings</h1>
+    <div className="space-y-9">
+      <PageHeader
+        title="Settings"
+        description="The details behind every public invitation for this event — the couple, the date, the venue, and the address guests visit."
+      />
 
-      {isLoading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full rounded-md" />
-          ))}
-        </div>
-      ) : (
-        <>
-          <section className="space-y-4">
-            <h2 className="text-base font-medium text-zinc-900">General</h2>
+      <Panel
+        title="General"
+        description="Shown on the invitation hero, the countdown, and the location card."
+        actions={
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
+        }
+      >
+        <div className="space-y-6">
+          <div className="space-y-1.5">
+            <Label htmlFor="name">Event name</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="name">Event Name</Label>
+              <Label htmlFor="brideName">Bride&apos;s name</Label>
               <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                id="brideName"
+                value={brideName}
+                onChange={(e) => setBrideName(e.target.value)}
+                placeholder="Ava"
               />
             </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="brideName">Bride&apos;s Name</Label>
-                <Input
-                  id="brideName"
-                  value={brideName}
-                  onChange={(e) => setBrideName(e.target.value)}
-                  placeholder="Ava"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="groomName">Groom&apos;s Name</Label>
-                <Input
-                  id="groomName"
-                  value={groomName}
-                  onChange={(e) => setGroomName(e.target.value)}
-                  placeholder="Liam"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="groomName">Groom&apos;s name</Label>
+              <Input
+                id="groomName"
+                value={groomName}
+                onChange={(e) => setGroomName(e.target.value)}
+                placeholder="Liam"
+              />
             </div>
+          </div>
 
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="date">Date</Label>
               <Input
@@ -229,50 +234,15 @@ export default function SettingsPage() {
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
-
             <div className="space-y-1.5">
-              <Label htmlFor="venueName">Venue Name</Label>
-              <Input
-                id="venueName"
-                value={venueName}
-                onChange={(e) => setVenueName(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="venueAddress">Venue Address</Label>
-              <Input
-                id="venueAddress"
-                value={venueAddress}
-                onChange={(e) => setVenueAddress(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="venueMapUrl">Location Link (Google Maps)</Label>
-              <Input
-                id="venueMapUrl"
-                type="url"
-                inputMode="url"
-                value={venueMapUrl}
-                onChange={(e) => setVenueMapUrl(e.target.value)}
-                placeholder="https://maps.google.com/?q=..."
-              />
-              <p className="text-xs text-zinc-400">
-                Guests tap &ldquo;View map&rdquo; on the invitation to open this
-                link.
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Status</Label>
+              <Label htmlFor="status">Status</Label>
               <Select
                 value={status}
                 onValueChange={(v) =>
                   setStatus(v as "draft" | "active" | "archived")
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id="status" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -281,185 +251,229 @@ export default function SettingsPage() {
                   <SelectItem value="archived">Archived</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </section>
-
-          <Separator />
-
-          <section className="space-y-4">
-            <h2 className="text-base font-medium text-zinc-900">Event Key</h2>
-            <p className="text-sm text-zinc-500">
-              Your public invitation links use this key, like a handle. It must
-              be unique across all events.
-            </p>
-            <div className="space-y-1.5">
-              <Label htmlFor="slug">Key</Label>
-              <Input
-                id="slug"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                className="font-mono text-sm"
-                placeholder="smith-wedding"
-              />
-              <p className="text-xs text-zinc-400 font-mono">
-                /{slug || "your-event"}/invitations/...
+              <p className="text-caption text-muted-foreground">
+                Archived events stop serving their public invitations.
               </p>
             </div>
-            <Button
-              onClick={handleSaveSlug}
-              disabled={savingSlug}
-              variant="outline"
-            >
-              {savingSlug ? "Saving..." : "Save Key"}
-            </Button>
-          </section>
+          </div>
 
-          <Separator />
-
-          <section className="space-y-4 opacity-60 pointer-events-none select-none">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-medium text-zinc-900">Subdomain</h2>
-              <Badge variant="outline" className="text-xs">
-                Coming soon
-              </Badge>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="venueName">Venue name</Label>
+              <Input
+                id="venueName"
+                value={venueName}
+                onChange={(e) => setVenueName(e.target.value)}
+              />
             </div>
-            <Input disabled placeholder="your-event" />
-          </section>
+            <div className="space-y-1.5">
+              <Label htmlFor="venueAddress">Venue address</Label>
+              <Input
+                id="venueAddress"
+                value={venueAddress}
+                onChange={(e) => setVenueAddress(e.target.value)}
+              />
+            </div>
+          </div>
 
-          <Separator />
+          <div className="space-y-1.5">
+            <Label htmlFor="venueMapUrl">Location link (Google Maps)</Label>
+            <Input
+              id="venueMapUrl"
+              type="url"
+              inputMode="url"
+              value={venueMapUrl}
+              onChange={(e) => setVenueMapUrl(e.target.value)}
+              placeholder="https://maps.google.com/?q=..."
+            />
+            <p className="text-caption text-muted-foreground">
+              Guests tap &ldquo;View map&rdquo; on the invitation to open this
+              link.
+            </p>
+          </div>
+        </div>
+      </Panel>
 
-          <CustomDomainSettings
-            eventId={eventId}
-            customDomain={event.customDomain}
-            customDomainVerified={event.customDomainVerified}
+      <Panel
+        title="Event key"
+        description="Your public invitation links use this key, like a handle. It must be unique across all events."
+        actions={
+          <Button
+            onClick={handleSaveSlug}
+            disabled={savingSlug}
+            variant="outline"
+          >
+            {savingSlug ? "Saving…" : "Save key"}
+          </Button>
+        }
+      >
+        <div className="space-y-1.5">
+          <Label htmlFor="slug">Key</Label>
+          <Input
+            id="slug"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            className="font-mono"
+            placeholder="smith-wedding"
           />
+          <p className="text-caption font-mono text-muted-foreground">
+            /{slug || "your-event"}/invitations/…
+          </p>
+        </div>
+      </Panel>
 
-          <Separator />
+      <CustomDomainSettings
+        eventId={eventId}
+        customDomain={event.customDomain}
+        customDomainVerified={event.customDomainVerified}
+      />
 
-          <section className="space-y-4">
-            <h2 className="text-base font-medium text-zinc-900">
-              Invitation Template
-            </h2>
-            <p className="text-sm text-zinc-500">
-              Choose a design template and the sections shown on your public
-              invitation page.
-            </p>
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/${event.slug}/template`}>
-                Manage invitation template
-              </Link>
-            </Button>
-          </section>
+      <Panel
+        title={
+          <span className="flex items-center gap-2">
+            Subdomain
+            <Badge variant="outline" className="text-caption font-normal">
+              Coming soon
+            </Badge>
+          </span>
+        }
+        description="A wedboard.app address for this event, without buying a domain."
+        className="opacity-70"
+      >
+        <div className="pointer-events-none select-none">
+          <Input disabled placeholder="your-event" />
+        </div>
+      </Panel>
 
-          <Separator />
+      <div className="grid gap-7 sm:grid-cols-2">
+        <Panel
+          title="Invitation template"
+          description="Choose a design and build the sections shown on your public invitation page."
+        >
+          <Button asChild variant="outline">
+            <Link href={`/dashboard/${event.slug}/template`}>
+              Manage template
+              <ArrowUpRight className="ml-1 size-4" aria-hidden />
+            </Link>
+          </Button>
+        </Panel>
 
-          <section className="space-y-4">
-            <h2 className="text-base font-medium text-zinc-900">
-              Members &amp; Sharing
-            </h2>
-            <p className="text-sm text-zinc-500">
-              Invite co-owners and editors to collaborate on this event.
-            </p>
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/${event.slug}/members`}>
-                Manage members
-              </Link>
-            </Button>
-          </section>
+        <Panel
+          title="Members & sharing"
+          description="Invite co-owners and editors to collaborate on this event."
+        >
+          <Button asChild variant="outline">
+            <Link href={`/dashboard/${event.slug}/members`}>
+              Manage members
+              <ArrowUpRight className="ml-1 size-4" aria-hidden />
+            </Link>
+          </Button>
+        </Panel>
+      </div>
 
-          <Separator />
+      <Panel
+        title={
+          <span className="flex items-center gap-2 text-danger">
+            <TriangleAlert className="size-4 shrink-0" aria-hidden />
+            Danger zone
+          </span>
+        }
+        description="These actions change who can reach this event. Deleting is permanent."
+        className="border-danger/30"
+        padded={false}
+      >
+        <div className="divide-y divide-border border-t border-border">
+          <div className="flex flex-col gap-3 px-7 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-body font-medium text-foreground">
+                Archive this event
+              </p>
+              <p className="text-caption max-w-md text-muted-foreground">
+                Hides it from your active events and stops serving its public
+                invitations. Everything is preserved and you can unarchive it
+                from the status field above.
+              </p>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-danger/30 text-danger hover:bg-danger-soft hover:text-danger"
+                >
+                  Archive
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Archive event</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Archive &ldquo;{event.name}&rdquo;? The event and its data
+                    are preserved, but its public invitation links stop working
+                    until you make it active again.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleArchive}
+                    disabled={archiving}
+                    className="bg-danger text-danger-foreground hover:bg-danger/90"
+                  >
+                    {archiving ? "Archiving…" : "Archive event"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
 
-          <section className="space-y-4">
-            <h2 className="text-base font-medium text-rose-700">Danger Zone</h2>
-            <div className="rounded-md border border-rose-200 p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Archive this event</p>
-                <p className="text-sm text-zinc-500">
-                  The event will be marked as archived and hidden from active
-                  events.
+          {isOwner && (
+            <div className="flex flex-col gap-3 px-7 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 space-y-0.5">
+                <p className="text-body font-medium text-foreground">
+                  Delete this event
+                </p>
+                <p className="text-caption max-w-md text-muted-foreground">
+                  Permanently removes the event and everything in it —
+                  invitations, guests, special invitations, menus, tables,
+                  media, and messages. This cannot be undone.
                 </p>
               </div>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
-                    variant="outline"
                     size="sm"
-                    className="text-rose-600 border-rose-200 hover:bg-rose-50"
+                    className="shrink-0 bg-danger text-danger-foreground hover:bg-danger/90"
                   >
-                    Archive
+                    Delete
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Archive Event</AlertDialogTitle>
+                    <AlertDialogTitle>Delete event</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to archive &ldquo;{event?.name}
-                      &rdquo;? The event and its data will be preserved but it
-                      will be marked as archived.
+                      Permanently delete &ldquo;{event.name}&rdquo;? This
+                      removes the event and all related invitations, guests,
+                      special invitations, menus, drinks, tables, media, and
+                      messages. This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={handleArchive}
-                      disabled={archiving}
-                      className="bg-rose-600 hover:bg-rose-700"
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="bg-danger text-danger-foreground hover:bg-danger/90"
                     >
-                      {archiving ? "Archiving..." : "Archive Event"}
+                      {deleting ? "Deleting…" : "Delete event"}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
             </div>
-
-            {isOwner && (
-              <div className="rounded-md border border-rose-200 p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Delete this event</p>
-                  <p className="text-sm text-zinc-500">
-                    Permanently delete the event and all of its data —
-                    invitations, guests, special events, menus, tables, media,
-                    and messages. This cannot be undone.
-                  </p>
-                </div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button size="sm" className="bg-rose-600 hover:bg-rose-700">
-                      Delete
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Event</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to permanently delete &ldquo;
-                        {event?.name}&rdquo;? This will remove the event and all
-                        related invitations, guests, special events, menus,
-                        drinks, tables, media, and messages. This action cannot
-                        be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleDelete}
-                        disabled={deleting}
-                        className="bg-rose-600 hover:bg-rose-700"
-                      >
-                        {deleting ? "Deleting..." : "Delete Event"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            )}
-          </section>
-        </>
-      )}
+          )}
+        </div>
+      </Panel>
     </div>
   );
 }

@@ -2,9 +2,9 @@
 id: EP-09-F03
 title: Media Picker
 epic: EP-09 Media Library
-version: 1.0.0
+version: 1.1.0
 status: implemented
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-09-F01, EP-09-F02]
 ---
 
@@ -261,12 +261,6 @@ The picker introduces no function of its own.
   - **Proposed rule:** Accept an optional `accept: string[]` prop and hide or disable rows outside
     it, so the favicon could adopt the picker and the social image could exclude formats platforms
     ignore.
-- **TODO-09-10** `[P2]` `[CHANGE]` — The picker has no loading state.
-  - **Rationale:** While `items === undefined` the component takes the non-empty branch and maps
-    `items ?? []`, so the dialog body is momentarily blank rather than skeletal
-    (`src/components/media/media-picker-dialog.tsx:58`). The Media page, by contrast, renders eight
-    skeletons (`src/app/(dashboard)/dashboard/[eventSlug]/media/page.tsx:31`).
-  - **Proposed rule:** Render the same skeleton grid while the query is unresolved.
 
 ### Open questions
 
@@ -292,6 +286,7 @@ The picker introduces no function of its own.
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                            |
+| ------- | ---------- | ------------------ | --------------------------------------------------------------------------------- |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-09-10 closed.** The picker renders its own loading and empty `StateBlock`s |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                    |

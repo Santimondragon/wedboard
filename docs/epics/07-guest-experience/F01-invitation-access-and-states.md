@@ -2,9 +2,9 @@
 id: EP-07-F01
 title: Invitation Access & State Resolution
 epic: EP-07 Guest Experience
-version: 1.0.0
+version: 1.0.2
 status: implemented
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-02-F04, EP-02-F05, EP-02-F08, EP-05-F01, EP-08-F01]
 ---
 
@@ -264,6 +264,17 @@ Both queries delegate to the shared `buildPublicInvitationPayload`
 
 ## 14. TODOs & Open Questions
 
+- **TODO-07-31** `[P2]` `[CHANGE]` — The desktop gutter behind the invitation card tints
+  slightly differently since the dashboard redesign.
+  - **Rationale:** `ElegantFrame`'s translucent `bg-wedding-soft/40` backdrop composites against
+    `<body>`, which sits outside the `.invitation-theme` pinned scope, so it now blends against
+    the warm dashboard `--background` rather than the old neutral one. Measured shift is 2–6/255
+    per channel — sub-perceptual, and invisible at mobile widths where the card fills the
+    viewport. Accepted at the time as out of scope; recorded here so it is not rediscovered as
+    a mystery.
+  - **Proposed rule:** the public invitation route sets its own opaque page background rather
+    than inheriting `<body>`'s, so the guest page is fully independent of `:root`.
+
 - **TODO-07-13** `[P2]` `[ADD]` — The loading spinner has no accessible label.
   - **Rationale:** A screen-reader user gets silence while the invitation loads.
   - **Proposed rule:** The loading state exposes `role="status"` and a Spanish label.
@@ -304,6 +315,7 @@ Both queries delegate to the shared `buildPublicInvitationPayload`
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                                                                               |
+| ------- | ---------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.2   | 2026-08-09 | Dashboard redesign | Filed TODO-07-31 — the desktop gutter tint shifts 2–6/255 because `ElegantFrame`'s translucent backdrop composites against `<body>`, outside the `.invitation-theme` scope. Sub-perceptual; accepted |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                                                                                                                       |

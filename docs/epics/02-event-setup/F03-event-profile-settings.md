@@ -49,11 +49,11 @@ Server gate: `requireEventMember(ctx, args.eventId, user._id, "planner")`
 
 ## 4. Entry Points
 
-| Entry point                    | Route / control                         | Actor                                                           |
-| ------------------------------ | --------------------------------------- | --------------------------------------------------------------- |
-| Settings page                  | `/dashboard/[eventSlug]/settings`       | Co-owner+                                                       |
-| Sidebar "Settings" link        | `NAV_ITEMS` entry, `minRole: "planner"` | Co-owner+ (`src/components/dashboard/dashboard-sidebar.tsx:76`) |
-| Direct navigation by an editor | Same URL                                | Editor — renders the access notice                              |
+| Entry point                    | Route / control                          | Actor                                                           |
+| ------------------------------ | ---------------------------------------- | --------------------------------------------------------------- |
+| Settings page                  | `/dashboard/[eventSlug]/settings`        | Co-owner+                                                       |
+| Sidebar "Settings" link        | `NAV_GROUPS` entry, `minRole: "planner"` | Co-owner+ (`src/components/dashboard/dashboard-sidebar.tsx:76`) |
+| Direct navigation by an editor | Same URL                                 | Editor — renders the access notice                              |
 
 ## 5. UX Flow
 

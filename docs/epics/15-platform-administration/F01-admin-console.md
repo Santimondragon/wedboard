@@ -2,9 +2,9 @@
 id: EP-15-F01
 title: Admin Console
 epic: EP-15 Platform Administration
-version: 1.0.0
+version: 1.1.0
 status: partial
-last_updated: 2026-07-27
+last_updated: 2026-08-09
 depends_on: [EP-15-F02]
 ---
 
@@ -128,7 +128,7 @@ draws its own minimal header (logo + `Admin` badge + `UserButton`); it does not 
 | Error             | None handled. A thrown `Unauthorized` from either query is not caught by the page; the page relies on the `"skip"` argument so the query is never issued for a non-superadmin                                                                                                                                                         |
 | Success           | Two bordered tables, each preceded by a heading and a pluralized count line                                                                                                                                                                                                                                                           |
 | Disabled / locked | The users table's Role column is a read-only badge — there is no control to change a role                                                                                                                                                                                                                                             |
-| Mobile            | The page is a `max-w-6xl` centered column. The two tables are wide (8 and 4 columns) and are not given a horizontal scroll container; the console is a desktop surface in practice. See `TODO-15-06`                                                                                                                                  |
+| Mobile            | Both tables render inside `DataTableShell`, which owns `overflow-x-auto` and a sticky header, so the wide column sets scroll rather than overflow the page. `/admin` uses deliberately denser operator chrome (compact rows) so it never reads as a planner board                                                                     |
 
 ## 7. UI Specification
 
@@ -263,6 +263,12 @@ rather than its true count. See `TODO-15-02` and `TODO-15-03`.
   unauthenticated request is redirected to `/` by middleware before the page renders.
 - **BR-15-F01-15** `[AS-BUILT]` — The console performs no mutation: it exposes no control that
   writes to any table.
+- **BR-15-F01-17** `[AS-BUILT]` — Each table renders a footer stating how many rows it holds
+  and, once the row count reaches the query's scan cap (200 events / 500 users), that the list
+  is capped and more may exist. The caps themselves are unchanged. _(Added in 1.1.0 —
+  TODO-15-01.)_
+- **BR-15-F01-18** `[AS-BUILT]` — Both tables render inside `DataTableShell`, which owns the
+  horizontal scroll container and the sticky header. _(Added in 1.1.0 — TODO-15-06.)_
 - **BR-15-F01-16** `[AS-BUILT]` — The users table renders `users.role` verbatim as a badge,
   amber for `"superadmin"` and grey for any other value, with no control to change it.
 
@@ -338,7 +344,8 @@ rather than its true count. See `TODO-15-02` and `TODO-15-03`.
 - [ ] Confirm the superadmin's own account shows an amber `superadmin` role badge
 - [ ] Sign in as an Editor, navigate to `/admin`, and confirm no admin data flashes before the
       redirect
-- [ ] Confirm the console renders acceptably at 1280px and note the overflow behavior below it
+- [ ] Confirm the console renders acceptably at 1280px and that both tables scroll horizontally below it
+- [ ] With fewer than 200 events, confirm the footer states the count without a cap warning
 
 ## 13. Non-Functional
 
@@ -353,14 +360,6 @@ rather than its true count. See `TODO-15-02` and `TODO-15-03`.
 
 ## 14. TODOs & Open Questions
 
-- **TODO-15-01** `[P1]` `[ADD]` — The events and users tables truncate silently at 200 and 500
-  rows.
-  - **Rationale:** the count line above each table reports the truncated length as though it
-    were the platform total, so an operator reading `200 events in the system` at 250 events is
-    actively misinformed, and events past the cap are invisible with no way to reach them.
-  - **Evidence:** `convex/admin.ts:17`, `convex/admin.ts:60`, `src/app/(dashboard)/admin/page.tsx:74`
-  - **Proposed rule:** the console paginates (cursor-based) and displays a true total, or at
-    minimum renders an explicit "showing the first 200 of N" notice when the cap is hit.
 - **TODO-15-02** `[P1]` `[CHANGE]` — Per-event counts are computed by materializing rows.
   - **Rationale:** `by_eventId.take(1000).length` runs twice per event on every page load and
     on every reactive re-run, so console cost grows with total platform data rather than with
@@ -392,11 +391,6 @@ rather than its true count. See `TODO-15-02` and `TODO-15-03`.
     `src/app/(dashboard)/admin/page.tsx` renders no form or button that writes
   - **Proposed rule:** decide the minimum operator action set (suspend a user, archive an
     event, grant/revoke superadmin) and expose each as an explicitly audited mutation.
-- **TODO-15-06** `[P2]` `[CHANGE]` — Neither table has a horizontal scroll container.
-  - **Rationale:** the events table has eight columns inside a `max-w-6xl` page; on a narrow
-    viewport the page itself scrolls horizontally.
-  - **Evidence:** `src/app/(dashboard)/admin/page.tsx:86`
-  - **Proposed rule:** wide admin tables scroll within their own `overflow-x-auto` container.
 - **TODO-15-07** `[P2]` `[ADD]` — The console cannot be reached from anywhere other than the
   logo or a typed URL while a Superadmin is inside an event.
   - **Rationale:** the sidebar has no `/admin` entry, so the way back to the platform view is
@@ -443,6 +437,7 @@ rather than its true count. See `TODO-15-02` and `TODO-15-03`.
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-27 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                                                                     |
+| ------- | ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-15-01 and TODO-15-06 closed.** Both tables render inside `DataTableShell` (horizontal scroll + sticky header) and each carries a footer disclosing the scan cap. Added BR-15-F01-14 |
+| 1.0.0   | 2026-07-27 | Spec suite v1      | Initial as-built specification                                                                                                                                                             |

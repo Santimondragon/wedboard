@@ -5,7 +5,7 @@ import { Id } from "convex/_generated/dataModel";
 import { Trash2 } from "lucide-react";
 import { useToastMutation } from "@/hooks/use-toast-mutation";
 import { ROLE_LABELS, type EventRole, type AssignableRole } from "@/lib/roles";
-import { Badge } from "@/components/ui/badge";
+import { ListRow, ListRows, StatusPill } from "@/components/app";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -25,6 +25,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export interface MemberItem {
   _id: Id<"eventMembers">;
@@ -34,6 +39,13 @@ export interface MemberItem {
   lastName?: string;
   email: string;
   isSelf: boolean;
+}
+
+/** Two-letter monogram for the row's leading medallion. */
+function initials(name: string, email: string) {
+  const source = name || email;
+  const parts = source.split(/[\s@.]+/).filter(Boolean);
+  return (parts[0]?.[0] ?? "?").concat(parts[1]?.[0] ?? "").toUpperCase();
 }
 
 export function MemberList({
@@ -53,7 +65,7 @@ export function MemberList({
   });
 
   return (
-    <ul className="space-y-2">
+    <ListRows>
       {members.map((m) => {
         const name = [m.firstName, m.lastName].filter(Boolean).join(" ").trim();
         const isOwnerRow = m.role === "owner";
@@ -67,86 +79,102 @@ export function MemberList({
           : ["editor"];
 
         return (
-          <li
+          <ListRow
             key={m._id}
-            className="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 p-3"
-          >
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-zinc-900">
-                {name || m.email}
+            leading={
+              <span
+                aria-hidden
+                className="text-caption flex size-9 items-center justify-center rounded-full bg-accent-soft font-medium text-accent-soft-foreground"
+              >
+                {initials(name, m.email)}
+              </span>
+            }
+            title={
+              <span className="flex items-center gap-2">
+                <span className="truncate">{name || m.email}</span>
                 {m.isSelf && (
-                  <span className="ml-2 text-xs font-normal text-zinc-400">
+                  <span className="text-caption font-normal text-muted-foreground">
                     (you)
                   </span>
                 )}
-              </p>
-              {name && (
-                <p className="truncate text-xs text-zinc-500">{m.email}</p>
-              )}
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              {canEdit ? (
-                <Select
-                  value={m.role}
-                  onValueChange={(v) =>
-                    updateRole.run({
-                      memberId: m._id,
-                      role: v as AssignableRole,
-                    })
-                  }
-                  disabled={updateRole.pending}
-                >
-                  <SelectTrigger className="h-8 w-32 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {roleOptions.map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {ROLE_LABELS[r]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Badge variant="outline">{ROLE_LABELS[m.role]}</Badge>
-              )}
-
-              {canEdit && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-zinc-400 hover:text-rose-600"
+              </span>
+            }
+            subtitle={name ? m.email : undefined}
+            actions={
+              <>
+                {canEdit ? (
+                  <Select
+                    value={m.role}
+                    onValueChange={(v) =>
+                      updateRole.run({
+                        memberId: m._id,
+                        role: v as AssignableRole,
+                      })
+                    }
+                    disabled={updateRole.pending}
+                  >
+                    <SelectTrigger
+                      className="h-9 w-36"
+                      aria-label={`Role for ${name || m.email}`}
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Remove member</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Remove {name || m.email} from this event? They will lose
-                        access immediately.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => removeMember.run({ memberId: m._id })}
-                        className="bg-rose-600 hover:bg-rose-700"
-                      >
-                        Remove
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-            </div>
-          </li>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roleOptions.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {ROLE_LABELS[r]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <StatusPill tone={isOwnerRow ? "accent" : "neutral"}>
+                    {ROLE_LABELS[m.role]}
+                  </StatusPill>
+                )}
+
+                {canEdit && (
+                  <AlertDialog>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-9 text-muted-foreground hover:text-danger"
+                            aria-label={`Remove ${name || m.email}`}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>Remove member</TooltipContent>
+                    </Tooltip>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove member</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Remove {name || m.email} from this event? They will
+                          lose access immediately.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => removeMember.run({ memberId: m._id })}
+                          className="bg-danger text-danger-foreground hover:bg-danger/90"
+                        >
+                          Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </>
+            }
+          />
         );
       })}
-    </ul>
+    </ListRows>
   );
 }

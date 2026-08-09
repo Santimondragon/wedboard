@@ -1,19 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 import { UserButton } from "@clerk/nextjs";
-import { PlusCircle, Calendar, MapPin, ArrowRight } from "lucide-react";
+import { ArrowRight, Calendar, MapPin, PlusCircle } from "lucide-react";
 import { format } from "date-fns";
-import { LoadingState } from "@/components/app/loading-state";
-import { EmptyState } from "@/components/app/empty-state";
+import { Logo, StateBlock, StatusBadge } from "@/components/app";
 import { CreateEventDialog } from "@/components/dashboard/create-event-dialog";
-import { Logo } from "@/components/app/logo";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import { StatusBadge } from "@/components/app/status-badge";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -33,88 +30,105 @@ export default function DashboardPage() {
   if (currentUser === undefined || isSuperadmin) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <LoadingState message="Loading…" />
+        <StateBlock kind="loading" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Minimal top bar — no event menu on the dashboard */}
-      <header className="border-b bg-white px-6 py-4 flex items-center justify-between">
+    <div className="flex min-h-screen flex-col bg-background">
+      {/* Minimal top bar — no event menu on the events list. */}
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-5 md:px-10">
         <Logo />
         <UserButton />
       </header>
 
-      <main className="flex-1 p-6">
-        {events === undefined ? (
-          <LoadingState message="Loading your events…" />
-        ) : events.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center min-h-[60vh]">
-            <EmptyState
-              title="Welcome to Wedboard"
-              description="Create your first event to start managing invitations, RSVPs, menus, and seating."
-              icon={PlusCircle}
-              action={{
-                label: "Create Event",
-                onClick: () => setCreateOpen(true),
-              }}
-            />
-          </div>
-        ) : (
-          <div className="max-w-3xl mx-auto space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-semibold text-zinc-900">
-                  Your Events
-                </h1>
-                <p className="text-sm text-zinc-500 mt-1">
-                  {events.length} {events.length === 1 ? "event" : "events"}
-                </p>
-              </div>
-              <Button onClick={() => setCreateOpen(true)}>
-                <PlusCircle className="h-4 w-4 mr-2" />
-                New Event
+      <main className="flex-1 px-5 py-10 md:px-10 md:py-14">
+        <div className="mx-auto max-w-[1180px]">
+          {events === undefined ? (
+            <StateBlock kind="loading" title="Loading your events…" />
+          ) : events.length === 0 ? (
+            <div className="flex min-h-[55vh] flex-col items-center justify-center gap-4 text-center">
+              <h1 className="text-display text-foreground">
+                Welcome to Wedboard
+              </h1>
+              <p className="text-body max-w-md text-muted-foreground">
+                Create your first event to start managing invitations, RSVPs,
+                menus and seating.
+              </p>
+              <Button size="lg" onClick={() => setCreateOpen(true)}>
+                <PlusCircle className="size-4" aria-hidden />
+                Create event
               </Button>
             </div>
+          ) : (
+            <div className="space-y-9">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div className="space-y-2">
+                  <h1 className="text-display text-foreground">Your events</h1>
+                  <p className="text-body text-muted-foreground">
+                    {events.length} {events.length === 1 ? "event" : "events"}{" "}
+                    you own or help plan.
+                  </p>
+                </div>
+                <Button onClick={() => setCreateOpen(true)}>
+                  <PlusCircle className="size-4" aria-hidden />
+                  New event
+                </Button>
+              </div>
 
-            <div className="grid gap-3">
-              {events.map((event) => (
-                <Card
-                  key={event._id}
-                  className="cursor-pointer hover:border-zinc-400 transition-colors group"
-                  onClick={() => router.push(`/dashboard/${event.slug}`)}
-                >
-                  <CardContent className="flex items-center gap-4 p-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <CardTitle className="text-base truncate">
-                          {event.name}
-                        </CardTitle>
-                        <StatusBadge status={event.status} />
+              {/* Real links: keyboard-activatable and middle-clickable. */}
+              <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {events.map((event) => (
+                  <li key={event._id}>
+                    <Link
+                      href={`/dashboard/${event.slug}`}
+                      className="group flex h-full flex-col justify-between gap-6 rounded-xl border border-border bg-card p-6 shadow-soft-xs transition-all hover:border-accent/40 hover:shadow-soft-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                      <div className="min-w-0 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <h2 className="text-section min-w-0 truncate text-foreground">
+                            {event.name}
+                          </h2>
+                          <StatusBadge status={event.status} />
+                        </div>
+                        <div className="text-caption flex flex-col gap-1.5 text-muted-foreground">
+                          {event.date && (
+                            <span className="flex items-center gap-1.5">
+                              <Calendar
+                                className="size-3.5 shrink-0"
+                                aria-hidden
+                              />
+                              {format(new Date(event.date), "MMMM d, yyyy")}
+                            </span>
+                          )}
+                          {event.venueName && (
+                            <span className="flex items-center gap-1.5">
+                              <MapPin
+                                className="size-3.5 shrink-0"
+                                aria-hidden
+                              />
+                              <span className="truncate">
+                                {event.venueName}
+                              </span>
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-zinc-500">
-                        {event.date && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {format(new Date(event.date), "MMM d, yyyy")}
-                          </span>
-                        )}
-                        {event.venueName && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {event.venueName}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-zinc-400 shrink-0 group-hover:text-zinc-700 transition-colors" />
-                  </CardContent>
-                </Card>
-              ))}
+                      <span className="text-caption flex items-center gap-1.5 font-medium text-muted-foreground transition-colors group-hover:text-accent">
+                        Open board
+                        <ArrowRight
+                          className="size-4 transition-transform group-hover:translate-x-0.5"
+                          aria-hidden
+                        />
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
 
       <CreateEventDialog open={createOpen} onOpenChange={setCreateOpen} />

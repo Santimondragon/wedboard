@@ -2,9 +2,9 @@
 id: EP-08-F03
 title: Block Composition
 epic: EP-08 Invitation Design Studio
-version: 1.0.0
+version: 1.1.0
 status: defective
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-08-F01, EP-08-F02]
 ---
 
@@ -414,12 +414,6 @@ whole layout is written.
     recovery is to abandon the whole editing session unsaved.
   - **Proposed rule:** Confirm removal of a block whose config differs from its template defaults,
     or offer an undo affordance after removal.
-- **TODO-08-18** `[P2]` `[ADD]` — The block list has no empty state.
-  - **Evidence:** `src/components/template-selection/template-settings.tsx:283`
-  - **Rationale:** A host who removes everything sees a blank column with no explanation that the
-    variant will silently revert to the default layout on save (EP-08-F02, BR-08-F02-07).
-  - **Proposed rule:** Show an empty state stating that an empty variant falls back to the
-    template default.
 - **TODO-08-19** `[P2]` `[ADD]` — `BLOCK_DEFS[type].description` is authored but never shown.
   - **Evidence:** `src/components/public-invitation/blocks.ts:92` etc. (a `description` on every
     block def) versus `src/components/template-selection/template-settings.tsx:305` (only `label`
@@ -476,6 +470,7 @@ whole layout is written.
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                 |
+| ------- | ---------- | ------------------ | ------------------------------------------------------------------------------------------------------ |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-08-18 closed.** The block list renders a `StateBlock kind="empty"` when a variant has no blocks |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                         |

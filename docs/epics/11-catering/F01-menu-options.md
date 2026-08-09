@@ -2,9 +2,9 @@
 id: EP-11-F01
 title: Menu (Food) Options
 epic: EP-11 Catering
-version: 1.0.0
+version: 1.1.0
 status: defective
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-02-F01, EP-03-F01]
 ---
 
@@ -400,10 +400,6 @@ Shared implementations: `listPublicOptions` (`convex/lib/options.ts:24`), `listA
   - **Proposed rule:** Trim both fields and reject `name` longer than 100 characters or
     `description` longer than 500, mirroring the bounds `submitPublicRsvp` applies to free text
     (`convex/guests.ts:551-556`).
-- **TODO-11-09** `[P2]` `[ADD]` — The row edit and delete buttons have no accessible name.
-  - **Rationale:** Both render a bare lucide icon inside a `Button` with no text child and no
-    `aria-label` (`menu-option-list.tsx:71-83`), so a screen reader announces only "button".
-  - **Proposed rule:** Give each an `aria-label` naming the action and the option.
 
 ### Open questions
 
@@ -436,6 +432,7 @@ Shared implementations: `listPublicOptions` (`convex/lib/options.ts:24`), `listA
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                     |
+| ------- | ---------- | ------------------ | ------------------------------------------------------------------------------------------ |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-11-09 closed.** Row edit/delete/toggle controls carry accessible names and tooltips |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                             |

@@ -143,7 +143,10 @@ export function SpecialInvitationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto bg-white sm:max-w-sm">
+      {/* `invitation-theme` re-pins the design tokens on the content element
+          itself — custom properties inherit from the element, so the scope
+          survives Radix portalling this outside the invitation's DOM subtree. */}
+      <DialogContent className="invitation-theme max-h-[90vh] overflow-y-auto bg-white sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="text-center font-script text-5xl font-normal text-wedding-gold">
             {specialEvent.name}

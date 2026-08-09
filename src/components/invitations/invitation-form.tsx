@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
@@ -9,10 +9,11 @@ import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 import { type Id } from "convex/_generated/dataModel";
 import { useToastMutation } from "@/hooks/use-toast-mutation";
-import { RefreshCw, UserPlus, Lock } from "lucide-react";
+import { RefreshCw, UserPlus, Lock, Sparkles, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -23,6 +24,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { StateBlock } from "@/components/app";
+import { cn } from "@/lib/utils";
 import {
   invitationSchema,
   type InvitationFormData,
@@ -61,6 +69,67 @@ interface InvitationFormProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/** One titled block of the dialog. Gives the long form real structure. */
+function FormSection({
+  title,
+  description,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  description?: string;
+  icon?: typeof Users;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="space-y-1">
+        <h3 className="text-section flex items-center gap-2 text-foreground">
+          {Icon && (
+            <Icon className="size-4 text-muted-foreground" aria-hidden />
+          )}
+          {title}
+        </h3>
+        {description && (
+          <p className="text-caption text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** A checkbox row inside one of the two selection lists. */
+function CheckRow({
+  checked,
+  disabled,
+  onToggle,
+  children,
+}: {
+  checked: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex items-center gap-2.5 rounded-md px-2.5 py-2 transition-colors",
+        disabled
+          ? "cursor-not-allowed opacity-60"
+          : "cursor-pointer hover:bg-secondary",
+      )}
+    >
+      <Checkbox
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onToggle}
+      />
+      <span className="text-body text-foreground">{children}</span>
+    </label>
+  );
+}
+
 export function InvitationForm({
   mode,
   invitation,
@@ -83,7 +152,9 @@ export function InvitationForm({
   });
   const setInvitationSent = useToastMutation(
     api.invitations.setInvitationSent,
-    { error: "Failed to update sent status" },
+    {
+      error: "Failed to update sent status",
+    },
   );
 
   // Both modes need the un-invited pool (to add) and the event's special
@@ -123,6 +194,7 @@ export function InvitationForm({
       lastName: g.lastName,
     })),
   ];
+  const guestsLoading = unassignedGuests === undefined;
 
   // Initialize the selection sets from the invitation each time the dialog
   // opens (or the source invitation changes while open). Done during render via
@@ -244,217 +316,254 @@ export function InvitationForm({
     if (result?.ok) onOpenChange(false);
   }
 
+  const noGuestsToInvite =
+    mode === "create" &&
+    unassignedGuests !== undefined &&
+    unassignedGuests.length === 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {mode === "create" ? "New Invitation" : "Edit Invitation"}
-          </DialogTitle>
-        </DialogHeader>
-        {mode === "create" &&
-        unassignedGuests !== undefined &&
-        unassignedGuests.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <div className="rounded-full bg-zinc-100 p-3">
-              <UserPlus className="h-6 w-6 text-zinc-500" />
+      <DialogContent className="max-h-[88vh] gap-0 overflow-hidden p-0 sm:max-w-xl">
+        {noGuestsToInvite ? (
+          <div className="flex max-h-[88vh] flex-col">
+            <DialogHeader className="border-b border-border px-8 pt-8 pb-5 text-left">
+              <DialogTitle>New invitation</DialogTitle>
+              <DialogDescription>
+                Group guests into one shareable link.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="px-8">
+              <StateBlock
+                kind="empty"
+                icon={UserPlus}
+                title="No guests to invite yet"
+                description="Add guests to this event first, then group them into an invitation."
+                compact
+              />
             </div>
-            <div className="space-y-1">
-              <p className="font-medium text-zinc-900">
-                No guests to invite yet
-              </p>
-              <p className="text-sm text-zinc-500">
-                Add guests to this event first, then group them into an
-                invitation.
-              </p>
-            </div>
-            <Button asChild>
-              <Link
-                href={`/dashboard/${eventSlug}/guests`}
+            <DialogFooter className="border-t border-border px-8 py-5">
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Add Guest
-              </Link>
-            </Button>
+                Cancel
+              </Button>
+              <Button asChild>
+                <Link
+                  href={`/dashboard/${eventSlug}/guests`}
+                  onClick={() => onOpenChange(false)}
+                >
+                  Add guest
+                </Link>
+              </Button>
+            </DialogFooter>
           </div>
         ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {mode === "edit" && invitation && (
-              <div
-                className={
-                  "flex items-center justify-between rounded-lg border p-3 " +
-                  (invitation.isSent
-                    ? "border-green-200 bg-green-50"
-                    : "border-zinc-200 bg-zinc-50")
-                }
-              >
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium text-zinc-900">
-                    {invitation.isSent ? "Invitation sent" : "Not sent yet"}
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    Mark this once you have shared the link with the guests.
-                  </p>
-                </div>
-                <Switch
-                  checked={invitation.isSent ?? false}
-                  onCheckedChange={(checked) =>
-                    setInvitationSent.run({
-                      id: invitation._id,
-                      isSent: checked,
-                    })
-                  }
-                  aria-label="Mark invitation as sent"
-                />
-              </div>
-            )}
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="flex max-h-[88vh] flex-col"
+          >
+            <DialogHeader className="border-b border-border px-8 pt-8 pb-5 text-left">
+              <DialogTitle>
+                {mode === "create" ? "New invitation" : "Edit invitation"}
+              </DialogTitle>
+              <DialogDescription>
+                {mode === "create"
+                  ? "One link for a person, couple, family, or group."
+                  : "Update this invitation's details, guests, and special invitations."}
+              </DialogDescription>
+            </DialogHeader>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="title">Title *</Label>
-              <Input
-                id="title"
-                {...register("title")}
-                placeholder="Smith Family"
-              />
-              {errors.title && (
-                <p className="text-xs text-red-500">{errors.title.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="slug">Slug *</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="slug"
-                  {...register("slug")}
-                  placeholder="smith-family"
-                  className="font-mono text-sm"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={handleRegenerateSlug}
-                  title="Regenerate slug"
+            <div className="flex-1 space-y-8 overflow-y-auto px-8 py-7">
+              {mode === "edit" && invitation && (
+                <div
+                  className={cn(
+                    "flex items-center justify-between gap-4 rounded-lg border p-4",
+                    invitation.isSent
+                      ? "border-success/25 bg-success-soft"
+                      : "border-border bg-secondary",
+                  )}
                 >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              </div>
-              {errors.slug && (
-                <p className="text-xs text-red-500">{errors.slug.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                {...register("notes")}
-                placeholder="Optional notes about this invitation..."
-                rows={3}
-              />
-            </div>
-
-            {composeLocked && (
-              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-                <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>
-                  Guests and special invitations are locked because a guest has
-                  already responded.
-                </span>
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label>Special invitations</Label>
-              {specialEvents === undefined ? (
-                <p className="text-xs text-zinc-500">Loading…</p>
-              ) : specialEvents.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-3 text-center">
-                  <p className="text-sm text-zinc-500">
-                    No special invitations yet (optional).
-                  </p>
-                  <Button
-                    asChild
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0"
-                  >
-                    <Link
-                      href={`/dashboard/${eventSlug}/special-events`}
-                      onClick={() => onOpenChange(false)}
-                    >
-                      Create a special invitation
-                    </Link>
-                  </Button>
+                  <div className="space-y-0.5">
+                    <p className="text-body font-medium text-foreground">
+                      {invitation.isSent ? "Invitation sent" : "Not sent yet"}
+                    </p>
+                    <p className="text-caption text-muted-foreground">
+                      Mark this once you have shared the link with the guests.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={invitation.isSent ?? false}
+                    onCheckedChange={(checked) =>
+                      setInvitationSent.run({
+                        id: invitation._id,
+                        isSent: checked,
+                      })
+                    }
+                    aria-label="Mark invitation as sent"
+                  />
                 </div>
-              ) : (
-                <>
-                  <p className="text-xs text-zinc-500">
-                    Choose which special invitations this group can see.
-                  </p>
-                  <div className="space-y-1 rounded-lg border p-2">
+              )}
+
+              <FormSection
+                title="Details"
+                description="The name guests see and the link they open."
+              >
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="title">Title *</Label>
+                    <Input
+                      id="title"
+                      {...register("title")}
+                      placeholder="Smith Family"
+                    />
+                    {errors.title && (
+                      <p className="text-caption text-danger">
+                        {errors.title.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="slug">Link slug *</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="slug"
+                        {...register("slug")}
+                        placeholder="smith-family"
+                        className="font-mono text-sm"
+                      />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={handleRegenerateSlug}
+                          >
+                            <RefreshCw className="size-4" aria-hidden />
+                            <span className="sr-only">Regenerate slug</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Regenerate slug</TooltipContent>
+                      </Tooltip>
+                    </div>
+                    {errors.slug && (
+                      <p className="text-caption text-danger">
+                        {errors.slug.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="notes">Notes</Label>
+                    <Textarea
+                      id="notes"
+                      {...register("notes")}
+                      placeholder="Private notes about this invitation — guests never see these."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              </FormSection>
+
+              {composeLocked && (
+                <div className="text-caption flex items-start gap-2.5 rounded-lg border border-warning/25 bg-warning-soft p-4 text-warning-foreground">
+                  <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span>
+                    Guests and special invitations are locked because a guest
+                    has already responded.
+                  </span>
+                </div>
+              )}
+
+              <FormSection
+                title="Special invitations"
+                icon={Sparkles}
+                description="Choose which special invitations this group can see."
+              >
+                {specialEvents === undefined ? (
+                  <StateBlock kind="loading" title="Loading…" compact />
+                ) : specialEvents.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-5 text-center">
+                    <p className="text-caption text-muted-foreground">
+                      No special invitations yet — this is optional.
+                    </p>
+                    <Button
+                      asChild
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0"
+                    >
+                      <Link
+                        href={`/dashboard/${eventSlug}/special-events`}
+                        onClick={() => onOpenChange(false)}
+                      >
+                        Create a special invitation
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-border bg-card p-1.5">
                     {specialEvents.map((se) => (
-                      <label
+                      <CheckRow
                         key={se._id}
-                        className={
-                          "flex items-center gap-2 rounded-md px-2 py-1.5 " +
-                          (composeLocked
-                            ? "cursor-not-allowed opacity-60"
-                            : "cursor-pointer hover:bg-zinc-50")
-                        }
+                        checked={selectedSpecialIds.includes(se._id)}
+                        disabled={composeLocked}
+                        onToggle={() => toggleSpecial(se._id)}
                       >
-                        <Checkbox
-                          checked={selectedSpecialIds.includes(se._id)}
-                          disabled={composeLocked}
-                          onCheckedChange={() => toggleSpecial(se._id)}
-                        />
-                        <span className="text-sm text-zinc-800">{se.name}</span>
-                      </label>
+                        {se.name}
+                      </CheckRow>
                     ))}
                   </div>
-                </>
-              )}
-            </div>
+                )}
+              </FormSection>
 
-            <div className="space-y-1.5">
-              <Label>Guests</Label>
-              {candidateGuests.length === 0 ? (
-                <p className="text-xs text-zinc-500">
-                  No guests available. Add guests to this event first.
-                </p>
-              ) : (
-                <>
-                  <p className="text-xs text-zinc-500">
-                    Select the guests included in this invitation.
-                  </p>
-                  <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border p-2">
+              <FormSection
+                title="Guests"
+                icon={Users}
+                description="Select the guests included in this invitation."
+              >
+                {guestsLoading ? (
+                  <StateBlock kind="loading" title="Loading…" compact />
+                ) : candidateGuests.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-5 text-center">
+                    <p className="text-caption text-muted-foreground">
+                      No guests available. Add guests to this event first.
+                    </p>
+                    <Button
+                      asChild
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0"
+                    >
+                      <Link
+                        href={`/dashboard/${eventSlug}/guests`}
+                        onClick={() => onOpenChange(false)}
+                      >
+                        Add a guest
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="max-h-56 overflow-y-auto rounded-lg border border-border bg-card p-1.5">
                     {candidateGuests.map((guest) => (
-                      <label
+                      <CheckRow
                         key={guest._id}
-                        className={
-                          "flex items-center gap-2 rounded-md px-2 py-1.5 " +
-                          (composeLocked
-                            ? "cursor-not-allowed opacity-60"
-                            : "cursor-pointer hover:bg-zinc-50")
-                        }
+                        checked={selectedGuestIds.includes(guest._id)}
+                        disabled={composeLocked}
+                        onToggle={() => toggleGuest(guest._id)}
                       >
-                        <Checkbox
-                          checked={selectedGuestIds.includes(guest._id)}
-                          disabled={composeLocked}
-                          onCheckedChange={() => toggleGuest(guest._id)}
-                        />
-                        <span className="text-sm text-zinc-800">
-                          {guest.firstName} {guest.lastName}
-                        </span>
-                      </label>
+                        {guest.firstName} {guest.lastName}
+                      </CheckRow>
                     ))}
                   </div>
-                </>
-              )}
+                )}
+              </FormSection>
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="border-t border-border px-8 py-5">
               <Button
                 type="button"
                 variant="outline"
@@ -465,11 +574,11 @@ export function InvitationForm({
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting
                   ? mode === "create"
-                    ? "Creating..."
-                    : "Saving..."
+                    ? "Creating…"
+                    : "Saving…"
                   : mode === "create"
-                    ? "Create Invitation"
-                    : "Save Changes"}
+                    ? "Create invitation"
+                    : "Save changes"}
               </Button>
             </DialogFooter>
           </form>

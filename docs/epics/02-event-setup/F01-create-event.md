@@ -2,9 +2,9 @@
 id: EP-02-F01
 title: Create Event
 epic: EP-02 Event Setup
-version: 1.0.0
+version: 1.1.0
 status: implemented
-last_updated: 2026-07-27
+last_updated: 2026-08-09
 depends_on: []
 ---
 
@@ -244,15 +244,6 @@ once per attempt.
     assuming it matches their event name will share a dead link.
   - **Proposed rule:** `createEvent` rejects an empty derived slug and a reserved key, and the
     dialog previews the resulting key before submit.
-- **TODO-02-03** `[P2]` `[CHANGE]` — `useToastMutation` reports a fixed "Failed to create
-  event" string, discarding the `ConvexError` message the server returned
-  (`src/components/dashboard/create-event-dialog.tsx:27`).
-  - **Rationale:** The same hook is used across the app, so any future server-side rejection
-    in `createEvent` (reserved key, per-user cap) will be invisible to the user. The Settings
-    page already demonstrates the alternative by unwrapping `err.data`
-    (`src/app/(dashboard)/dashboard/[eventSlug]/settings/page.tsx:99`).
-  - **Proposed rule:** `useToastMutation` surfaces `ConvexError.data` when present and falls
-    back to the configured error string otherwise.
 
 ### Open questions
 
@@ -277,6 +268,7 @@ once per attempt.
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-27 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                         |
+| ------- | ---------- | ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **TODO-02-03 closed.** The create dialog surfaces the server's `ConvexError` message instead of a fixed string |
+| 1.0.0   | 2026-07-27 | Spec suite v1      | Initial as-built specification                                                                                 |

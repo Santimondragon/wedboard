@@ -2,9 +2,9 @@
 id: EP-03-F01
 title: Per-event role model
 epic: EP-03 Collaboration & Permissions
-version: 1.0.0
+version: 1.0.1
 status: implemented
-last_updated: 2026-07-27
+last_updated: 2026-08-09
 depends_on: [EP-01, EP-02, EP-15]
 ---
 
@@ -73,7 +73,7 @@ collaborator can see and do.
    returning it as `myRole` (`convex/events.ts:57`–`:61`).
 3. `EventProvider` publishes the event through `useEvent()` and the role through
    `useEventRole()` (`src/components/dashboard/event-provider.tsx:60`, `:69`).
-4. `DashboardSidebar` filters `NAV_ITEMS` with `hasMinRole(role, item.minRole)`, so an Editor
+4. `DashboardSidebar` filters `NAV_GROUPS` with `hasMinRole(role, item.minRole)`, so an Editor
    never sees the Members or Settings links (`src/components/dashboard/dashboard-sidebar.tsx:116`).
 5. The user acts on a page → the mutation re-checks the same hierarchy server-side via
    `requireEventEditor`, which is what actually authorizes the write.
@@ -117,7 +117,7 @@ collaborator can see and do.
 | Element                   | Component                                   | Path                                             |
 | ------------------------- | ------------------------------------------- | ------------------------------------------------ |
 | Role resolution + context | `EventProvider`, `useEvent`, `useEventRole` | `src/components/dashboard/event-provider.tsx`    |
-| Role-filtered navigation  | `DashboardSidebar` (`NAV_ITEMS`)            | `src/components/dashboard/dashboard-sidebar.tsx` |
+| Role-filtered navigation  | `DashboardSidebar` (`NAV_GROUPS`)           | `src/components/dashboard/dashboard-sidebar.tsx` |
 | Client rank helper        | `hasMinRole`, `ROLE_RANK`                   | `src/lib/roles.ts`                               |
 | Role display labels       | `ROLE_LABELS`                               | `src/lib/roles.ts:23`                            |
 
@@ -271,7 +271,7 @@ behavior is defined by the guards.
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Limits & caps    | `listMyEvents` reads at most 100 memberships (`convex/events.ts:30`). No cap on roles per user.                                                                                                                                         |
 | Performance      | Each guard costs one `events` get, one `users` get and at most one indexed `eventMembers` lookup via `by_eventId_and_userId`. `getEventBySlug` runs the membership lookup twice (once in `requireEventAccess`, once in `getEventRole`). |
-| Security & authz | Server guards are the sole enforcement point. Client gating in `hasMinRole`/`NAV_ITEMS` hides controls only and must never be treated as a control.                                                                                     |
+| Security & authz | Server guards are the sole enforcement point. Client gating in `hasMinRole`/`NAV_GROUPS` hides controls only and must never be treated as a control.                                                                                    |
 | Accessibility    | Nav filtering removes links entirely, so screen readers never announce unavailable destinations.                                                                                                                                        |
 | i18n             | All role-model copy is English; roles are not guest-facing.                                                                                                                                                                             |
 | Analytics        | None. Role grants and changes are not tracked (see TODO-03-02).                                                                                                                                                                         |
@@ -327,11 +327,12 @@ behavior is defined by the guards.
 | Client rank mirror                       | `src/lib/roles.ts:6`, `:14`                                            |
 | Role labels                              | `src/lib/roles.ts:23`                                                  |
 | Role context                             | `src/components/dashboard/event-provider.tsx:27`, `:60`, `:69`         |
-| Sidebar `NAV_ITEMS` + filter             | `src/components/dashboard/dashboard-sidebar.tsx:29`, `:116`            |
+| Sidebar `NAV_GROUPS` + filter            | `src/components/dashboard/dashboard-sidebar.tsx:29`, `:116`            |
 | Members page role gate                   | `src/app/(dashboard)/dashboard/[eventSlug]/members/page.tsx:18`, `:26` |
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-27 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                         |
+| ------- | ---------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.1   | 2026-08-09 | Dashboard redesign | `NAV_ITEMS` renamed to the grouped `NAV_GROUPS`; a group whose items are all gated out renders nothing. Per-item `minRole` gating is unchanged |
+| 1.0.0   | 2026-07-27 | Spec suite v1      | Initial as-built specification                                                                                                                 |

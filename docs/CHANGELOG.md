@@ -8,6 +8,57 @@ one rule was clarified.
 
 ---
 
+## 1.1.0 — 2026-08-09
+
+Dashboard redesign. The logged-in planner surface, `/admin` and the marketing pages were
+rebuilt on a warm semantic token system with shared primitives. The public guest invitation
+is unchanged — verified twice by computed-style fingerprint diff.
+
+### Changed
+
+- **EP-12-F02 Seat Assignment → 2.0.0.** `DEF-12-01` (P0, seat off-by-one) **fixed**:
+  BR-12-F02-05 changed meaning — the UI now generates and stores 0-based seat indices and
+  labels them 1-based, so every seat of every table is fillable. Added BR-12-F02-20 (display
+  labels) and BR-12-F02-21 (no backfill was run).
+- **EP-14-F01 Overview Dashboard → 2.0.0.** BR-14-F01-15 and -19 changed meaning: the
+  skeleton count matches the card count, and every metric card is a link. `MetricCard` was
+  deleted in favour of the shared `StatCard`.
+- **EP-04-F02, EP-13-F01, EP-15-F01, EP-03-F05** and eight other specs → `1.1.0`, recording
+  the shared-primitive adoption (`DataTableShell`, `ListRow`, `StateBlock`, `Panel`,
+  `PageHeader`) and the cap-disclosure footers.
+- **EP-04-F06 and EP-05-F02** moved from `defective` to `partial` — their only `DEF-` closed.
+
+### Fixed (24 backlog entries closed)
+
+`DEF-12-01`, `DEF-04-01`, `DEF-05-02`, `TODO-12-01`, `TODO-14-01`, `TODO-14-02`,
+`TODO-14-04`, `TODO-14-09`, `TODO-14-10`, `TODO-04-11`, `TODO-04-15`, `TODO-02-03`,
+`TODO-02-06`, `TODO-03-01`, `TODO-03-13`, `TODO-08-18`, `TODO-09-10`, `TODO-11-09`,
+`TODO-11-11`, `TODO-13-06`, `TODO-13-07`, `TODO-13-12`, `TODO-15-01`, `TODO-15-06`.
+
+The **swallowed error messages** cross-cutting theme is resolved at the root:
+`useToastMutation` now unwraps `ConvexError` payloads across ~35 call sites.
+
+### Added (4 new backlog entries)
+
+- `DEF-12-03` (P1) — legacy 1-based seat rows display one position lower; no backfill was run.
+- `DEF-04-04` (P2) — the guest directory's Seat column reads one lower than the Tables page.
+- `TODO-07-31` (P2) — the invitation's desktop gutter tint shifts 2–6/255 because the
+  translucent backdrop composites against `<body>`, outside the `.invitation-theme` scope.
+- `TODO-08-33` (P2) — nothing enforces the `.invitation-theme` contract on a new template.
+
+### Narrowed, not closed
+
+`TODO-01-11` (styled error panel now exists; routing-layer authz and the soft disclosure do
+not), `TODO-03-05` (cap disclosed; no pagination or retention), `TODO-07-15` (messages reach
+the guest; still English on a Spanish page), `TODO-03-07` (Members is the one capped list
+with no disclosure footer), `TODO-13-05` (footer added; truncate-before-sort unchanged).
+
+### Totals
+
+298 → **278** findings (36 defects, 242 gaps); P0 4 → **3**, P1 79 → **73**, P2 215 → **202**.
+
+---
+
 ## 1.0.0 — 2026-07-28
 
 Initial as-built specification of Wedboard.

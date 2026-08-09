@@ -1,63 +1,98 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useQuery } from "convex/react"
-import { api } from "convex/_generated/api"
-import { useEvent } from "@/components/dashboard/event-provider"
-import { TableGrid } from "@/components/tables/table-grid"
-import { AddTableDialog } from "@/components/tables/add-table-dialog"
-import { EmptyState } from "@/components/app/empty-state"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { TableIcon, Plus } from "lucide-react"
+import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "convex/_generated/api";
+import { Plus, Table as TableIcon } from "lucide-react";
+import { useEvent } from "@/components/dashboard/event-provider";
+import { TableGrid } from "@/components/tables/table-grid";
+import { AddTableDialog } from "@/components/tables/add-table-dialog";
+import { PageHeader, Panel, StateBlock, StatusPill } from "@/components/app";
+import { QueryErrorBoundary } from "@/components/app/query-error-boundary";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default function TablesPage() {
-  const eventId = useEvent()._id
+function SeatingBoard({ onAdd }: { onAdd: () => void }) {
+  const eventId = useEvent()._id;
+  const data = useQuery(api.tables.getTablesAndGuests, { eventId });
 
-  const data = useQuery(api.tables.getTablesAndGuests, { eventId })
-  const [addDialogOpen, setAddDialogOpen] = useState(false)
-
-  const isLoading = data === undefined
-
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-zinc-900">Tables</h1>
-          {data && data.unassignedGuests.length > 0 && (
-            <Badge variant="outline" className="text-amber-600 border-amber-300">
-              {data.unassignedGuests.length} unassigned
-            </Badge>
-          )}
-        </div>
-        <Button size="sm" onClick={() => setAddDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add Table
-        </Button>
+  if (data === undefined) {
+    return (
+      <div
+        aria-busy
+        className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-72 w-full rounded-lg" />
+        ))}
       </div>
+    );
+  }
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-64 w-full rounded-lg" />
-          ))}
-        </div>
-      ) : data?.tables.length === 0 ? (
-        <EmptyState
+  if (data.tables.length === 0) {
+    return (
+      <Panel>
+        <StateBlock
+          kind="empty"
           icon={TableIcon}
           title="No tables yet"
-          description="Create tables to start assigning guests to seats"
-          action={{ label: "Add Table", onClick: () => setAddDialogOpen(true) }}
+          description="Add a table, set how many seats it has, and start placing guests. Seating is manual — pick a guest for each seat."
+          action={{ label: "Add table", onClick: onAdd }}
         />
-      ) : (
-        <TableGrid
-          tables={data?.tables ?? []}
-          guestsByTable={data?.guestsByTable ?? {}}
-          unassignedGuests={data?.unassignedGuests ?? []}
-          eventId={eventId}
-        />
-      )}
+      </Panel>
+    );
+  }
+
+  const unseated = data.unassignedGuests.length;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-3">
+        {unseated > 0 && (
+          <StatusPill tone="warning" dot>
+            {unseated} unseated
+          </StatusPill>
+        )}
+        <p className="text-caption text-muted-foreground">
+          {unseated === 0
+            ? "Every guest has a seat."
+            : "Pick them from any empty seat below."}
+        </p>
+      </div>
+
+      <TableGrid
+        tables={data.tables}
+        guestsByTable={data.guestsByTable}
+        unassignedGuests={data.unassignedGuests}
+        eventId={eventId}
+      />
+    </div>
+  );
+}
+
+export default function TablesPage() {
+  const eventId = useEvent()._id;
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+
+  return (
+    <div className="space-y-9">
+      <PageHeader
+        title="Tables"
+        description="Your seating plan. Each table lists its seats in order — assign a guest to a seat, or free one up again."
+        actions={
+          <Button size="sm" onClick={() => setAddDialogOpen(true)}>
+            <Plus className="size-4" aria-hidden />
+            Add table
+          </Button>
+        }
+      />
+
+      <QueryErrorBoundary
+        title="Couldn't load the seating plan"
+        description="The tables failed to load. Check your connection and try again."
+      >
+        <SeatingBoard onAdd={() => setAddDialogOpen(true)} />
+      </QueryErrorBoundary>
 
       <AddTableDialog
         eventId={eventId}
@@ -65,5 +100,5 @@ export default function TablesPage() {
         onOpenChange={setAddDialogOpen}
       />
     </div>
-  )
+  );
 }

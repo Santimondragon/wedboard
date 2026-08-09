@@ -2,9 +2,9 @@
 id: EP-01-F04
 title: Route Protection
 epic: EP-01 Account & Access
-version: 1.0.0
+version: 1.0.2
 status: implemented
-last_updated: 2026-07-27
+last_updated: 2026-08-09
 depends_on: [EP-01-F03]
 ---
 
@@ -407,8 +407,13 @@ Supporting helpers (not Convex functions):
   - **Proposed fix:** add `/admin` handling in middleware (or a server component that reads
     the session claim) so a non-superadmin receives a redirect before any admin markup is
     served.
-- **TODO-01-11** `[P1]` `[CHANGE]` — There is no per-event authorization at the routing layer,
-  and the resulting failure is unstyled. A signed-in non-member who opens
+- **TODO-01-11** `[P1]` `[CHANGE]` — There is no per-event authorization at the routing layer.
+  _(Partially addressed: since the dashboard redesign, `src/app/(dashboard)/error.tsx` catches
+  the throw and renders a styled `StateBlock kind="error"` with a retry inside the shell, so
+  the failure is no longer the framework's raw error screen. What remains open is the absence
+  of a routing-layer check and the soft disclosure below — an error rather than a not-found
+  still distinguishes "this slug exists but is not yours" from "no such slug".)_ A signed-in
+  non-member who opens
   `/dashboard/{someone-elses-slug}` passes the middleware and the layout; `EventProvider`
   issues `getEventBySlug`, which finds the event and then throws `ConvexError("Unauthorized")`
   from `requireEventAccess`.
@@ -473,6 +478,7 @@ ConvexError("Unauthorized")`), and no `error.tsx` exists anywhere under `src/app
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                         |
-| ------- | ---------- | ------------- | ------------------------------ |
-| 1.0.0   | 2026-07-27 | Spec suite v1 | Initial as-built specification |
+| Version | Date       | Author             | Change                                                                                                                                                                                    |
+| ------- | ---------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.2   | 2026-08-09 | Dashboard redesign | TODO-01-11 narrowed: the `(dashboard)` and root `error.tsx` boundaries now render a styled error panel for the throw; the missing routing-layer check and the soft disclosure remain open |
+| 1.0.0   | 2026-07-27 | Spec suite v1      | Initial as-built specification                                                                                                                                                            |

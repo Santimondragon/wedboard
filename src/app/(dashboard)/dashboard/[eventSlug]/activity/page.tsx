@@ -5,41 +5,72 @@ import { api } from "convex/_generated/api";
 import { History } from "lucide-react";
 import { useEvent } from "@/components/dashboard/event-provider";
 import { ActivityList } from "@/components/activity/activity-list";
-import { EmptyState } from "@/components/app/empty-state";
-import { LoadingState } from "@/components/app/loading-state";
+import { PageHeader, Panel, StateBlock } from "@/components/app";
+import { QueryErrorBoundary } from "@/components/app/query-error-boundary";
 
-export default function ActivityPage() {
+/** Mirrors the `.take()` cap in `activity.listByEvent`. */
+const ACTIVITY_CAP = 200;
+
+function ActivityPanel() {
   const eventId = useEvent()._id;
   const items = useQuery(api.activity.listByEvent, { eventId });
 
-  return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">
-          Activity
-          {items !== undefined && (
-            <span className="ml-2 text-base font-normal text-zinc-500">
-              ({items.length})
-            </span>
-          )}
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          A log of changes made to guests, invitations, special events, the
-          template, and meta by you and your collaborators.
-        </p>
-      </div>
+  if (items === undefined) {
+    return (
+      <Panel>
+        <StateBlock kind="loading" title="Loading activity…" />
+      </Panel>
+    );
+  }
 
-      {items === undefined ? (
-        <LoadingState message="Loading activity…" />
-      ) : items.length === 0 ? (
-        <EmptyState
+  if (items.length === 0) {
+    return (
+      <Panel>
+        <StateBlock
+          kind="empty"
           icon={History}
           title="No activity yet"
           description="Changes to your event will show up here as they happen."
         />
-      ) : (
-        <ActivityList items={items} />
-      )}
+      </Panel>
+    );
+  }
+
+  const capped = items.length >= ACTIVITY_CAP;
+
+  return (
+    <Panel
+      title="Recent changes"
+      description={`${items.length} ${items.length === 1 ? "entry" : "entries"}, newest first`}
+      padded={false}
+      footer={
+        capped ? (
+          <p className="text-caption text-muted-foreground">
+            Showing the {ACTIVITY_CAP} most recent entries. Earlier history is
+            retained but not listed here.
+          </p>
+        ) : undefined
+      }
+    >
+      <ActivityList items={items} />
+    </Panel>
+  );
+}
+
+export default function ActivityPage() {
+  return (
+    <div className="space-y-9">
+      <PageHeader
+        title="Activity"
+        description="A log of changes made to guests, invitations, special invitations, the template, and meta by you and your collaborators."
+      />
+
+      <QueryErrorBoundary
+        title="Couldn't load activity"
+        description="The activity log failed to load. Check your connection and try again."
+      >
+        <ActivityPanel />
+      </QueryErrorBoundary>
     </div>
   );
 }

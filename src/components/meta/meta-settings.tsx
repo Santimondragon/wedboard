@@ -4,17 +4,22 @@ import { useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 import { Id } from "convex/_generated/dataModel";
-import { Image as ImageIcon } from "lucide-react";
+import { Image as ImageIcon, Globe } from "lucide-react";
 import { useEvent } from "@/components/dashboard/event-provider";
 import { useToastMutation } from "@/hooks/use-toast-mutation";
 import { MediaPickerDialog } from "@/components/media/media-picker-dialog";
 import { FaviconUploadButton } from "@/components/meta/favicon-upload-button";
+import { PageHeader, Panel } from "@/components/app";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import {
   META_VARIABLES,
   META_TITLE_MAX,
@@ -80,6 +85,7 @@ export function MetaSettings() {
   );
   const primaryDomain =
     process.env.NEXT_PUBLIC_PRIMARY_DOMAIN ?? "wedboard.app";
+  const previewHost = event.customDomain ?? primaryDomain;
   const previewUrl = `${event.customDomain ?? `${primaryDomain}/${event.slug}`}/invitations/${sampleInvitation?.slug ?? "the-smith-family"}`;
 
   function insertVariable(token: string) {
@@ -105,206 +111,257 @@ export function MetaSettings() {
   }
 
   return (
-    <div className="p-6 max-w-5xl grid grid-cols-1 gap-8 lg:grid-cols-2">
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">
-            Meta &amp; Sharing
-          </h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            Controls how your public invitation links look when shared on
-            WhatsApp, iMessage, and social networks, plus the browser-tab icon.
-            Leave a field empty to use the default built from your event data.
-          </p>
+    <div className="space-y-9">
+      <PageHeader
+        title="Meta &amp; Sharing"
+        description="Controls how your public invitation links look when shared on WhatsApp, iMessage, and social networks, plus the browser-tab icon. Leave a field empty to use the default built from your event data."
+        actions={
+          <Button onClick={handleSave} disabled={saveMeta.pending}>
+            {saveMeta.pending ? "Saving…" : "Save changes"}
+          </Button>
+        }
+      />
+
+      <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="space-y-7">
+          <Panel
+            title="Link text"
+            description="The headline and blurb that appear under a shared link."
+          >
+            <div className="space-y-6">
+              <div className="space-y-1.5">
+                <Label htmlFor="metaTitle">Title</Label>
+                <Input
+                  id="metaTitle"
+                  ref={titleRef}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={META_TITLE_MAX}
+                  placeholder={DEFAULT_META_TITLE}
+                />
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-caption text-muted-foreground">
+                    Click a variable to insert it
+                  </p>
+                  <CharCount value={title.length} max={META_TITLE_MAX} />
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {META_VARIABLES.map((variable) => (
+                    <Tooltip key={variable.token}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => insertVariable(variable.token)}
+                          className="text-caption cursor-pointer rounded-md border border-border bg-secondary px-2 py-0.5 font-mono text-muted-foreground transition-colors hover:border-accent/40 hover:bg-accent-soft hover:text-accent-soft-foreground"
+                        >
+                          {"{" + variable.token + "}"}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{variable.description}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="metaDescription">Description</Label>
+                <Textarea
+                  id="metaDescription"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  maxLength={META_DESCRIPTION_MAX}
+                  rows={3}
+                  placeholder={DEFAULT_META_DESCRIPTION}
+                />
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-caption text-muted-foreground">
+                    The same variables work here.
+                  </p>
+                  <CharCount
+                    value={description.length}
+                    max={META_DESCRIPTION_MAX}
+                  />
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel
+            title="Social image"
+            description="Shown as the large preview image when the link is shared. Recommended 1200×630."
+          >
+            <div className="flex flex-wrap items-center gap-5">
+              <div className="flex h-20 w-36 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-secondary">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt="Social preview"
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <ImageIcon
+                    className="size-6 text-muted-foreground"
+                    aria-hidden
+                  />
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setImagePickerOpen(true)}
+                >
+                  {imageId ? "Change image" : "Choose image"}
+                </Button>
+                {imageId && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setImageId(undefined)}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+            <MediaPickerDialog
+              eventId={eventId}
+              open={imagePickerOpen}
+              onOpenChange={setImagePickerOpen}
+              value={imageId}
+              onSelect={(id) => setImageId(id as Id<"media"> | undefined)}
+            />
+          </Panel>
+
+          <Panel
+            title="Favicon"
+            description="The browser-tab icon on your public invitation pages. Accepts .ico, .svg, or .png files."
+          >
+            <div className="flex flex-wrap items-center gap-5">
+              <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-secondary">
+                {favicon?.url ? (
+                  <img
+                    src={favicon.url}
+                    alt="Favicon"
+                    className="size-6 object-contain"
+                  />
+                ) : (
+                  <Globe className="size-5 text-muted-foreground" aria-hidden />
+                )}
+              </div>
+              <div className="flex gap-2">
+                <FaviconUploadButton
+                  eventId={eventId}
+                  onUploaded={(id) => setFaviconId(id)}
+                />
+                {faviconId && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFaviconId(undefined)}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Panel>
         </div>
 
-        <section className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="metaTitle">Title</Label>
-            <Input
-              id="metaTitle"
-              ref={titleRef}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              maxLength={META_TITLE_MAX}
-              placeholder={DEFAULT_META_TITLE}
-            />
-            <p className="text-xs text-zinc-400">
-              {title.length}/{META_TITLE_MAX} · Click a variable to insert it:
+        {/* The unfurl preview is the point of this page — keep it in view. */}
+        <aside className="lg:sticky lg:top-6 lg:self-start">
+          <div className="space-y-3">
+            <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">
+              Live preview
             </p>
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {META_VARIABLES.map((variable) => (
-                <button
-                  key={variable.token}
-                  type="button"
-                  title={variable.description}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => insertVariable(variable.token)}
-                >
-                  <Badge
-                    variant="outline"
-                    className="font-mono text-xs cursor-pointer hover:bg-zinc-100"
-                  >
-                    {"{" + variable.token + "}"}
-                  </Badge>
-                </button>
-              ))}
+
+            {/* Browser tab — shows the favicon in the place it actually lands. */}
+            <div className="flex items-center gap-2 rounded-t-lg border border-border bg-secondary px-3 py-2">
+              <span className="flex size-4 shrink-0 items-center justify-center overflow-hidden rounded-sm">
+                {favicon?.url ? (
+                  <img
+                    src={favicon.url}
+                    alt=""
+                    className="size-full object-contain"
+                  />
+                ) : (
+                  <Globe
+                    className="size-3.5 text-muted-foreground"
+                    aria-hidden
+                  />
+                )}
+              </span>
+              <span className="text-caption truncate text-muted-foreground">
+                {previewTitle}
+              </span>
             </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="metaDescription">Description</Label>
-            <Textarea
-              id="metaDescription"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              maxLength={META_DESCRIPTION_MAX}
-              rows={3}
-              placeholder={DEFAULT_META_DESCRIPTION}
-            />
-            <p className="text-xs text-zinc-400">
-              {description.length}/{META_DESCRIPTION_MAX} · The same variables
-              work here.
-            </p>
-          </div>
-        </section>
-
-        <Separator />
-
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-base font-medium text-zinc-900">
-              Social Image
-            </h2>
-            <p className="text-sm text-zinc-500">
-              Shown as the large preview image when the link is shared.
-              Recommended 1200×630.
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="h-20 w-36 shrink-0 overflow-hidden rounded-md border border-zinc-200 bg-zinc-50 flex items-center justify-center">
-              {imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt="Social preview"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <ImageIcon className="h-6 w-6 text-zinc-300" />
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setImagePickerOpen(true)}
-              >
-                {imageId ? "Change image" : "Choose image"}
-              </Button>
-              {imageId && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setImageId(undefined)}
-                >
-                  Remove
-                </Button>
-              )}
-            </div>
-          </div>
-          <MediaPickerDialog
-            eventId={eventId}
-            open={imagePickerOpen}
-            onOpenChange={setImagePickerOpen}
-            value={imageId}
-            onSelect={(id) => setImageId(id as Id<"media"> | undefined)}
-          />
-        </section>
-
-        <Separator />
-
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-base font-medium text-zinc-900">Favicon</h2>
-            <p className="text-sm text-zinc-500">
-              The browser-tab icon on your public invitation pages. Accepts
-              .ico, .svg, or .png files.
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-zinc-200 bg-zinc-50 flex items-center justify-center">
-              {favicon?.url ? (
-                <img
-                  src={favicon.url}
-                  alt="Favicon"
-                  className="h-6 w-6 object-contain"
-                />
-              ) : (
-                <ImageIcon className="h-4 w-4 text-zinc-300" />
-              )}
-            </div>
-            <div className="flex gap-2">
-              <FaviconUploadButton
-                eventId={eventId}
-                onUploaded={(id) => setFaviconId(id)}
-              />
-              {faviconId && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setFaviconId(undefined)}
-                >
-                  Remove
-                </Button>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <Button onClick={handleSave} disabled={saveMeta.pending}>
-          {saveMeta.pending ? "Saving…" : "Save Changes"}
-        </Button>
-      </div>
-
-      <div className="space-y-2 lg:pt-16">
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-400 text-center">
-          Social card preview
-        </p>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-          <div className="aspect-[1200/630] bg-zinc-100 flex items-center justify-center">
-            {imageUrl ? (
-              <img
-                src={imageUrl}
-                alt="Social card"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="text-center">
-                <p className="text-sm text-zinc-400">No image selected</p>
-                <p className="text-xs text-zinc-300">
-                  Platforms may pick a random image from the page
+            {/* Social card */}
+            <div className="-mt-3 overflow-hidden rounded-b-lg border border-t-0 border-border bg-card shadow-soft-md">
+              <div className="flex aspect-[1200/630] items-center justify-center bg-secondary">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt="Social card"
+                    className="size-full object-cover"
+                  />
+                ) : (
+                  <div className="space-y-1 px-6 text-center">
+                    <ImageIcon
+                      className="mx-auto size-6 text-muted-foreground"
+                      aria-hidden
+                    />
+                    <p className="text-caption text-muted-foreground">
+                      No image selected
+                    </p>
+                    <p className="text-caption text-muted-foreground/70">
+                      Platforms may pick a random image from the page
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1 px-5 py-4">
+                <p className="text-caption truncate text-muted-foreground uppercase">
+                  {previewHost}
+                </p>
+                <p className="text-body leading-snug font-semibold text-foreground">
+                  {previewTitle}
+                </p>
+                <p className="text-caption line-clamp-2 text-muted-foreground">
+                  {previewDescription}
                 </p>
               </div>
-            )}
-          </div>
-          <div className="p-4 space-y-1">
-            <p className="font-semibold text-zinc-900 leading-snug">
-              {previewTitle}
+            </div>
+
+            <p className="text-caption text-muted-foreground">
+              <span className="font-mono break-all">{previewUrl}</span>
             </p>
-            <p className="text-sm text-zinc-600 line-clamp-2">
-              {previewDescription}
+            <p className="text-caption text-muted-foreground">
+              Preview uses{" "}
+              {sampleInvitation
+                ? `your invitation “${sampleInvitation.title}”`
+                : "a sample invitation"}
+              . Guest-name variables resolve per invitation on the real page.
             </p>
-            <p className="text-xs text-zinc-400 truncate">{previewUrl}</p>
           </div>
-        </div>
-        <p className="text-xs text-zinc-400 text-center">
-          Preview uses{" "}
-          {sampleInvitation
-            ? `your invitation "${sampleInvitation.title}"`
-            : "a sample invitation"}
-          . Guest-name variables resolve per invitation on the real page.
-        </p>
+        </aside>
       </div>
     </div>
+  );
+}
+
+/** Char counter that warns as the field approaches its cap. */
+function CharCount({ value, max }: { value: number; max: number }) {
+  const near = value >= max * 0.9;
+  return (
+    <span
+      className={cn(
+        "text-caption tabular-figures shrink-0",
+        near ? "text-warning-foreground" : "text-muted-foreground",
+      )}
+    >
+      {value}/{max}
+    </span>
   );
 }

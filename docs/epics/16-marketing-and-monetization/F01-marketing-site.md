@@ -2,9 +2,9 @@
 id: EP-16-F01
 title: Marketing Site
 epic: EP-16 Marketing & Monetization
-version: 1.0.1
+version: 1.0.2
 status: defective
-last_updated: 2026-07-28
+last_updated: 2026-08-09
 depends_on: [EP-01-F01]
 ---
 
@@ -383,7 +383,8 @@ Clerk's hosted `/sign-in` and `/sign-up` components (EP-01); this page only link
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                                                                                               |
-| ------- | ---------- | ------------- | ---------------------------------------------------------------------------------------------------- |
-| 1.0.1   | 2026-07-28 | Spec suite v1 | Status corrected to `defective` per authoring-guide §3 (spec carries a behaviour-breaking P1 defect) |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification                                                                       |
+| Version | Date       | Author             | Change                                                                                                                                                                                        |
+| ------- | ---------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0.2   | 2026-08-09 | Dashboard redesign | Landing page and `/pricing` restyled onto the new design system (warm semantic tokens, Bricolage/Inter type scale, shared `(auth)` chrome). No business rule changed; no backlog entry closed |
+| 1.0.1   | 2026-07-28 | Spec suite v1      | Status corrected to `defective` per authoring-guide §3 (spec carries a behaviour-breaking P1 defect)                                                                                          |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                                                                                                                |

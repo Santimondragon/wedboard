@@ -8,8 +8,7 @@ import { Users2, Plus } from "lucide-react";
 import { useEvent } from "@/components/dashboard/event-provider";
 import { hasMinRole } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { EmptyState } from "@/components/app/empty-state";
+import { AccessNotice, PageHeader, Panel, StateBlock } from "@/components/app";
 import { MemberList } from "@/components/members/member-list";
 import { AddMemberDialog } from "@/components/members/add-member-dialog";
 
@@ -25,12 +24,15 @@ export default function MembersPage() {
 
   if (!canManage) {
     return (
-      <div className="p-6 max-w-2xl space-y-4">
-        <h1 className="text-2xl font-semibold text-zinc-900">Members</h1>
-        <p className="text-sm text-zinc-500">
-          You don&apos;t have permission to manage this event&apos;s members.
-          Ask an owner or co-owner for access.
-        </p>
+      <div className="max-w-2xl space-y-6">
+        <PageHeader
+          title="Members"
+          description="Share this event with co-owners and editors."
+        />
+        <AccessNotice requiredRole="planner">
+          Managing members is available to owners and co-owners. Ask an event
+          owner if you need access.
+        </AccessNotice>
         <Button asChild variant="outline">
           <Link href={`/dashboard/${event.slug}`}>Back to overview</Link>
         </Button>
@@ -39,34 +41,42 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Members</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Share this event with co-owners (full access except deleting the
-          event) and editors (content only). Members must already have a
-          Wedboard account.
-        </p>
-      </div>
+    <div className="max-w-2xl space-y-9">
+      <PageHeader
+        title="Members"
+        description="Share this event with co-owners (full access except deleting the event) and editors (content only). Members must already have a Wedboard account."
+        actions={
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus className="mr-1 size-4" />
+            Add member
+          </Button>
+        }
+      />
 
-      <div className="flex items-center justify-end">
-        <Button size="sm" onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add member
-        </Button>
-      </div>
-
-      {members === undefined ? (
-        <Skeleton className="h-32 w-full rounded-md" />
-      ) : members.length === 0 ? (
-        <EmptyState
-          icon={Users2}
-          title="No members yet"
-          description="Add a co-owner or editor to collaborate on this event."
-        />
-      ) : (
-        <MemberList members={members} isOwner={isOwner} />
-      )}
+      <Panel
+        title="People with access"
+        description={
+          members === undefined
+            ? undefined
+            : `${members.length} ${members.length === 1 ? "person" : "people"} can open this event.`
+        }
+        padded={false}
+      >
+        {members === undefined ? (
+          <StateBlock kind="loading" title="Loading members…" compact />
+        ) : members.length === 0 ? (
+          <StateBlock
+            kind="empty"
+            icon={Users2}
+            title="No members yet"
+            description="Add a co-owner or editor to collaborate on this event."
+            action={{ label: "Add member", onClick: () => setAddOpen(true) }}
+            compact
+          />
+        ) : (
+          <MemberList members={members} isOwner={isOwner} />
+        )}
+      </Panel>
 
       <AddMemberDialog
         eventId={event._id}

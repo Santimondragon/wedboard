@@ -20,17 +20,20 @@ Wedding and event management platform. A logged-in planner manages event boards 
 
 ## Stack
 
-| Layer           | Technology                                             |
-| --------------- | ------------------------------------------------------ |
-| Framework       | Next.js 16 App Router (`src/` dir, `@/*` alias)        |
-| Backend / DB    | Convex (`convex/` at root, `convex/*` alias)           |
-| Auth            | Clerk (`@clerk/nextjs` v7) + `ConvexProviderWithClerk` |
-| UI              | shadcn/ui + Tailwind CSS v4                            |
-| Forms           | react-hook-form + zod + @hookform/resolvers            |
-| Tables          | @tanstack/react-table                                  |
-| Toasts          | sonner                                                 |
-| Dates           | date-fns                                               |
-| Package manager | pnpm                                                   |
+| Layer           | Technology                                                                                                       |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Framework       | Next.js 16 App Router (`src/` dir, `@/*` alias)                                                                  |
+| Backend / DB    | Convex (`convex/` at root, `convex/*` alias)                                                                     |
+| Auth            | Clerk (`@clerk/nextjs` v7) + `ConvexProviderWithClerk`                                                           |
+| UI              | shadcn/ui + Tailwind CSS v4 (see Design System)                                                                  |
+| Icons           | `lucide-react` **only** (`components.json` → lucide)                                                             |
+| Fonts           | Inter (`--font-sans`) + Bricolage Grotesque (`--font-display`); Fleur De Leah / Gowun Batang are invitation-only |
+| Mobile nav      | `vaul` drawer (under `md`)                                                                                       |
+| Forms           | react-hook-form + zod + @hookform/resolvers                                                                      |
+| Tables          | @tanstack/react-table                                                                                            |
+| Toasts          | sonner                                                                                                           |
+| Dates           | date-fns                                                                                                         |
+| Package manager | pnpm                                                                                                             |
 
 ## Running locally
 
@@ -532,9 +535,9 @@ Event sharing (guards via `requireEventEditor`). `listMembers` is readable by an
 
 /dashboard                            Lists all events — minimal chrome (logo + user menu), NO event sidebar. No auto-redirect, EXCEPT superadmins are client-redirected to /admin.
 /admin                                Superadmin-only global dashboard (in the (dashboard) route group) — tables of ALL events (owner, guest/invitation counts, custom-domain flag, status, open link) and ALL users. Non-superadmins are client-redirected to /dashboard; queries enforce requireSuperadmin server-side.
-/dashboard/[eventSlug]                Overview — 8 metric cards
+/dashboard/[eventSlug]                Overview — 7 StatCards, each a link into the list it summarises
 /dashboard/[eventSlug]/invitations    Invitation CRUD + copy public link
-/dashboard/[eventSlug]/special-events Special invitations (mini sub-events) CRUD, ≤2 per event, + per-invitation visibility assignment
+/dashboard/[eventSlug]/special-events Special invitations (mini sub-events) CRUD, ≤2 per event, + per-invitation visibility assignment. The route segment stays `special-events`; **all user-facing copy says "Special Invitations"**
 /dashboard/[eventSlug]/guests         Guest table with search/filter + detail sheet + Add Guest
 /dashboard/[eventSlug]/menu           Food & drink option management
 /dashboard/[eventSlug]/tables         Drag-free seat assignment grid
@@ -559,11 +562,92 @@ Custom domains: middleware compares the request `Host` against `NEXT_PUBLIC_PRIM
 
 Route groups:
 
-- `(auth)` — sign-in/sign-up (both `fallbackRedirectUrl="/dashboard"`), no dashboard shell
+- `(auth)` — sign-in/sign-up (both `fallbackRedirectUrl="/dashboard"`), no dashboard shell. `(auth)/layout.tsx` supplies the shared split-screen chrome and `(auth)/appearance.ts` the shared Clerk `appearance` object both pages pass to `<SignIn>`/`<SignUp>`
 - `(dashboard)` — minimal group layout (`UserSync` only). `/dashboard` renders its own minimal top bar; the per-event routes `/dashboard/[eventSlug]/*` are wrapped by `dashboard/[eventSlug]/layout.tsx` in `EventProvider` (resolves slug → event) + `DashboardShell` (sidebar + header)
 - `(marketing)` — landing, pricing
 
+Error boundaries: `src/app/error.tsx` (root) and `src/app/(dashboard)/error.tsx` (renders inside the shell, so the sidebar stays usable). Both render `StateBlock kind="error"` with a `reset` retry. They are the **only** place a thrown Convex query error is handled — see Key Conventions.
+
 > The `[eventSlug]` segment is resolved to its event by `EventProvider`; pages read it via the `useEvent()` hook (`event._id`, `event.slug`) instead of a route id.
+
+---
+
+## Design System
+
+All token work lives in **one file**: `src/app/globals.css` (Tailwind v4, CSS-first — there is no
+`tailwind.config.*`). Fonts are loaded in `src/app/layout.tsx`.
+
+### Tokens
+
+- **Palette** — warm paper neutrals (`--background`, `--card`, `--foreground`, `--muted`,
+  `--border`) with a clay `--accent` (+ `--accent-soft`) as the single brand gesture. `--radius`
+  is `0.75rem`.
+- **Semantic status tokens** — `--success` / `--warning` / `--danger`, each with a `-soft` and a
+  `-foreground` variant, exposed to Tailwind as `bg-success-soft`, `text-danger` etc.
+  **`--destructive` is an alias of `--danger`.** Never hardcode a status colour at a call site —
+  use `StatusPill` or the semantic classes.
+- **Shadows are namespaced `--shadow-soft-*` → `shadow-soft-xs|sm|md|lg`.** Tailwind's built-in
+  `shadow-*` scale is deliberately **left untouched**: the public invitation's polaroid frames
+  depend on it, and overriding it also breaks `shadow-{color}` tinting app-wide. Surfaces rest at
+  `shadow-soft-xs`; dialogs and popovers use `shadow-soft-lg`. **Future work must follow this —
+  add to `--shadow-soft-*`, never redefine `--shadow-*`.**
+- **Charts** — `--chart-1..5` are a warm ramp (clay, sage, ochre, dusty rose, warm slate).
+
+### Typography
+
+`Inter` on `--font-sans`, **`Bricolage Grotesque` on `--font-display`**, and
+`--font-heading: var(--font-display)` in `@theme inline` — so every shadcn title
+(`ui/card`, `ui/dialog`, `ui/sheet`, `ui/alert-dialog`) inherits the display face with no
+call-site edits. `Geist`/`Geist_Mono`/`Figtree` are gone. `Fleur_De_Leah` (`--font-script`) and
+`Gowun_Batang` (`--font-serif-elegant`) are **invitation-only** and unchanged.
+
+Type scale utilities (defined once in `globals.css`, used instead of ad-hoc class strings):
+
+| Class             | Face      | Use                                                     |
+| ----------------- | --------- | ------------------------------------------------------- |
+| `text-display`    | Bricolage | `/dashboard` + marketing hero                           |
+| `text-title`      | Bricolage | page `<h1>` — rendered by `PageHeader`, not by the page |
+| `text-section`    | Bricolage | card / section headings                                 |
+| `text-body`       | Inter     | default body copy                                       |
+| `text-caption`    | Inter     | muted subtitles and helper text                         |
+| `text-metric`     | Bricolage | `StatCard` values (tabular-nums)                        |
+| `tabular-figures` | —         | opt-in tabular numerals for numeric table cells         |
+
+### Icons
+
+`components.json` declares `iconLibrary: "lucide"`. **`lucide-react` is the only icon library** —
+`@hugeicons/react` and `@hugeicons/core-free-icons` have been removed from `package.json`.
+
+### The `.invitation-theme` contract
+
+Dashboard tokens are global (Radix portals mount to `document.body`, so scoping them to a wrapper
+would strand every menu and toast). The public guest invitation — a finished design that is
+**out of scope** and must not shift — is therefore **positively pinned** by a `.invitation-theme`
+class in `globals.css` that re-declares `--background`, `--card`, `--popover`, `--foreground`,
+`--border`, `--muted`, `--ring`, `--radius: 0.625rem` and `--font-sans` to their pre-redesign
+values, and **re-applies `font-family` and `color` as real declarations** (redefining the variables
+alone does not reach the subtree, because `html { font-family: var(--font-sans) }` resolves once
+and inherits as a computed string).
+
+It is applied in exactly three places:
+
+1. `public-invitation/templates/elegant/frame.tsx` — the `ElegantFrame` root
+2. `public-invitation/templates/elegant/blocks/special-invitation-dialog.tsx` — on the
+   `DialogContent` itself (custom properties inherit from the element, so this survives the
+   Radix portal)
+3. `template-selection/template-settings.tsx` — the preview container wrapping
+   `<InvitationTemplate>`, so the editor preview keeps matching the live page
+
+**Rules that follow from this:**
+
+- **Any new public template must apply `.invitation-theme` to its own frame.**
+- **Any shadcn primitive the guest page consumes must carry the class** (today `ui/dialog` is the
+  only one).
+- Nothing type-checks or tests this — it is a convention, not an invariant (see TODO-08-33).
+
+Known accepted deviation: `ElegantFrame`'s translucent `bg-wedding-soft/40` backdrop composites
+against `<body>`, which is outside the pinned scope, so the desktop gutter tint shifts by 2–6/255.
+Sub-perceptual, invisible at mobile widths, accepted (TODO-07-31).
 
 ---
 
@@ -575,21 +659,28 @@ src/components/
     root-providers.tsx          ClerkProvider > ConvexClientProvider > ThemeProvider > Toaster
     convex-client-provider.tsx  ConvexProviderWithClerk wired to Clerk useAuth
 
-  app/
+  app/                          Shared dashboard primitives. Barrel: `src/components/app/index.ts` — import from `@/components/app`
+    page-header.tsx             PageHeader `{title, description?, actions?, breadcrumb?, className?}` — the page `<h1>` (text-title) + optional actions row. Pages must NOT render their own `<h1>`
+    panel.tsx                   Panel `{title?, description?, actions?, footer?, padded?=true, children?, className?, bodyClassName?}` — the standard bordered surface (wraps shadcn Card)
+    list-row.tsx                ListRow `{leading?, title, subtitle?, meta?, actions?, className?}` + ListRows — retires the hand-rolled `<ul>` rows in messages/activity/members/special-events/menu
+    data-table-shell.tsx        DataTableShell `{toolbar?, children, footer?, className?}` — owns `overflow-x-auto`, the sticky `<thead>` and the 56px row rhythm. Every dashboard table goes through it
+    stat-card.tsx               StatCard `{label, value, hint?, icon?, href?, tone?}` — the metric tile (text-metric). `href` makes it a real link. Replaces the deleted `dashboard/metric-card.tsx` (its dead `trend` prop is gone)
+    state-block.tsx             StateBlock `{kind: "empty"|"loading"|"error", title?, description?, icon?, action?, retry?, compact?, className?}` — the single async-state surface
+    status-pill.tsx             StatusPill `{tone?, dot?, children, className?}` — semantic status chip; replaces the per-call-site pastel maps
+    access-notice.tsx           AccessNotice `{requiredRole: EventRole, children?, className?}` — the "you need role X" panel for role-gated pages
+    query-error-boundary.tsx    Client error boundary for a single async subtree (not in the barrel; the route `error.tsx` files are the default path)
     logo.tsx                    "Wedboard" wordmark
-    loading-state.tsx           Centered spinner
-    empty-state.tsx             Icon + title + description + optional action
-    error-state.tsx             AlertCircle + message + retry
-    status-badge.tsx            Maps status string → colored Badge
+    loading-state.tsx           Thin wrapper over `StateBlock kind="loading"` (kept for call-site compatibility)
+    empty-state.tsx             Thin wrapper over `StateBlock kind="empty"` (kept for call-site compatibility)
+    status-badge.tsx            Maps status string → StatusPill
     copy-button.tsx             Clipboard copy with checkmark feedback
 
   dashboard/
     event-provider.tsx          Resolves [eventSlug]→event via getEventBySlug (payload = `{...event, myRole}`); exposes useEvent() (typed `EventWithRole`) + `useEventRole()`; handles loading/not-found. Wraps only event routes.
-    dashboard-shell.tsx         Sidebar + Header + scrollable main (rendered only inside the event layout)
-    dashboard-sidebar.tsx       Nav links (built from eventSlug), event-switcher, user info. `NAV_ITEMS` each carry a `minRole` and are **filtered by the caller's event role** (`useEventRole()` + `hasMinRole`): content links = editor, Members + Settings = planner. The "Wedboard" logo is a home Link — /admin for superadmins, /dashboard otherwise
-    dashboard-header.tsx        Page title (from path section), event name (useEvent), status badge, UserButton
-    event-switcher.tsx          Dropdown to switch events (by slug → /dashboard/{slug}) or create new
-    metric-card.tsx             Stat card with title/value/icon
+    dashboard-shell.tsx         Sidebar + Header + scrollable main. **Owns all page padding and rhythm** — `px-5 py-6 / md:px-10 md:py-9` with an inner `mx-auto max-w-[1180px] space-y-9`. Pages render bare fragments (see Key Conventions)
+    dashboard-sidebar.tsx       Grouped nav + event-switcher + user info. Exports `NAV_GROUPS` (Overview / Guests / Event / Design / Manage) and `getSectionLabel(segment)`. Each item carries a `minRole` and is **filtered by the caller's event role** (`useEventRole()` + `hasMinRole`); a group whose items are all gated out renders nothing, label included. Collapse-to-rail is persisted in `localStorage` under `wedboard:sidebar-collapsed` (module-level store + `useSyncExternalStore`); under `md` the nav is a `vaul` drawer. The "Wedboard" logo is a home Link — /admin for superadmins, /dashboard otherwise
+    dashboard-header.tsx        `Breadcrumb` (event → section, via `getSectionLabel`), event name (useEvent), status badge, UserButton. There is no `PAGE_TITLES` map — the page title belongs to `PageHeader`
+    event-switcher.tsx          `Command`-based searchable combobox to switch events (by slug → /dashboard/{slug}) or create new
     user-sync.tsx               Invisible — calls upsertCurrentUser on mount
     create-event-dialog.tsx     Form dialog to create an event; navigates to /dashboard/{slug}
     custom-domain-settings.tsx  "use client" — guided custom-domain wizard on the settings page: none → connect (POST /api/domains) → pending-DNS (record table w/ copy buttons + TXT-challenge note, records re-fetched from /api/domains/status after reloads) → live (badge, visit link, remove behind AlertDialog)
@@ -608,19 +699,19 @@ src/components/
   menu/
     menu-option-list.tsx        List of options with active toggle + edit/delete
     menu-option-form.tsx        Create/edit dialog for menu or drink option
-    selection-summary.tsx       Option → guest count breakdown (props: options + counts/unassigned from menu.getSelectionCounts)
+    selection-summary.tsx       Option → guest count breakdown (props: options + counts/unassigned from menu.getSelectionCounts). The menu page renders a `StateBlock kind="loading"` for the panel while the counts query is in flight
 
   media/
     media-grid.tsx              Thumbnail grid with inline rename + delete (exports MediaItem type)
     upload-button.tsx           File input → Convex upload URL → media.register (client-side type/size checks)
-    media-picker-dialog.tsx     Pick (or upload) one image from the event library — used by the template editor's image fields
+    media-picker-dialog.tsx     Pick (or upload) one image from the event library — used by the template editor's image fields. Has its own loading and empty `StateBlock`s
 
   meta/
     meta-settings.tsx           "use client" — the Meta & Sharing page: title/description template inputs with clickable {variable} badges + char counters, social-image picker (MediaPickerDialog), favicon uploader, and a live social-card preview resolved against the event's first invitation; saves via meta.updateEventMeta
     favicon-upload-button.tsx   Uploads an .ico/.svg/.png into the media library (extension fallback for browsers reporting empty .ico mime)
 
   messages/
-    message-list.tsx            List of host messages (name, invitation title, relative date, body) — exports GuestMessageItem type
+    message-list.tsx            `ListRow`s of host messages (sender initial, name, invitation title, body, relative date in a `<time datetime>` carrying the absolute timestamp) — exports GuestMessageItem type. An unnamed sender renders as **"Anonymous"** (host UI is English)
 
   activity/
     activity-list.tsx           List of activity-log rows ("{actor} {created|modified|removed} {entity} {name}" + relative time) — exports ActivityLogItem type
@@ -635,8 +726,8 @@ src/components/
 
   tables/
     table-grid.tsx              Responsive grid of TableCards
-    table-card.tsx              Single table: seats, assign/unassign, edit/delete
-    seat-select.tsx             Dropdown to assign unassigned guest to a seat
+    table-card.tsx              Single table: seats, assign/unassign, edit/delete. Generates seat indices **0..seatsCount-1** and labels them **1..seatsCount** (matching the server's 0-based `seatNumber` bound). Shrinking the seat count opens an `AlertDialog` naming the guests who would be unseated
+    seat-select.tsx             Dropdown to assign an unassigned guest to a seat — takes the 0-based `seatNumber` it sends and a 1-based `seatLabel` used only in the accessible name
     add-table-dialog.tsx        Create table dialog
 
   public-invitation/
@@ -652,14 +743,14 @@ src/components/
       invitation-template.tsx   "use client" — resolves the template, renders its Frame, and for each LayoutBlock its block component (block types the template omits render nothing); takes `rsvpState`; layout = saved blocks ?? template.defaultLayouts[rsvpState]() ?? defaultLayout(rsvpState)
       dummy-data.ts             DUMMY_INVITATION_DATA sample used by the live preview
       elegant/                  The official template (Figma design, node 452:172) — its own markup, not the default sections
-        frame.tsx               ElegantFrame — phone-width card, NO global gap (each block owns padding)
+        frame.tsx               ElegantFrame — phone-width card, NO global gap (each block owns padding). **Carries `.invitation-theme` on its root** (see Design System)
         blocks.tsx              "use client" — ELEGANT_BLOCKS: a component per design section (hero/location/rsvp/countdown/itinerary/text/allergies/dressCode/specialInvitation/guestMessage/footer) + primitives (ElegantSection [24px horizontal padding; each block sets its own vertical padding/gap], WeddingButton [renders an `<a>` when given `href` — location "Ver mapa" links to `event.venueMapUrl`], CheckRow [real interactive checkbox/radio], CircularPhoto/ImagePlaceholder render real images from mediaUrls when an "image" config field is set). The `guestMessage` block (`blocks/guest-message.tsx`) is a working name + message form wired to `messages.submitGuestMessage`. The `specialInvitation` block (`blocks/special-invitation.tsx`) renders a decorated sub-event card (its name/description/date/location **sourced from the linked special event**, managed under the dashboard's Special Events page — not authored in the block) plus a "Confirmar asistencia" button that opens a themed modal (shadcn `Dialog`) showing the event's date/time/location/description and a per-guest attending/declining radio group, submitting via `submitPublicRsvp.specialEventRsvps`. It binds to a special event via its `specialEventId` config (falls back to the sole accessible one) and picks a display template via `specialTemplateId` (a small `SPECIAL_TEMPLATES` registry — `elegant` (decorated card) or `with-image` (a full-width 16/10 photo from the block's `image` config above name/description); both share the same modal button via `blocks/special-invitation-dialog.tsx`, and the `with-image` card lives in `blocks/special-invitation-with-image.tsx`). Because `getPublicInvitation` only returns special events the invitation has access to, the block **renders nothing on the live page when unbound** (i.e. the invitation isn't assigned it); in the editor preview it shows the sample sub-event with the button disabled. Each guest is prefilled from `specialEvents[].guestStatuses`. Hero uses `event.brideName`/`groomName` (stacked on two lines). All copy reads block.config first, falling back to ELEGANT_COPY
         default-copy.ts         ELEGANT_COPY (the design's Spanish copy) + ELEGANT_BLOCK_CONFIG (per-block default configs)
         default-layout.ts       elegantDefaultLayouts: Record<RsvpVariant,()=>LayoutBlock[]> — accepted (full design order), pending (hero/location/rsvp/footer), declined (hero/location/guestMessage/footer); configs seeded from ELEGANT_BLOCK_CONFIG. elegantDefaultLayout() = the accepted layout
         index.ts                Re-exports ElegantFrame, ELEGANT_BLOCKS, elegantDefaultLayout(s)
 
   template-selection/
-    template-settings.tsx       "use client" — template picker + per-RSVP-variant block page-builder (Pending/Accepted/Declined Tabs; add via Select with template-seeded config, reorder up/down, duplicate, remove, edit fields) + live InvitationTemplate preview (dummy data + the event's real media URLs, `rsvpState` = active tab); saves all three variants via events.setInvitationTemplate `layoutVariants`. Rendered by /dashboard/[eventSlug]/template
+    template-settings.tsx       "use client" — template picker + per-RSVP-variant block page-builder (Pending/Accepted/Declined Tabs; add via Select with template-seeded config, reorder up/down, duplicate, remove, edit fields) + live InvitationTemplate preview (dummy data + the event's real media URLs, `rsvpState` = active tab); saves all three variants via events.setInvitationTemplate `layoutVariants`. The preview container carries `.invitation-theme` so it matches the live page. Rendered by /dashboard/[eventSlug]/template
     config-field-input.tsx      "use client" — ConfigFieldInput: renders one block-config field switching on field.input (text / textarea / list with add-remove rows / image via MediaPickerDialog / select populated from a dynamic source, e.g. the event's special events). Takes an optional `specialEvents` prop for select fields.
 
 src/hooks/
@@ -735,6 +826,9 @@ src/lib/
 >     modal with their saved choices. Because the block only renders for invitations granted access, it
 >     **renders nothing on the live page when unassigned**; the editor preview shows the sample sub-event with
 >     the button disabled.
+> - **A new template's `Frame` must apply the `.invitation-theme` class on its root**, and any
+>   shadcn primitive its blocks consume must carry it too — otherwise the guest page inherits the
+>   dashboard's global tokens. See the Design System section.
 > - Add more templates by giving each its own `Frame`/`blocks` (and optional `defaultLayouts`) in its
 >   `TemplateDef`; a template implements the markup for every block type it intends to render.
 
@@ -819,7 +913,8 @@ Spec ↔ backlog parity is a hard requirement: an ID exists in exactly one spec'
 [docs/\_conventions/authoring-guide.md](docs/_conventions/authoring-guide.md) for the ID
 scheme and semver rules.
 
-Since AGENTS.md is a copy of CLAUDE.md, both must be kept in sync. Update one, then copy to the other.
+`CLAUDE.md` is a one-line `@AGENTS.MD` import, so editing this file is sufficient — do not
+duplicate its contents into `CLAUDE.md`.
 
 ## Key Conventions
 
@@ -829,10 +924,20 @@ Since AGENTS.md is a copy of CLAUDE.md, both must be kept in sync. Update one, t
 - **Shadcn/app imports**: use `@/*` alias (e.g. `import { Button } from "@/components/ui/button"`).
 - **No `.collect()`**: use `.take(n)` for bounded queries per Convex guidelines.
 - **No `.filter()`**: always use `.withIndex()`.
-- **Mutations always toast**: use `useToastMutation` (`src/hooks/use-toast-mutation.ts`) instead of hand-rolled try/catch — it wraps `useMutation` with the success/error sonner toasts and a `pending` flag; `run()` returns `{ok, value}` for branching.
+- **Mutations always toast**: use `useToastMutation` (`src/hooks/use-toast-mutation.ts`) instead of hand-rolled try/catch — it wraps `useMutation` with the success/error sonner toasts and a `pending` flag; `run()` returns `{ok, value}` for branching. It **unwraps `ConvexError` payloads** (`err.data`, string or `{message}`) and toasts the server's own message, falling back to the caller's generic `error` string only for unexpected failures. So a `ConvexError` thrown in a mutation is user-facing copy — write it that way.
+- **Design tokens, not literals**: no `zinc-*`/`gray-*` and no hardcoded status colours anywhere under `src/` outside `src/components/public-invitation/`. Use the semantic tokens, the type-scale classes (`text-title`, `text-caption`, …) and `StatusPill`.
+- **Shadows**: `shadow-soft-xs|sm|md|lg` only. Never redefine Tailwind's built-in `--shadow-*` scale — the public invitation depends on it and overriding it breaks `shadow-{color}` tinting app-wide.
+- **`.invitation-theme`**: every public invitation frame, and every shadcn primitive the guest page consumes, must carry the class. See Design System.
+- **Shell owns the page frame**: `DashboardShell` applies the padding (`px-5 py-6 / md:px-10 md:py-9`), the `max-w-[1180px]` measure and the `space-y-9` rhythm. **Dashboard pages render bare fragments** — no per-page padding, no `max-w-*`, no wrapper `<div className="p-6 space-y-6">`, and no `<h1>` (that belongs to `PageHeader`).
+- **Async states**: a page owns its **empty** and **loading** states via `StateBlock`; it does **not** write an inline error branch. Convex `useQuery` _throws_ on failure rather than returning `null`, so errors are caught by the route `error.tsx` boundary (`src/app/error.tsx`, `src/app/(dashboard)/error.tsx`). `undefined` means loading and only loading. Use `QueryErrorBoundary` only when one subtree must fail without taking the page with it.
+- **Tables**: every dashboard table renders inside `DataTableShell`, which owns horizontal scrolling and the sticky header — do not hand-roll `overflow-x-auto`.
+- **Bounded reads are disclosed**: where a query `.take()`s a cap, the surface renders a footer saying so (Activity 200, Messages 500, `/admin` events 200 / users 500). A new capped list must do the same.
+- **Icon-only buttons** carry an accessible name (`aria-label` or an `sr-only` span) and, in dense rows, a `Tooltip`.
+- **Copy**: the dashboard is **English**; the guest-facing invitation is **Spanish**. Host-facing fallbacks (e.g. an unnamed message sender → "Anonymous") use the host UI's language. "Special Events" is called **"Special Invitations"** in all user-facing copy; only the route segment and the `specialEvents` table keep the old name.
 - **Convex auth guard**: event-scoped functions call `requireEventEditor(ctx, eventId)` (or load the doc first, then guard on `doc.eventId`); public slug-based functions resolve via `convex/lib/public.ts` so archived-event gating stays centralized.
 - **Event roles**: `requireEventEditor` now takes a `minRole` (default `"editor"`) — content (guests/invitations/special events/menu/tables/media/**template/meta**) is editor+, privileged ops (settings/domain/members management) are planner+ ("Co-owner"), archive/delete are owner-only. Read-only member data uses `"viewer"`. Surface the caller's role to the client via `getEventBySlug`'s `myRole`; gate UI with `hasMinRole` (`src/lib/roles.ts`). Server guards are the source of truth — UI gating is convenience only.
 - **Activity logging**: dashboard mutations that create/update/delete a guest, invitation, or special event — plus `setInvitationTemplate` and `updateEventMeta` — call `logActivity(ctx, {...})` (`convex/lib/activity.ts`) **after** the write, reusing the user doc returned by `requireEventEditor`. Public and per-toggle mutations are intentionally not logged.
+- **Seat numbering**: `guests.seatNumber` is **0-based** on the server (`assignGuestToSeat` rejects `seatNumber >= table.seatsCount`, and `updateTableSeats` unseats on the same arithmetic). The UI stores 0-based and **labels 1-based**. Never send a 1-based index to a seating mutation.
 - **Client components**: any file using Convex hooks, Clerk hooks, or browser APIs needs `"use client"` at the top.
 
 ## Zod Validations (`src/lib/validations/`)

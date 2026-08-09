@@ -2,9 +2,9 @@
 id: EP-04-F06
 title: Bulk Guest Entry
 epic: EP-04 Guest Management
-version: 1.0.1
-status: defective
-last_updated: 2026-07-28
+version: 1.1.0
+status: partial
+last_updated: 2026-08-09
 depends_on: [EP-04-F01, EP-05-F02]
 ---
 
@@ -218,21 +218,6 @@ the _permission_ only, exactly as `createGuest` does ([F04](./F04-plus-one-lifec
 
 ## 14. TODOs & Open Questions
 
-- **DEF-04-01** `[P1]` — Server error messages never reach the user.
-  - **Evidence:** `src/hooks/use-toast-mutation.ts:39` — the `catch` block takes no argument and
-    toasts the caller's fixed `error` string, discarding the `ConvexError` payload entirely.
-  - **Impact:** Every meaningful message this epic's mutations raise is replaced by a generic
-    failure: "Cannot create more than 20 guests at once" (`convex/guests.ts:431`),
-    "This guest is not allowed a +1" (`convex/guests.ts:363`), "A +1 cannot have its own +1"
-    (`:360`), "Invitation does not belong to this event" (`:164`), "Special event does not belong
-    to this event" (`:265`) and "Guest not found" all surface as "Failed to …". The user is told
-    something went wrong but never what, and every one of these is a condition they could fix.
-  - **Scope:** The hook is the app-wide mutation convention (see
-    [glossary.md](../../glossary.md), "Toast mutation"), so this defect recurs in every epic. It
-    is filed once, here, scoped to the guest mutations listed above; other epics reference
-    `DEF-04-01` rather than re-filing it.
-  - **Proposed fix:** `useToastMutation` catches the error, and when it is a `ConvexError` with a
-    string payload, toasts that message with the configured string as the fallback.
 - **TODO-04-06** `[P1]` `[ADD]` — The bulk mutation has no UI.
   - **Rationale:** `BR-04-F06-11`. The capability, its cap and its aggregate activity entry all
     exist and are tested by nothing, because nothing calls them. Meanwhile the only way to add a
@@ -282,7 +267,8 @@ the _permission_ only, exactly as `createGuest` does ([F04](./F04-plus-one-lifec
 
 ## 16. Changelog
 
-| Version | Date       | Author        | Change                                                                                               |
-| ------- | ---------- | ------------- | ---------------------------------------------------------------------------------------------------- |
-| 1.0.1   | 2026-07-28 | Spec suite v1 | Status corrected to `defective` per authoring-guide §3 (spec carries a behaviour-breaking P1 defect) |
-| 1.0.0   | 2026-07-28 | Spec suite v1 | Initial as-built specification                                                                       |
+| Version | Date       | Author             | Change                                                                                                                   |
+| ------- | ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| 1.1.0   | 2026-08-09 | Dashboard redesign | **DEF-04-01 closed.** `useToastMutation` now unwraps `ConvexError` payloads, so server rejection messages reach the user |
+| 1.0.1   | 2026-07-28 | Spec suite v1      | Status corrected to `defective` per authoring-guide §3 (spec carries a behaviour-breaking P1 defect)                     |
+| 1.0.0   | 2026-07-28 | Spec suite v1      | Initial as-built specification                                                                                           |
