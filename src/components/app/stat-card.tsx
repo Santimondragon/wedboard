@@ -18,6 +18,8 @@ export interface StatCardProps {
   /** Tints the value — use sparingly, for genuinely semantic figures. */
   tone?: StatTone;
   className?: string;
+  /** Overrides the value's text-metric size, e.g. "text-6xl". */
+  valueClassName?: string;
 }
 
 const TONE_CLASS: Record<StatTone, string> = {
@@ -41,6 +43,7 @@ export function StatCard({
   href,
   tone = "default",
   className,
+  valueClassName,
 }: StatCardProps) {
   const body = (
     <>
@@ -62,7 +65,9 @@ export function StatCard({
           )
         )}
       </div>
-      <div className={cn("text-metric mt-3", TONE_CLASS[tone])}>{value}</div>
+      <div className={cn("text-metric mt-3", TONE_CLASS[tone], valueClassName)}>
+        {value}
+      </div>
       {hint && (
         <p className="text-caption mt-1 text-muted-foreground">{hint}</p>
       )}

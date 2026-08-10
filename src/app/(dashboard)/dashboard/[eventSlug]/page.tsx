@@ -131,6 +131,7 @@ export default function EventOverviewPage() {
           tone={pendingCount > 0 ? "warning" : "success"}
           href={`${base}/guests`}
           className="flex flex-col justify-between px-7 py-6 lg:col-span-1"
+          valueClassName="text-5xl leading-none"
         />
 
         <Panel
