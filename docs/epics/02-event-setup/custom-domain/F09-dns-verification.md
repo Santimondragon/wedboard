@@ -95,7 +95,7 @@ the event through `events.getEventById`, which uses `requireEventAccess`
   ignores failures (`custom-domain-settings.tsx:96`–`:108`).
 - **A2** — The record list is still loading → the placeholder "Loading DNS records..." (`:235`).
 - **A3** — The domain is an apex (`name === apexName`) → a single `A` record at `@` with the
-  value Vercel recommends, defaulting to `76.76.21.21` (`src/lib/vercel-domains.ts:141`).
+  value Vercel recommends, defaulting to `216.198.79.1` (`src/lib/vercel-domains.ts:141`).
 - **A4** — The domain is a subdomain → a `CNAME` whose name is the label(s) below the apex and
   whose value defaults to `cname.vercel-dns.com` (`src/lib/vercel-domains.ts:148`).
 - **A5** — Vercel returns ownership challenges (the apex is registered to a different Vercel
@@ -151,7 +151,7 @@ No user input. The only request parameter is `eventId`, required (`status/route.
 
 | DNS row             | Type                                        | Name                                | Value                                                  |
 | ------------------- | ------------------------------------------- | ----------------------------------- | ------------------------------------------------------ |
-| Apex                | `A`                                         | `@`                                 | `config.recommendedIPs[0]` ?? `76.76.21.21`            |
+| Apex                | `A`                                         | `@`                                 | `config.recommendedIPs[0]` ?? `216.198.79.1`           |
 | Subdomain           | `CNAME`                                     | labels below the apex               | `config.recommendedCNAME[0]` ?? `cname.vercel-dns.com` |
 | Ownership challenge | Vercel's `challenge.type` (typically `TXT`) | challenge name relative to the apex | `challenge.value`                                      |
 
@@ -222,7 +222,7 @@ Source: `src/app/api/domains/status/route.ts:18`.
 - **BR-02-F09-08** `[AS-BUILT]` — An apex domain is instructed with a single `A` record at `@`;
   a subdomain with a `CNAME` at its sub-label (`src/lib/vercel-domains.ts:141`, `:148`).
 - **BR-02-F09-09** `[AS-BUILT]` — Vercel's recommended values take precedence, with
-  `76.76.21.21` and `cname.vercel-dns.com` as fallbacks
+  `216.198.79.1` and `cname.vercel-dns.com` as fallbacks
   (`src/lib/vercel-domains.ts:145`, `:151`).
 - **BR-02-F09-10** `[AS-BUILT]` — Every ownership-verification challenge Vercel returns is
   appended to the record list, with its name rewritten relative to the apex

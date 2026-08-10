@@ -142,7 +142,7 @@ export function buildDnsInstructions(
     records.push({
       type: "A",
       name: "@",
-      value: config?.recommendedIPs?.[0] ?? "76.76.21.21",
+      value: config?.recommendedIPs?.[0] ?? "216.198.79.1",
     });
   } else {
     records.push({
