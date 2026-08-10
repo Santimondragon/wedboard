@@ -54,6 +54,7 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
 CLERK_SECRET_KEY=sk_...
 CLERK_FRONTEND_API_URL=https://sharing-akita-57.clerk.accounts.dev
 NEXT_PUBLIC_PRIMARY_DOMAIN=localhost:3000   # hosts ≠ this are treated as custom domains by middleware
+NEXT_PUBLIC_APP_DOMAINS=                    # optional comma-separated extra hosts that also serve the full app (bypass the custom-domain rewrite)
 # Custom domains (Vercel Domains API, used by /api/domains):
 VERCEL_TOKEN=...        # vercel.com/account/tokens
 VERCEL_PROJECT_ID=...   # Project Settings → General
@@ -836,7 +837,7 @@ src/lib/
 
 ## Auth Flow
 
-1. Middleware (`src/middleware.ts`) first checks the request `Host`: custom-domain hosts are rewritten to `/_domain/{host}{path}` and **never touch Clerk**; on the primary host, direct `/_domain` paths 404. Then it protects every non-public route: if there's no `userId` it **redirects to `/`** (not `/sign-in`). The marketing landing links to sign-in.
+1. Middleware (`src/middleware.ts`) first checks the request `Host`: a host is treated as "primary" (serves the normal app) if it matches `NEXT_PUBLIC_PRIMARY_DOMAIN` (or `www.` + it), `localhost`/`127.0.0.1`, any `*.vercel.app`, or is listed in the optional `NEXT_PUBLIC_APP_DOMAINS` comma-separated allowlist (for hosting the app itself on an additional domain). Any other host is a custom-domain and is rewritten to `/_domain/{host}{path}`, **never touching Clerk**; on a primary host, direct `/_domain` paths 404. Then it protects every non-public route: if there's no `userId` it **redirects to `/`** (not `/sign-in`). The marketing landing links to sign-in.
 2. After sign-in/sign-up, Clerk redirects to `/dashboard` (via `fallbackRedirectUrl`). `/dashboard` shows the events list — it does **not** auto-redirect into a single event. This Clerk app uses the **native Convex integration** (activated at `dashboard.clerk.com/apps/setup/convex`), **not** a JWT template: the Clerk **session token itself** carries `aud: "convex"`, so there is **no JWT template named `convex`** — calling `getToken({ template: "convex" })` against this app returns a Clerk `404 "No JWT template exists with name: convex"`. Fetch the Convex token with plain `getToken()` instead (client-side, `ConvexProviderWithClerk` does this automatically by checking `sessionClaims.aud`; server-side, use `getConvexToken()` from `src/lib/convex-token.ts`, which mirrors that check)
 3. `ConvexProviderWithClerk` attaches the Clerk JWT to every Convex request
 4. `convex/auth.config.ts` validates the JWT against `CLERK_FRONTEND_API_URL`

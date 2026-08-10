@@ -11,6 +11,14 @@ const isPublicRoute = createRouteMatcher([
   "/_domain(.*)",
 ]);
 
+// Additional hosts (besides the primary domain) that should also serve the
+// normal app instead of being treated as a customer's custom domain — e.g. a
+// separate subdomain the app is hosted under. Comma-separated hostnames.
+const APP_DOMAINS = (process.env.NEXT_PUBLIC_APP_DOMAINS ?? "")
+  .split(",")
+  .map((d) => d.trim().toLowerCase())
+  .filter(Boolean);
+
 // Hosts served as the normal app (marketing + dashboard). Anything else is a
 // customer's custom domain and is rewritten to the internal /_domain routes.
 function isPrimaryHost(host: string): boolean {
@@ -20,6 +28,7 @@ function isPrimaryHost(host: string): boolean {
   const primary =
     process.env.NEXT_PUBLIC_PRIMARY_DOMAIN?.split(":")[0]?.toLowerCase();
   if (primary && (host === primary || host === `www.${primary}`)) return true;
+  if (APP_DOMAINS.includes(host)) return true;
   return false;
 }
 
